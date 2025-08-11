@@ -1,1436 +1,936 @@
-gl_FragColor = mix(originalColor, color, featheredMask);
-                }
-            }
-        `;
-
-        // Global variables
-        let video, canvas, gl, program;
-        let stream = null;
-        let animationId = null;
-        let faceMesh = null;
-        let lastFaceResults = null;
-        let effectStack = [];
-        let presets = {};
-        let feedbackTexture = null;
-        let maskCanvas, maskCtx;
-        let faceCenter = { x: 0.5, y: 0.5 };
-        let frameCount = 0;
-        let lastTime = performance.now();
-
-        // Effect definitions
-        const effectDefinitions = {
-            microGlitch: {
-                name: 'Micro Glitch',
-                params: [
-                    { name: 'Block Size', min: 2, max: 50, default: 8, step: 1 },
-                    { name: 'Probability', min: 0, max: 1, default: 0.1, step: 0.01 },
-                    { name: 'Color Shift', min: 0, max: 10, default: 2, step: 0.1 }
-                ]
-            },
-            dataCorruption: {
-                name: 'Data Corruption',
-                params: [
-                    { name: 'Corruption Rate', min: 0, max: 1, default: 0.05, step: 0.01 },
-                    { name: 'Bit Depth', min: 2, max: 32, default: 8, step: 1 }
-                ]
-            },
-            scanlines: {
-                name: 'Scanlines',
-                params: [
-                    { name: 'Line Count', min: 10, max: 500, default: 100, step: 10 },
-                    { name: 'Speed', min: 0, max: 10, default: 2, step: 0.1 },
-                    { name: 'Opacity', min: 0, max: 1, default: 0.3, step: 0.01 }
-                ]
-            },
-            rgbShift: {
-                name: 'RGB Shift',
-                params: [
-                    { name: 'Shift Amount', min: 0, max: 20, default: 5, step: 0.5 },
-                    { name: 'Red Angle', min: 0, max: 6.28, default: 0, step: 0.1 },
-                    { name: 'Blue Angle', min: 0, max: 6.28, default: 3.14, step: 0.1 }
-                ]
-            },
-            pixelSort: {
-                name: 'Pixel Sort',
-                params: [
-                    { name: 'Threshold', min: 0, max: 1, default: 0.5, step: 0.01 },
-                    { name: 'Direction', min: 0, max: 1, default: 0, step: 1 },
-                    { name: 'Sort Length', min: 0, max: 100, default: 20, step: 1 }
-                ]
-            },
-            datamosh: {
-                name: 'Datamosh',
-                params: [
-                    { name: 'Mosh Amount', min: 10, max: 200, default: 50, step: 5 },
-                    { name: 'Time Offset', min: 0, max: 10, default: 1, step: 0.1 },
-                    { name: 'Feedback', min: 0, max: 1, default: 0.3, step: 0.01 }
-                ]
-            },
-            bitcrush: {
-                name: 'Bit Crush',
-                params: [
-                    { name: 'Bits', min: 1, max: 8, default: 4, step: 0.5 },
-                    { name: 'Dither', min: 0, max: 1, default: 0.1, step: 0.01 }
-                ]
-            },
-            vhsGlitch: {
-                name: 'VHS Glitch',
-                params: [
-                    { name: 'Distortion', min: 0, max: 1, default: 0.5, step: 0.01 },
-                    { name: 'Noise', min: 0, max: 0.5, default: 0.1, step: 0.01 },
-                    { name: 'Tracking', min: 0, max: 20, default: 5, step: 0.5 }
-                ]
-            },
-            displacement: {
-                name: 'Displacement',
-                params: [
-                    { name: 'Scale', min: 1, max: 50, default: 10, step: 1 },
-                    { name: 'Speed', min: 0, max: 5, default: 1, step: 0.1 },
-                    { name: 'Amount', min: 0, max: 50, default: 10, step: 1 }
-                ]
-            },
-            feedback: {
-                name: 'Feedback Loop',
-                params: [
-                    { name: 'Amount', min: 0, max: 1, default: 0.5, step: 0.01 },
-                    { name: 'Rotation', min: -0.1, max: 0.1, default: 0.01, step: 0.001 },
-                    { name: 'Scale', min: 0.9, max: 1.1, default: 1.01, step: 0.001 }
-                ]
-            }
-        };
-
-        // Initialize WebGL
-        function initWebGL() {
-            canvas = document.getElementById('glcanvas');
-            gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
-            
-            if (!gl) {
-                console.error('WebGL not supported');
-                return false;
-            }
-
-            // Create shaders
-            const vertexShader = createShader(gl.VERTEX_SHADER, vertexShaderSource);
-            const fragmentShader = createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
-
-            // Create program
-            program = gl.createProgram();
-            gl.attachShader(program, vertexShader);
-            gl.attachShader(program, fragmentShader);
-            gl.linkProgram(program);
-
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                console.error('Unable to initialize shader program:', gl.getProgramInfoLog(program));
-                return false;
-            }
-
-            gl.useProgram(program);
-
-            // Set up vertices
-            const vertices = new Float32Array([
-                -1, -1, 0, 1,
-                 1, -1, 1, 1,
-                -1,  1, 0, 0,
-                 1,  1, 1, 0
-            ]);
-
-            const buffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-            const positionLocation = gl.getAttribLocation(program, 'a_position');
-            const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
-
-            gl.enableVertexAttribArray(positionLocation);
-            gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 16, 0);
-
-            gl.enableVertexAttribArray(texCoordLocation);
-            gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 16, 8);
-
-            // Create textures
-            createTextures();
-
-            // Initialize mask canvas
-            maskCanvas = document.createElement('canvas');
-            maskCtx = maskCanvas.getContext('2d');
-
-            return true;
-        }
-
-        function createShader(type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                console.error('An error occurred compiling the shaders:', gl.getShaderInfoLog(shader));
-                gl.deleteShader(shader);
-                return null;
-            }
-
-            return shader;
-        }
-
-        function createTextures() {
-            // Video texture
-            const videoTexture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, videoTexture);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-            // Mask texture
-            const maskTexture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, maskTexture);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-            // Feedback texture
-            feedbackTexture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, feedbackTexture);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        }
-
-        // Initialize face detection
-        async function initFaceDetection() {
-            const FaceMesh = window.FaceMesh;
-            faceMesh = new FaceMesh({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-                }
-            });
-
-            faceMesh.setOptions({
-                maxNumFaces: 1,
-                refineLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-
-            faceMesh.onResults(onFaceResults);
-        }
-
-        function onFaceResults(results) {
-            lastFaceResults = results;
-            
-            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                const landmarks = results.multiFaceLandmarks[0];
-                
-                // Calculate face center
-                let sumX = 0, sumY = 0;
-                for (const landmark of landmarks) {
-                    sumX += landmark.x;
-                    sumY += landmark.y;
-                }
-                faceCenter.x = sumX / landmarks.length;
-                faceCenter.y = sumY / landmarks.length;
-
-                // Draw face mask
-                drawFaceMask(landmarks);
-            }
-        }
-
-        function drawFaceMask(landmarks) {
-            if (!maskCanvas || !maskCtx) return;
-
-            maskCanvas.width = canvas.width;
-            maskCanvas.height = canvas.height;
-            
-            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
-            
-            // Face oval indices for precise mask
-            const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
-            
-            maskCtx.fillStyle = 'white';
-            maskCtx.beginPath();
-            
-            for (let i = 0; i < FACE_OVAL.length; i++) {
-                const point = landmarks[FACE_OVAL[i]];
-                const x = point.x * maskCanvas.width;
-                const y = point.y * maskCanvas.height;
-                
-                if (i === 0) {
-                    maskCtx.moveTo(x, y);
-                } else {
-                    maskCtx.lineTo(x, y);
-                }
-            }
-            
-            maskCtx.closePath();
-            maskCtx.fill();
-            
-            // Apply feathering with blur
-            const featherAmount = parseFloat(document.getElementById('maskFeather').value);
-            if (featherAmount > 0) {
-                maskCtx.filter = `blur(${featherAmount}px)`;
-                maskCtx.drawImage(maskCanvas, 0, 0);
-            }
-        }
-
-        // Camera controls
-        async function startCamera() {
-            try {
-                video = document.getElementById('video');
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user'
-                    }
-                });
-                
-                video.srcObject = stream;
-                await video.play();
-                
-                // Wait for video to be ready
-                await new Promise((resolve) => {
-                    video.onloadedmetadata = () => {
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        maskCanvas.width = video.videoWidth;
-                        maskCanvas.height = video.videoHeight;
-                        resolve();
-                    };
-                });
-                
-                // Initialize face detection
-                await initFaceDetection();
-                
-                // Start render loop
-                render();
-                
-                // Update UI
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-                document.getElementById('statusDot').classList.add('active');
-                document.getElementById('statusText').textContent = 'Camera Active';
-                
-            } catch (error) {
-                console.error('Error accessing camera:', error);
-                document.getElementById('statusText').textContent = 'Camera Error';
-            }
-        }
-
-        function stopCamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-            
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            document.getElementById('statusDot').classList.remove('active');
-            document.getElementById('statusText').textContent = 'Camera Stopped';
-        }
-
-        // Render loop
-        function render() {
-            animationId = requestAnimationFrame(render);
-            
-            // Send video to face detection
-            if (faceMesh && video.readyState === 4) {
-                faceMesh.send({ image: video });
-            }
-            
-            // Update FPS counter
-            frameCount++;
-            const currentTime = performance.now();
-            if (currentTime - lastTime >= 1000) {
-                const fps = Math.round(frameCount * 1000 / (currentTime - lastTime));
-                document.getElementById('fpsCounter').textContent = `${fps} FPS`;
-                frameCount = 0;
-                lastTime = currentTime;
-            }
-            
-            // Render to WebGL
-            renderWebGL();
-        }
-
-        function renderWebGL() {
-            if (!gl || !program || !video) return;
-            
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            
-            // Update video texture
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            
-            // Update mask texture
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
-            if (maskCanvas && document.getElementById('preciseMask').checked) {
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
-            } else {
-                // Create default mask
-                const defaultMask = document.createElement('canvas');
-                defaultMask.width = canvas.width;
-                defaultMask.height = canvas.height;
-                const ctx = defaultMask.getContext('2d');
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, defaultMask.width, defaultMask.height);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, defaultMask);
-            }
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-            
-            // Set uniforms
-            gl.uniform1i(gl.getUniformLocation(program, 'u_image'), 0);
-            gl.uniform1i(gl.getUniformLocation(program, 'u_mask'), 1);
-            gl.uniform1i(gl.getUniformLocation(program, 'u_feedback'), 2);
-            
-            gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
-            gl.uniform1f(gl.getUniformLocation(program, 'u_time'), performance.now() / 1000.0);
-            gl.uniform2f(gl.getUniformLocation(program, 'u_faceCenter'), faceCenter.x, faceCenter.y);
-            
-            // Global settings
-            gl.uniform1f(gl.getUniformLocation(program, 'u_masterIntensity'), parseFloat(document.getElementById('masterIntensity').value));
-            gl.uniform1f(gl.getUniformLocation(program, 'u_timeScale'), parseFloat(document.getElementById('timeScale').value));
-            gl.uniform1f(gl.getUniformLocation(program, 'u_maskFeather'), parseFloat(document.getElementById('maskFeather').value));
-            gl.uniform1i(gl.getUniformLocation(program, 'u_allowBleed'), document.getElementById('allowBleed').checked ? 1 : 0);
-            gl.uniform1i(gl.getUniformLocation(program, 'u_invertY'), 1);
-            gl.uniform1i(gl.getUniformLocation(program, 'u_mirrorX'), document.getElementById('invertCamera').checked ? 1 : 0);
-            
-            // Update effect stack uniforms
-            updateEffectUniforms();
-            
-            // Draw
-            gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
-            
-            // Copy to feedback texture
-            gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, feedbackTexture);
-            gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, canvas.width, canvas.height, 0);
-        }
-
-        function updateEffectUniforms() {
-            const effectTypes = [];
-            const effectIntensities = [];
-            const effectParams = [];
-            
-            effectStack.forEach((effect, index) => {
-                if (!effect.enabled) return;
-                
-                const effectDef = effectDefinitions[effect.type];
-                const typeIndex = Object.keys(effectDefinitions).indexOf(effect.type);
-                
-                effectTypes.push(typeIndex);
-                effectIntensities.push(effect.intensity);
-                
-                // Add params (pad to 8 values)
-                for (let i = 0; i < 8; i++) {
-                    effectParams.push(effect.params[i] || 0);
-                }
-            });
-            
-            // Set uniforms
-            gl.uniform1i(gl.getUniformLocation(program, 'u_effectCount'), effectTypes.length);
-            gl.uniform1iv(gl.getUniformLocation(program, 'u_effectTypes'), new Int32Array(effectTypes.concat(new Array(10 - effectTypes.length).fill(0))));
-            gl.uniform1fv(gl.getUniformLocation(program, 'u_effectIntensities'), new Float32Array(effectIntensities.concat(new Array(10 - effectIntensities.length).fill(0))));
-            gl.uniform1fv(gl.getUniformLocation(program, 'u_effectParams'), new Float32Array(effectParams.concat(new Array(80 - effectParams.length).fill(0))));
-        }
-
-        // Effect stack management
-        function addEffect(type) {
-            const effectDef = effectDefinitions[type];
-            const effect = {
-                id: Date.now(),
-                type: type,
-                name: effectDef.name,
-                enabled: true,
-                intensity: 1.0,
-                params: effectDef.params.map(p => p.default)
-            };
-            
-            effectStack.push(effect);
-            renderEffectLayer(effect);
-        }
-
-        function renderEffectLayer(effect) {
-            const container = document.getElementById('effectLayers');
-            const effectDef = effectDefinitions[effect.type];
-            
-            const layer = document.createElement('div');
-            layer.className = 'effect-layer';
-            layer.dataset.effectId = effect.id;
-            
-            layer.innerHTML = `
-                <div class="effect-layer-header">
-                    <span class="effect-name">${effect.name}</span>
-                    <div class="effect-controls">
-                        <button class="effect-toggle ${effect.enabled ? 'active' : ''}" onclick="toggleEffect(${effect.id})">●</button>
-                        <button class="effect-toggle" onclick="removeEffect(${effect.id})">✕</button>
-                    </div>
-                </div>
-                <div class="effect-params">
-                    <div class="param-control">
-                        <label class="param-label">
-                            <span>Intensity</span>
-                            <span id="intensity-${effect.id}">${effect.intensity.toFixed(2)}</span>
-                        </label>
-                        <input type="range" class="param-slider" min="0" max="2" step="0.01" value="${effect.intensity}" 
-                               onchange="updateEffectParam(${effect.id}, 'intensity', this.value)">
-                    </div>
-                    ${effectDef.params.map((param, index) => `
-                        <div class="param-control">
-                            <label class="param-label">
-                                <span>${param.name}</span>
-                                <span id="param-${effect.id}-${index}">${effect.params[index].toFixed(2)}</span>
-                            </label>
-                            <input type="range" class="param-slider" min="${param.min}" max="${param.max}" step="${param.step}" value="${effect.params[index]}" 
-                                   onchange="updateEffectParam(${effect.id}, ${index}, this.value)">
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            
-            container.appendChild(layer);
-        }
-
-        function toggleEffect(id) {
-            const effect = effectStack.find(e => e.id === id);
-            if (effect) {
-                effect.enabled = !effect.enabled;
-                const toggle = document.querySelector(`[data-effect-id="${id}"] .effect-toggle`);
-                toggle.classList.toggle('active', effect.enabled);
-            }
-        }
-
-        function removeEffect(id) {
-            effectStack = effectStack.filter(e => e.id !== id);
-            const layer = document.querySelector(`[data-effect-id="${id}"]`);
-            if (layer) layer.remove();
-        }
-
-        function updateEffectParam(id, paramIndex, value) {
-            const effect = effectStack.find(e => e.id === id);
-            if (effect) {
-                if (paramIndex === 'intensity') {
-                    effect.intensity = parseFloat(value);
-                    document.getElementById(`intensity-${id}`).textContent = value;
-                } else {
-                    effect.params[paramIndex] = parseFloat(value);
-                    document.getElementById(`param-${id}-${paramIndex}`).textContent = parseFloat(value).toFixed(2);
-                }
-            }
-        }
-
-        // Preset management
-        function savePreset() {
-            const name = prompt('Preset name:');
-            if (name) {
-                presets[name] = {
-                    stack: JSON.parse(JSON.stringify(effectStack)),
-                    masterIntensity: document.getElementById('masterIntensity').value,
-                    timeScale: document.getElementById('timeScale').value,
-                    maskFeather: document.getElementById('maskFeather').value
-                };
-                localStorage.setItem('faceGlitchPresets', JSON.stringify(presets));
-                updatePresetList();
-            }
-        }
-
-        function loadPreset(name) {
-            if (name === 'subtle') {
-                effectStack = [];
-                document.getElementById('effectLayers').innerHTML = '';
-                addEffect('microGlitch');
-                addEffect('scanlines');
-                effectStack[0].intensity = 0.5;
-                effectStack[1].intensity = 0.3;
-            } else if (name === 'heavy') {
-                effectStack = [];
-                document.getElementById('effectLayers').innerHTML = '';
-                addEffect('dataCorruption');
-                addEffect('rgbShift');
-                addEffect('displacement');
-                effectStack[0].intensity = 1.5;
-                effectStack[1].intensity = 1.2;
-                effectStack[2].intensity = 0.8;
-            } else if (name === 'vhs') {
-                effectStack = [];
-                document.getElementById('effectLayers').innerHTML = '';
-                addEffect('vhsGlitch');
-                addEffect('scanlines');
-                addEffect('rgbShift');
-                effectStack[0].intensity = 1.0;
-                effectStack[1].intensity = 0.5;
-                effectStack[2].intensity = 0.3;
-            } else if (presets[name]) {
-                const preset = presets[name];
-                effectStack = [];
-                document.getElementById('effectLayers').innerHTML = '';
-                preset.stack.forEach(effect => {
-                    effectStack.push(effect);
-                    renderEffectLayer(effect);
-                });
-                document.getElementById('masterIntensity').value = preset.masterIntensity;
-                document.getElementById('timeScale').value = preset.timeScale;
-                document.getElementById('maskFeather').value = preset.maskFeather;
-            }
-        }
-
-        function updatePresetList() {
-            const list = document.getElementById('presetList');
-            const customPresets = Object.keys(presets).map(name => `
-                <div class="preset-item">
-                    <span>${name}</span>
-                    <div class="preset-actions">
-                        <button class="btn" onclick="loadPreset('${name}')">LOAD</button>
-                        <button class="btn" onclick="deletePreset('${name}')">DELETE</button>
-                    </div>
-                </div>
-            `).join('');
-            
-            list.innerHTML = `
-                <div class="preset-item">
-                    <span>Subtle Corruption</span>
-                    <div class="preset-actions">
-                        <button class="btn" onclick="loadPreset('subtle')">LOAD</button>
-                    </div>
-                </div>
-                <div class="preset-item">
-                    <span>Heavy Distortion</span>
-                    <div class="preset-actions">
-                        <button class="btn" onclick="loadPreset('heavy')">LOAD</button>
-                    </div>
-                </div>
-                <div class="preset-item">
-                    <span>VHS Nightmare</span>
-                    <div class="preset-actions">
-                        <button class="btn" onclick="loadPreset('vhs')">LOAD</button>
-                    </div>
-                </div>
-                ${customPresets}
-            `;
-        }
-
-        function deletePreset(name) {
-            delete presets[name];
-            localStorage.setItem('faceGlitchPresets', JSON.stringify(presets));
-            updatePresetList();
-        }
-
-        // UI event listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize WebGL
-            if (!initWebGL()) {
-                document.getElementById('statusText').textContent = 'WebGL not supported';
-                return;
-            }
-            
-            // Loa<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Glitch V2 - Advanced Effects Studio</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Face Glitch V2</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0a0a0a;
-            --bg-secondary: #111111;
-            --bg-tertiary: #1a1a1a;
-            --border: #2a2a2a;
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
-            --accent-red: #ff3366;
-            --accent-cyan: #00ffcc;
-            --accent-yellow: #ffcc00;
-            --glitch-1: #ff00ff;
-            --glitch-2: #00ff00;
+            --bg: #0b0d11;
+            --panel: #11141a;
+            --stroke: #1f2430;
+            --fg: #e5e7eb;
+            --muted: #9aa0aa;
+            --accent: #6ee7b7;
+            --danger: #f87171;
+            --primary-bg: #1a202c;
+            --secondary-bg: #2d3748;
+            --text-color: #f7fafc;
+            --primary-color: #6ee7b7;
+            --border-color: #4a5568;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            --radius-sm: 8px;
+            --radius-md: 12px;
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Courier New', monospace;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            height: 100vh;
-            gap: 1px;
-            background: var(--border);
-        }
-
-        .preview-area {
-            position: relative;
-            background: var(--bg-secondary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        #video {
-            display: none;
-        }
-
-        #glcanvas {
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-            image-rendering: crisp-edges;
-        }
-
-        .controls-panel {
-            background: var(--bg-tertiary);
-            overflow-y: auto;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .header {
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 15px;
-        }
-
-        h1 {
-            font-size: 18px;
-            font-weight: normal;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 10px;
-            color: var(--accent-cyan);
-            text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
-        }
-
-        .camera-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            padding: 8px 16px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s;
-        }
-
-        .btn:hover:not(:disabled) {
-            background: var(--border);
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
-        }
-
-        .btn:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .btn.active {
-            background: var(--accent-cyan);
-            color: var(--bg-primary);
-            border-color: var(--accent-cyan);
-        }
-
-        .effect-stack {
-            border: 1px solid var(--border);
-            background: var(--bg-secondary);
-            padding: 15px;
-        }
-
-        .stack-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .stack-title {
-            font-size: 12px;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .effect-layer {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            padding: 10px;
-            margin-bottom: 10px;
-            position: relative;
-            transition: all 0.2s;
-        }
-
-        .effect-layer.dragging {
-            opacity: 0.5;
-        }
-
-        .effect-layer-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            cursor: move;
-        }
-
-        .effect-name {
-            font-size: 12px;
-            color: var(--accent-cyan);
-        }
-
-        .effect-controls {
-            display: flex;
-            gap: 5px;
-        }
-
-        .effect-toggle {
-            width: 20px;
-            height: 20px;
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-        }
-
-        .effect-toggle.active {
-            background: var(--accent-cyan);
-            color: var(--bg-primary);
-        }
-
-        .effect-params {
-            display: grid;
-            gap: 8px;
-        }
-
-        .param-control {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .param-label {
-            font-size: 10px;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .param-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            height: 2px;
-            background: var(--border);
-            outline: none;
-        }
-
-        .param-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 12px;
-            height: 12px;
-            background: var(--accent-cyan);
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
-        .param-slider::-moz-range-thumb {
-            width: 12px;
-            height: 12px;
-            background: var(--accent-cyan);
-            cursor: pointer;
-            border-radius: 50%;
-        }
-
-        .effect-selector {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 5px;
-        }
-
-        .effect-add-btn {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            padding: 8px;
-            font-size: 11px;
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-secondary);
-        }
-
-        .effect-add-btn:hover {
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
-            box-shadow: 0 0 5px rgba(0, 255, 204, 0.3);
-        }
-
-        .preset-section {
-            border: 1px solid var(--border);
-            padding: 15px;
-            background: var(--bg-secondary);
-        }
-
-        .preset-list {
-            display: grid;
-            gap: 5px;
-            margin-top: 10px;
-        }
-
-        .preset-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border);
-            font-size: 11px;
-        }
-
-        .preset-actions {
-            display: flex;
-            gap: 5px;
-        }
-
-        .global-controls {
-            border: 1px solid var(--border);
-            padding: 15px;
-            background: var(--bg-secondary);
-        }
-
-        .checkbox-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-
-        .checkbox-label input[type="checkbox"] {
-            width: 14px;
-            height: 14px;
-            accent-color: var(--accent-cyan);
-        }
-
-        .status-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg-primary);
-            border-top: 1px solid var(--border);
-            padding: 10px 20px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            color: var(--text-secondary);
-        }
-
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent-red);
-        }
-
-        .status-dot.active {
-            background: var(--accent-cyan);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .glitch-text {
-            position: relative;
-            display: inline-block;
-        }
-
-        .glitch-text::before,
-        .glitch-text::after {
-            content: attr(data-text);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .glitch-text::before {
-            animation: glitch-1 0.3s infinite;
-            color: var(--glitch-1);
-            z-index: -1;
-        }
-
-        .glitch-text::after {
-            animation: glitch-2 0.3s infinite;
-            color: var(--glitch-2);
-            z-index: -2;
-        }
-
-        @keyframes glitch-1 {
-            0%, 100% { clip-path: inset(0 0 100% 0); transform: translate(0); }
-            20% { clip-path: inset(20% 0 30% 0); transform: translate(-2px, 2px); }
-            40% { clip-path: inset(50% 0 20% 0); transform: translate(2px, -2px); }
-            60% { clip-path: inset(70% 0 10% 0); transform: translate(-1px, 1px); }
-            80% { clip-path: inset(10% 0 60% 0); transform: translate(1px, -1px); }
-        }
-
-        @keyframes glitch-2 {
-            0%, 100% { clip-path: inset(0 0 100% 0); transform: translate(0); }
-            20% { clip-path: inset(80% 0 10% 0); transform: translate(2px, -1px); }
-            40% { clip-path: inset(10% 0 70% 0); transform: translate(-2px, 1px); }
-            60% { clip-path: inset(40% 0 40% 0); transform: translate(1px, 2px); }
-            80% { clip-path: inset(60% 0 20% 0); transform: translate(-1px, -2px); }
-        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--text-color); }
+        body { display: flex; justify-content: center; align-items: center; padding: 20px; background: radial-gradient(circle at center, #1a1f26 0%, #0d0f13 100%); }
+        .container { display: flex; width: 100%; max-width: 1600px; height: 90vh; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow); background: var(--primary-bg); border: 1px solid var(--border-color); }
+        .main-stage { flex: 3; position: relative; background: #0d0f13; display: flex; align-items: center; justify-content: center; }
+        #glcanvas, #video { width: 100%; height: 100%; object-fit: contain; display: block; }
+        #video { display: none; }
+        .controls-panel { flex: 1; min-width: 400px; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; background: var(--secondary-bg); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
+        h1 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.5px; }
+        .btn { padding: 10px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background-color: transparent; color: var(--text-color); font-size: 14px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; font-family: 'Poppins', sans-serif; }
+        .btn:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.1); border-color: var(--primary-color); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); color: #1a1f26; font-weight: 600; }
+        .btn-primary:hover:not(:disabled) { background-color: #55d4a6; border-color: #55d4a6; }
+        .section-heading { font-size: 18px; font-weight: 600; margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
+        .effect-stack { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+        .effect-toggle { display: flex; align-items: center; justify-content: space-between; background: var(--primary-bg); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s; }
+        .effect-toggle:hover { border-color: var(--primary-color); }
+        .effect-toggle.active { background: rgba(110, 231, 183, 0.1); border-color: var(--primary-color); }
+        .effect-toggle span { font-weight: 600; }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 24px; }
+        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .switch-slider { background-color: var(--primary-color); }
+        input:checked + .switch-slider:before { transform: translateX(20px); }
+        .control-group { border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 10px; background: var(--primary-bg); display: none; }
+        .control-group.active { display: block; }
+        .control-group-header { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; transition: background-color 0.2s; }
+        .control-group-header:hover { background-color: rgba(255, 255, 255, 0.05); }
+        .control-group-content { padding: 12px 16px; border-top: 1px solid var(--border-color); }
+        .control-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        @media (min-width: 600px) { .control-grid { grid-template-columns: 1fr 1fr; } }
+        .control-item { display: flex; flex-direction: column; gap: 6px; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+        .slider-input { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color); -webkit-appearance: none; appearance: none; outline: none; }
+        .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
+        .slider-input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
+        .options-list { display: flex; flex-direction: column; gap: 10px; }
+        .options-list label { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
+        .preset-manager { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+        .preset-controls { display: flex; gap: 8px; }
+        .preset-controls input { flex-grow: 1; background: var(--primary-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 8px; border-radius: var(--radius-sm); }
+        #presetList { display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; padding: 8px; background: var(--primary-bg); border-radius: var(--radius-sm); }
+        .preset-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+        .preset-item:hover { background: rgba(255, 255, 255, 0.1); }
+        .preset-delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; }
+        .status-bar { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+        .status-badge { background: var(--primary-bg); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 10px; }
+        .status-error { color: var(--danger); }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="preview-area">
+        <div class="main-stage">
             <video id="video" playsinline muted></video>
-            <canvas id="glcanvas"></canvas>
+            <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
         </div>
-        
         <div class="controls-panel">
             <div class="header">
-                <h1 class="glitch-text" data-text="FACE GLITCH V2">FACE GLITCH V2</h1>
-                <div class="camera-controls">
-                    <button id="startBtn" class="btn">START</button>
-                    <button id="stopBtn" class="btn" disabled>STOP</button>
+                <h1>Face Glitch V2</h1>
+                <div class="header-actions">
+                    <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                    <button id="stopBtn" class="btn" disabled>Stop</button>
                 </div>
             </div>
 
-            <div class="effect-stack">
-                <div class="stack-header">
-                    <span class="stack-title">EFFECT STACK</span>
-                    <button id="clearStack" class="btn">CLEAR</button>
-                </div>
-                <div id="effectLayers"></div>
-                <div class="effect-selector">
-                    <button class="effect-add-btn" data-effect="microGlitch">Micro Glitch</button>
-                    <button class="effect-add-btn" data-effect="dataCorruption">Data Corruption</button>
-                    <button class="effect-add-btn" data-effect="scanlines">Scanlines</button>
-                    <button class="effect-add-btn" data-effect="rgbShift">RGB Shift</button>
-                    <button class="effect-add-btn" data-effect="pixelSort">Pixel Sort</button>
-                    <button class="effect-add-btn" data-effect="datamosh">Datamosh</button>
-                    <button class="effect-add-btn" data-effect="bitcrush">Bit Crush</button>
-                    <button class="effect-add-btn" data-effect="vhsGlitch">VHS Glitch</button>
-                    <button class="effect-add-btn" data-effect="displacement">Displacement</button>
-                    <button class="effect-add-btn" data-effect="feedback">Feedback Loop</button>
-                </div>
+            <div id="globalControls">
+                 <div class="section-heading">Global Controls</div>
+                 <div class="control-grid">
+                     <div class="control-item">
+                         <label class="slider-label">Master Mix<span id="mixVal">1.00</span></label>
+                         <input type="range" id="mix" min="0" max="1" step="0.01" value="1.0" class="slider-input">
+                     </div>
+                     <div class="control-item">
+                         <label class="slider-label">Animation Speed<span id="speedVal">1.00</span></label>
+                         <input type="range" id="speed" min="0" max="5" step="0.01" value="1.0" class="slider-input">
+                     </div>
+                      <div class="control-item">
+                         <label class="slider-label">Mask Feather<span id="featherVal">20</span></label>
+                         <input type="range" id="feather" min="0" max="100" step="1" value="20" class="slider-input">
+                     </div>
+                     <div class="control-item">
+                         <label class="slider-label">Mask Padding (px)<span id="padVal">15</span></label>
+                         <input type="range" id="pad" min="-50" max="150" step="1" value="15" class="slider-input">
+                     </div>
+                 </div>
+                 <div class="options-list" style="margin-top: 16px;">
+                     <label><input type="checkbox" id="mirrorChk" checked> Mirror Camera</label>
+                     <label><input type="checkbox" id="animateChk" checked> Animate Effects</label>
+                     <label><input type="checkbox" id="trackCenterChk" checked> Track Center of Face</label>
+                     <label><input type="checkbox" id="preciseMaskChk" checked> Use Precise Face Mesh</label>
+                     <label><input type="checkbox" id="invertMaskChk"> Invert Mask</label>
+                 </div>
             </div>
 
-            <div class="preset-section">
-                <div class="stack-header">
-                    <span class="stack-title">PRESETS</span>
-                    <button id="savePreset" class="btn">SAVE</button>
+            <div class="section-heading">Effect Stack</div>
+            <div class="effect-stack" id="effectStack">
                 </div>
-                <div class="preset-list" id="presetList">
-                    <div class="preset-item">
-                        <span>Subtle Corruption</span>
-                        <div class="preset-actions">
-                            <button class="btn" onclick="loadPreset('subtle')">LOAD</button>
-                        </div>
-                    </div>
-                    <div class="preset-item">
-                        <span>Heavy Distortion</span>
-                        <div class="preset-actions">
-                            <button class="btn" onclick="loadPreset('heavy')">LOAD</button>
-                        </div>
-                    </div>
-                    <div class="preset-item">
-                        <span>VHS Nightmare</span>
-                        <div class="preset-actions">
-                            <button class="btn" onclick="loadPreset('vhs')">LOAD</button>
-                        </div>
-                    </div>
+            <div id="effectControlsContainer">
                 </div>
-            </div>
 
-            <div class="global-controls">
-                <span class="stack-title">GLOBAL SETTINGS</span>
-                <div class="param-control">
-                    <label class="param-label">
-                        <span>Master Intensity</span>
-                        <span id="masterIntensityVal">1.0</span>
-                    </label>
-                    <input type="range" id="masterIntensity" class="param-slider" min="0" max="2" step="0.01" value="1">
-                </div>
-                <div class="param-control">
-                    <label class="param-label">
-                        <span>Time Scale</span>
-                        <span id="timeScaleVal">1.0</span>
-                    </label>
-                    <input type="range" id="timeScale" class="param-slider" min="0" max="5" step="0.1" value="1">
-                </div>
-                <div class="param-control">
-                    <label class="param-label">
-                        <span>Mask Feather</span>
-                        <span id="maskFeatherVal">20</span>
-                    </label>
-                    <input type="range" id="maskFeather" class="param-slider" min="0" max="100" step="1" value="20">
-                </div>
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="invertCamera" checked>
-                        <span>Mirror Camera</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="preciseMask" checked>
-                        <span>Precise Face Mask</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="trackFace" checked>
-                        <span>Track Face Center</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="animateEffects" checked>
-                        <span>Animate Effects</span>
-                    </label>
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="allowBleed">
-                        <span>Allow Effect Bleed</span>
-                    </label>
-                </div>
+            <div class="section-heading">Presets</div>
+             <div class="preset-manager">
+                 <div class="preset-controls">
+                     <input type="text" id="presetName" placeholder="Preset Name">
+                     <button id="savePresetBtn" class="btn btn-primary">Save</button>
+                 </div>
+                 <div id="presetList"></div>
+                 <button id="randomBtn" class="btn">Randomize All</button>
+             </div>
+
+            <div class="status-bar">
+                <span id="msg" class="status-error"></span>
+                <span id="status2" class="status-badge">Idle</span>
             </div>
         </div>
     </div>
-
-    <div class="status-bar">
-        <div class="status-indicator">
-            <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">Ready</span>
-        </div>
-        <span id="fpsCounter">0 FPS</span>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
     <script>
-        // WebGL shader sources
-        const vertexShaderSource = `
-            attribute vec2 a_position;
-            attribute vec2 a_texCoord;
-            varying vec2 v_texCoord;
-            
-            void main() {
-                gl_Position = vec4(a_position, 0.0, 1.0);
-                v_texCoord = a_texCoord;
-            }
-        `;
+    (() => {
+        // --- V2 Feature Flags ---
+        const V2_FEATURES = {
+            EFFECT_STACKING: true,
+            PRESET_SAVING: true,
+            ADVANCED_EFFECTS: true,
+            TRACKING_FIX: true,
+            MASK_FIX: true,
+        };
 
-        const fragmentShaderSource = `
+        // --- DOM Elements ---
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('glcanvas');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const msgEl = document.getElementById('msg');
+        const status2El = document.getElementById('status2');
+        
+        // --- State Variables ---
+        let stream = null, rafId = null, gl = null, program = null, tex = null, buf = null;
+        let lastFacesMesh = [];
+        let effectCenter = { x: 0.5, y: 0.5 };
+        const maskCanvas = document.createElement('canvas');
+        const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+        let maskTex = null;
+        let faceMesh = null;
+        let faceMeshReady = false;
+        let fmBusy = false;
+        let lastFmTime = 0;
+        const FM_MIN_INTERVAL = 50; // ms
+        const FACE_OVAL_INDICES = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+        
+        // --- WebGL Source ---
+        const vertSrc = `
+            attribute vec2 a_pos;
+            varying vec2 v_uv;
+            void main() {
+                v_uv = a_pos;
+                gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
+            }`;
+
+        const fragSrc = `
             precision highp float;
-            
-            varying vec2 v_texCoord;
-            uniform sampler2D u_image;
-            uniform sampler2D u_mask;
-            uniform sampler2D u_feedback;
-            
+            varying vec2 v_uv;
+
+            // Textures
+            uniform sampler2D u_tex;
+            uniform sampler2D u_maskTex;
+
+            // Global settings
             uniform vec2 u_resolution;
             uniform float u_time;
-            uniform vec2 u_faceCenter;
-            uniform float u_masterIntensity;
-            uniform float u_timeScale;
-            uniform float u_maskFeather;
-            uniform int u_allowBleed;
-            uniform int u_invertY;
-            uniform int u_mirrorX;
+            uniform float u_speed;
+            uniform float u_masterMix;
+            uniform bool u_mirror;
+
+            // Mask settings
+            uniform vec2 u_center;
+            uniform bool u_usePreciseMask;
+            uniform bool u_invertMask;
+            uniform float u_feather;
+
+            // Effect-specific uniforms
+            uniform bool u_smear_enabled;
+            uniform float u_smear_len;
+            uniform float u_smear_ang;
+            uniform int u_smear_samples;
+            uniform float u_smear_pingpong;
+
+            uniform bool u_pixelate_enabled;
+            uniform float u_pixelate_size;
+            uniform float u_pixelate_pattern_scale;
             
-            // Effect uniforms (max 10 effects in stack)
-            uniform int u_effectCount;
-            uniform int u_effectTypes[10];
-            uniform float u_effectIntensities[10];
-            uniform float u_effectParams[10 * 8]; // 8 params per effect
-            
-            // Utility functions
-            float random(vec2 st) {
-                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+            uniform bool u_noiseflow_enabled;
+            uniform float u_noiseflow_scale;
+            uniform float u_noiseflow_strength;
+
+            uniform bool u_jitter_enabled;
+            uniform float u_jitter_amount;
+            uniform float u_jitter_speed;
+
+            uniform bool u_chroma_enabled;
+            uniform float u_chroma_amount;
+
+            uniform bool u_distort_enabled;
+            uniform float u_distort_freq;
+            uniform float u_distort_amp;
+
+            // --- Utility Functions ---
+            float rand(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            vec3 hash3(vec2 p) {
+                vec3 q = vec3(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)), dot(p, vec2(419.2, 371.9)));
+                return fract(sin(q) * 43758.5453);
             }
-            
-            vec2 random2(vec2 st) {
-                st = vec2(dot(st, vec2(127.1, 311.7)), dot(st, vec2(269.5, 183.3)));
-                return -1.0 + 2.0 * fract(sin(st) * 43758.5453123);
-            }
-            
-            float noise(vec2 st) {
-                vec2 i = floor(st);
-                vec2 f = fract(st);
-                
-                float a = random(i);
-                float b = random(i + vec2(1.0, 0.0));
-                float c = random(i + vec2(0.0, 1.0));
-                float d = random(i + vec2(1.0, 1.0));
-                
-                vec2 u = f * f * (3.0 - 2.0 * f);
-                
-                return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-            }
-            
-            // Effect functions
-            vec4 microGlitch(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float time = u_time * u_timeScale;
-                float blockSize = params[0];
-                float probability = params[1];
-                float colorShift = params[2];
-                
-                vec2 block = floor(uv * u_resolution / blockSize);
-                float glitchSeed = random(block + floor(time * 10.0));
-                
-                if (glitchSeed < probability) {
-                    vec2 offset = random2(block + time) * 0.02 * intensity;
-                    vec2 newUV = uv + offset;
-                    
-                    // Add small RGB shifts
-                    vec3 glitched;
-                    glitched.r = texture2D(u_image, newUV + vec2(colorShift * 0.01, 0.0)).r;
-                    glitched.g = texture2D(u_image, newUV).g;
-                    glitched.b = texture2D(u_image, newUV - vec2(colorShift * 0.01, 0.0)).b;
-                    
-                    return vec4(glitched, color.a);
+
+            // --- Masking ---
+            float getMaskValue(vec2 uv) {
+                float mask = 1.0;
+                if (u_usePreciseMask) {
+                    // MASK_FIX: Feathering is now done via blurring the mask texture lookup, not a canvas filter.
+                    // This provides a proper feather instead of a "glow".
+                    float feather_uv = u_feather / u_resolution.x;
+                    if (feather_uv > 0.001) {
+                        float total = 0.0;
+                        for (float x = -2.0; x <= 2.0; x += 1.0) {
+                            for (float y = -2.0; y <= 2.0; y += 1.0) {
+                                total += texture2D(u_maskTex, uv + vec2(x, y) * feather_uv / 2.0).r;
+                            }
+                        }
+                        mask = total / 25.0;
+                    } else {
+                        mask = texture2D(u_maskTex, uv).r;
+                    }
                 }
                 
-                return color;
+                if (u_invertMask) {
+                    mask = 1.0 - mask;
+                }
+                return clamp(mask, 0.0, 1.0);
             }
+
+            // --- Effect Functions ---
             
-            vec4 dataCorruption(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float time = u_time * u_timeScale;
-                float corruptionRate = params[0];
-                float bitDepth = params[1];
-                
-                float corruption = step(corruptionRate, random(uv + time));
-                vec3 corrupted = floor(color.rgb * bitDepth) / bitDepth;
-                
-                return vec4(mix(corrupted, color.rgb, corruption), color.a);
+            // DISPLACEMENT: Noise Flow
+            vec2 applyNoiseFlow(vec2 uv, float mask) {
+                if (!u_noiseflow_enabled || mask == 0.0) return uv;
+                vec2 p = uv * u_noiseflow_scale + u_time * u_speed * 0.1;
+                vec3 n = hash3(p) * 2.0 - 1.0;
+                vec2 offset = n.xy * (u_noiseflow_strength / u_resolution) * mask;
+                return uv + offset;
             }
-            
-            vec4 scanlines(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float lineCount = params[0];
-                float lineSpeed = params[1];
-                float lineOpacity = params[2];
-                
-                float line = sin((uv.y * lineCount) + (u_time * lineSpeed * u_timeScale)) * 0.5 + 0.5;
-                vec3 scanlined = color.rgb * (1.0 - (lineOpacity * line * intensity));
-                
-                return vec4(scanlined, color.a);
+
+            // DISPLACEMENT: Wavy Distort
+            vec2 applyDistort(vec2 uv, float mask) {
+                if (!u_distort_enabled || mask == 0.0) return uv;
+                float angle = u_time * u_speed;
+                float sx = sin(uv.y * u_distort_freq + angle);
+                float sy = cos(uv.x * u_distort_freq + angle);
+                vec2 offset = vec2(sx, sy) * (u_distort_amp / u_resolution) * mask;
+                return uv + offset;
             }
-            
-            vec4 rgbShift(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float shiftAmount = params[0] * intensity;
-                float angleR = params[1];
-                float angleB = params[2];
-                
-                vec2 offsetR = vec2(cos(angleR), sin(angleR)) * shiftAmount / u_resolution;
-                vec2 offsetB = vec2(cos(angleB), sin(angleB)) * shiftAmount / u_resolution;
-                
-                vec3 shifted;
-                shifted.r = texture2D(u_image, uv + offsetR).r;
-                shifted.g = color.g;
-                shifted.b = texture2D(u_image, uv + offsetB).b;
-                
-                return vec4(shifted, color.a);
+
+            // DISPLACEMENT: Jitter
+            vec2 applyJitter(vec2 uv, float mask) {
+                if (!u_jitter_enabled || mask == 0.0) return uv;
+                float t = floor(u_time * u_jitter_speed);
+                vec2 block_uv = floor(uv * 50.0);
+                float r = rand(block_uv + t);
+                if (r < 0.95) return uv;
+                vec2 offset = (hash3(block_uv + t + 10.0).xy - 0.5) * (u_jitter_amount / u_resolution) * mask;
+                return uv + offset;
             }
-            
-            vec4 pixelSort(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float threshold = params[0];
-                float direction = params[1]; // 0 = horizontal, 1 = vertical
-                float sortLength = params[2];
+
+            // COLOR: Smear
+            vec4 applySmear(vec4 originalColor, vec2 uv, float mask) {
+                if (!u_smear_enabled || mask == 0.0) return originalColor;
                 
-                float brightness = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                // ADVANCED_EFFECTS: Smear animates back and forth (ping-pong)
+                float angle = radians(u_smear_ang + sin(u_time * u_speed * 2.0) * u_smear_pingpong);
+                vec2 dir = vec2(cos(angle), sin(angle));
+                vec2 stepUV = dir * (u_smear_len / u_resolution) / float(u_smear_samples);
                 
-                if (brightness > threshold) {
-                    vec2 sortDir = direction < 0.5 ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-                    vec2 offset = sortDir * sortLength * intensity / u_resolution;
-                    
-                    vec4 sorted = texture2D(u_image, uv + offset);
-                    return mix(color, sorted, 0.7);
+                vec4 acc = vec4(0.0);
+                float totalWeight = 0.0;
+                
+                for(int i = 0; i < 32; i++) {
+                    if (i >= u_smear_samples) break;
+                    float t = float(i);
+                    // MASK_FIX: The effect "seeps" because it samples outside pixels.
+                    // The strength of the effect (smear length) is modulated by the mask.
+                    vec2 sampleUV = uv - stepUV * t * mask;
+                    float weight = 1.0 - (t / float(u_smear_samples));
+                    acc += texture2D(u_tex, sampleUV) * weight;
+                    totalWeight += weight;
                 }
                 
-                return color;
+                return acc / max(totalWeight, 1.0);
             }
-            
-            vec4 datamosh(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float moshAmount = params[0];
-                float timeOffset = params[1];
-                float feedback = params[2];
+
+            // COLOR: Pixelate
+            vec4 applyPixelate(vec4 originalColor, vec2 uv, float mask) {
+                if (!u_pixelate_enabled || mask == 0.0) return originalColor;
                 
-                vec2 moshUV = uv + random2(floor(uv * moshAmount) / moshAmount + u_time * timeOffset) * 0.01 * intensity;
-                vec4 moshed = texture2D(u_image, moshUV);
+                // ADVANCED_EFFECTS: Pixelation strength is modulated by a noise pattern.
+                float noise_mask = rand(uv * u_pixelate_pattern_scale + floor(u_time * u_speed * 5.0));
+                float currentPixelSize = u_pixelate_size * noise_mask * mask;
                 
-                // Mix with feedback texture
-                vec4 feedbackColor = texture2D(u_feedback, uv);
-                moshed = mix(moshed, feedbackColor, feedback * intensity);
+                if (currentPixelSize < 1.5) return originalColor;
                 
-                return moshed;
+                vec2 pixelatedUV = (floor(uv * u_resolution / currentPixelSize) + 0.5) * currentPixelSize / u_resolution;
+                return texture2D(u_tex, pixelatedUV);
             }
-            
-            vec4 bitcrush(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float bits = params[0];
-                float dither = params[1];
-                
-                float levels = pow(2.0, bits);
-                vec3 crushed = floor(color.rgb * levels + random(uv) * dither) / levels;
-                
-                return vec4(mix(color.rgb, crushed, intensity), color.a);
+
+            // COLOR: Chromatic Aberration
+            vec4 applyChroma(vec4 originalColor, vec2 uv, float mask) {
+                if (!u_chroma_enabled || mask == 0.0) return originalColor;
+                float offset = u_chroma_amount / u_resolution.x * mask;
+                float r = texture2D(u_tex, uv + vec2(offset, 0.0)).r;
+                float b = texture2D(u_tex, uv - vec2(offset, 0.0)).b;
+                return vec4(r, originalColor.g, b, originalColor.a);
             }
-            
-            vec4 vhsGlitch(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float distortion = params[0];
-                float noiseAmount = params[1];
-                float tracking = params[2];
-                
-                float time = u_time * u_timeScale;
-                
-                // VHS tracking lines
-                float trackingLine = sin(uv.y * 100.0 + time * tracking) * 0.01;
-                vec2 vhsUV = uv + vec2(trackingLine * distortion, 0.0);
-                
-                // Add noise
-                vec3 vhsColor = texture2D(u_image, vhsUV).rgb;
-                float vhsNoise = random(uv + time) * noiseAmount;
-                vhsColor += vec3(vhsNoise);
-                
-                // Color bleeding
-                vhsColor.r = texture2D(u_image, vhsUV + vec2(0.002, 0.0)).r;
-                vhsColor.b = texture2D(u_image, vhsUV - vec2(0.002, 0.0)).b;
-                
-                return vec4(mix(color.rgb, vhsColor, intensity), color.a);
-            }
-            
-            vec4 displacement(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float scale = params[0];
-                float speed = params[1];
-                float amount = params[2];
-                
-                vec2 displacement = vec2(
-                    noise(uv * scale + u_time * speed),
-                    noise(uv * scale + u_time * speed + 100.0)
-                ) * 2.0 - 1.0;
-                
-                vec2 displacedUV = uv + displacement * amount * intensity / u_resolution;
-                return texture2D(u_image, displacedUV);
-            }
-            
-            vec4 feedbackLoop(vec4 color, vec2 uv, float intensity, float params[8]) {
-                float feedbackAmount = params[0];
-                float rotation = params[1];
-                float scale = params[2];
-                
-                // Transform UV for feedback
-                vec2 center = vec2(0.5, 0.5);
-                vec2 feedbackUV = uv - center;
-                
-                // Rotate
-                float s = sin(rotation);
-                float c = cos(rotation);
-                feedbackUV = vec2(
-                    feedbackUV.x * c - feedbackUV.y * s,
-                    feedbackUV.x * s + feedbackUV.y * c
-                );
-                
-                // Scale
-                feedbackUV *= scale;
-                feedbackUV += center;
-                
-                vec4 feedbackColor = texture2D(u_feedback, feedbackUV);
-                return mix(color, feedbackColor, feedbackAmount * intensity);
-            }
-            
-            vec4 applyEffect(vec4 color, vec2 uv, int effectType, float intensity, int paramOffset) {
-                float params[8];
-                for (int i = 0; i < 8; i++) {
-                    params[i] = u_effectParams[paramOffset + i];
-                }
-                
-                if (effectType == 0) return microGlitch(color, uv, intensity, params);
-                if (effectType == 1) return dataCorruption(color, uv, intensity, params);
-                if (effectType == 2) return scanlines(color, uv, intensity, params);
-                if (effectType == 3) return rgbShift(color, uv, intensity, params);
-                if (effectType == 4) return pixelSort(color, uv, intensity, params);
-                if (effectType == 5) return datamosh(color, uv, intensity, params);
-                if (effectType == 6) return bitcrush(color, uv, intensity, params);
-                if (effectType == 7) return vhsGlitch(color, uv, intensity, params);
-                if (effectType == 8) return displacement(color, uv, intensity, params);
-                if (effectType == 9) return feedbackLoop(color, uv, intensity, params);
-                
-                return color;
-            }
-            
+
+
             void main() {
-                vec2 uv = v_texCoord;
-                
-                // Fix coordinate system
-                if (u_invertY == 1) {
-                    uv.y = 1.0 - uv.y;
-                }
-                if (u_mirrorX == 1) {
+                // Base UV coordinate, handling mirroring
+                vec2 uv = v_uv;
+                if (u_mirror) {
                     uv.x = 1.0 - uv.x;
                 }
+
+                // Get the mask value at the current pixel
+                float mask = getMaskValue(uv);
                 
-                vec4 color = texture2D(u_image, uv);
+                // --- EFFECT STACKING: UV / Displacement Effects ---
+                // Effects that change *where* we look up the texture
+                vec2 effectedUV = uv;
+                effectedUV = applyNoiseFlow(effectedUV, mask);
+                effectedUV = applyDistort(effectedUV, mask);
+                effectedUV = applyJitter(effectedUV, mask);
                 
-                // Get mask value with proper feathering
-                float maskValue = texture2D(u_mask, v_texCoord).r;
+                // Sample the texture using the final distorted UV
+                vec4 effectedColor = texture2D(u_tex, effectedUV);
+
+                // --- EFFECT STACKING: Color / Post-Processing Effects ---
+                // Effects that change the color of the sampled pixel
+                effectedColor = applySmear(effectedColor, effectedUV, mask);
+                effectedColor = applyPixelate(effectedColor, effectedUV, mask);
+                effectedColor = applyChroma(effectedColor, effectedUV, mask);
                 
-                // Apply feathering to mask edges
-                float featheredMask = smoothstep(0.0, u_maskFeather / 100.0, maskValue);
-                
-                // Apply effect stack
-                vec4 originalColor = color;
-                for (int i = 0; i < 10; i++) {
-                    if (i >= u_effectCount) break;
-                    
-                    int paramOffset = i * 8;
-                    color = applyEffect(color, uv, u_effectTypes[i], u_effectIntensities[i] * u_masterIntensity, paramOffset);
-                }
-                
-                // Mix based on mask
-                if (u_allowBleed == 1) {
-                    // Allow effects to bleed outside mask
-                    gl_FragColor = mix(originalColor, color, featheredMask * 0.7 + 0.3);
-                } else {
-                    gl_FragColor = mix(originalColor, color, featheredMask);
-                }
+                // Get the original, unaffected color
+                vec4 baseColor = texture2D(u_tex, uv);
+
+                // Final mix between base color and effected color, controlled by master mix
+                gl_FragColor = mix(baseColor, effectedColor, u_masterMix);
             }
         `;
+        
+        // --- Effect Definitions ---
+        const effects = {
+            smear: {
+                name: 'Directional Smear',
+                enabled: true,
+                controls: [
+                    { id: 'smear_len', label: 'Length', min: 0, max: 200, step: 1, value: 40 },
+                    { id: 'smear_ang', label: 'Angle', min: 0, max: 360, step: 1, value: 0 },
+                    { id: 'smear_samples', label: 'Samples', min: 1, max: 32, step: 1, value: 12 },
+                    { id: 'smear_pingpong', label: 'Ping-Pong', min: 0, max: 90, step: 1, value: 20 },
+                ]
+            },
+            pixelate: {
+                name: 'Patterned Pixelate',
+                enabled: false,
+                controls: [
+                    { id: 'pixelate_size', label: 'Max Size', min: 1, max: 80, step: 1, value: 16 },
+                    { id: 'pixelate_pattern_scale', label: 'Pattern Scale', min: 1, max: 200, step: 1, value: 50 },
+                ]
+            },
+            noiseflow: {
+                name: 'Noise Flow',
+                enabled: true,
+                controls: [
+                    { id: 'noiseflow_scale', label: 'Scale', min: 0.5, max: 20, step: 0.1, value: 4 },
+                    { id: 'noiseflow_strength', label: 'Strength', min: 0, max: 100, step: 1, value: 20 },
+                ]
+            },
+            jitter: {
+                name: 'Block Jitter',
+                enabled: false,
+                controls: [
+                    { id: 'jitter_amount', label: 'Amount', min: 0, max: 200, step: 1, value: 50 },
+                    { id: 'jitter_speed', label: 'Speed', min: 1, max: 30, step: 1, value: 10 },
+                ]
+            },
+            chroma: {
+                name: 'Chroma Shift',
+                enabled: true,
+                controls: [
+                    { id: 'chroma_amount', label: 'Amount', min: 0, max: 50, step: 1, value: 8 },
+                ]
+            },
+            distort: {
+                name: 'Wavy Distort',
+                enabled: false,
+                controls: [
+                    { id: 'distort_freq', label: 'Frequency', min: 0, max: 100, step: 0.5, value: 15 },
+                    { id: 'distort_amp', label: 'Amplitude', min: 0, max: 100, step: 1, value: 10 },
+                ]
+            }
+        };
+
+        // UI hooks
+        const ui = {};
+
+        function hookSlider(id, valueId, config) {
+            const el = document.getElementById(id);
+            const out = document.getElementById(valueId);
+            if (!el || !out) return null;
+            
+            const set = () => {
+                const val = parseFloat(el.value);
+                out.textContent = val.toFixed(config.step < 1 ? 2 : 0);
+            };
+            el.addEventListener('input', set);
+            set();
+            return el;
+        }
+
+        function createEffectUI() {
+            const stackContainer = document.getElementById('effectStack');
+            const controlsContainer = document.getElementById('effectControlsContainer');
+            stackContainer.innerHTML = '';
+            controlsContainer.innerHTML = '';
+
+            for (const key in effects) {
+                const config = effects[key];
+                
+                // Create Toggles
+                const toggle = document.createElement('div');
+                toggle.className = 'effect-toggle';
+                toggle.id = `toggle_${key}`;
+                toggle.innerHTML = `
+                    <span>${config.name}</span>
+                    <label class="switch">
+                        <input type="checkbox" id="chk_${key}" ${config.enabled ? 'checked' : ''}>
+                        <span class="switch-slider"></span>
+                    </label>
+                `;
+                stackContainer.appendChild(toggle);
+
+                // Create Control Panels
+                const panel = document.createElement('div');
+                panel.className = `control-group ${config.enabled ? 'active' : ''}`;
+                panel.id = `controls_${key}`;
+                panel.innerHTML = `
+                    <div class="control-group-header">${config.name} Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            ${config.controls.map(c => `
+                                <div class="control-item">
+                                    <label class="slider-label">${c.label}<span id="val_${c.id}">${c.value}</span></label>
+                                    <input type="range" id="${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.value}" class="slider-input">
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                controlsContainer.appendChild(panel);
+                
+                // Hook up controls
+                ui[`chk_${key}`] = document.getElementById(`chk_${key}`);
+                ui[`chk_${key}`].addEventListener('change', (e) => {
+                    document.getElementById(`controls_${key}`).classList.toggle('active', e.target.checked);
+                    document.getElementById(`toggle_${key}`).classList.toggle('active', e.target.checked);
+                });
+                 document.getElementById(`toggle_${key}`).classList.toggle('active', config.enabled);
+
+
+                config.controls.forEach(c => {
+                    ui[c.id] = hookSlider(c.id, `val_${c.id}`, c);
+                });
+            }
+             // Hook global controls
+            ui.mix = hookSlider('mix', 'mixVal', { step: 0.01 });
+            ui.speed = hookSlider('speed', 'speedVal', { step: 0.01 });
+            ui.feather = hookSlider('feather', 'featherVal', { step: 1 });
+            ui.pad = hookSlider('pad', 'padVal', { step: 1 });
+            ui.mirrorChk = document.getElementById('mirrorChk');
+            ui.animateChk = document.getElementById('animateChk');
+            ui.trackCenterChk = document.getElementById('trackCenterChk');
+            ui.preciseMaskChk = document.getElementById('preciseMaskChk');
+            ui.invertMaskChk = document.getElementById('invertMaskChk');
+        }
+
+        function setStatus(text) { status2El.textContent = text; }
+        function setMsg(text, isError = false) { msgEl.textContent = text || ''; msgEl.classList.toggle('status-error', !!isError); }
+
+        async function initFaceMesh() {
+            if (faceMeshReady) return;
+            if (typeof window.FaceMesh === 'undefined') {
+                setMsg('Loading FaceMesh model...');
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
+                    s.crossOrigin = 'anonymous';
+                    s.onload = resolve;
+                    s.onerror = () => reject(new Error('Failed to load MediaPipe FaceMesh'));
+                    document.head.appendChild(s);
+                });
+            }
+            faceMesh = new window.FaceMesh({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            faceMesh.onResults((results) => {
+                fmBusy = false;
+                if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                    const landmarks = results.multiFaceLandmarks[0];
+                    lastFacesMesh = landmarks.map(p => ({ x: p.x, y: p.y }));
+                    
+                    if (ui.trackCenterChk.checked) {
+                        const noseTip = landmarks[1]; // Use a stable central point like the nose tip
+                        if (noseTip) {
+                           // TRACKING_FIX: Y-axis is inverted because WebGL's V coordinate (0=bottom) is opposite to image/DOM Y (0=top).
+                           // We use 1.0 - y to correct this. X-axis is handled by the `u_mirror` uniform in the shader.
+                           effectCenter = { x: noseTip.x, y: 1.0 - noseTip.y };
+                        }
+                    }
+                } else {
+                    lastFacesMesh = [];
+                }
+            });
+            await faceMesh.initialize();
+            faceMeshReady = true;
+            setMsg('');
+        }
+        
+        function fit() {
+            if (!video.videoWidth) return;
+            const videoRatio = video.videoWidth / video.videoHeight;
+            const container = canvas.parentElement;
+            const containerRatio = container.clientWidth / container.clientHeight;
+            
+            let w, h;
+            if (containerRatio > videoRatio) {
+                h = container.clientHeight;
+                w = h * videoRatio;
+            } else {
+                w = container.clientWidth;
+                h = w / videoRatio;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.style.width = `${w}px`;
+            canvas.style.height = `${h}px`;
+
+            maskCanvas.width = video.videoWidth;
+            maskCanvas.height = video.videoHeight;
+            if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+
+        function createGL() {
+            gl = canvas.getContext('webgl');
+            if (!gl) throw new Error('WebGL not available');
+
+            const compile = (type, src) => {
+                const s = gl.createShader(type);
+                gl.shaderSource(s, src);
+                gl.compileShader(s);
+                if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+                return s;
+            };
+            program = gl.createProgram();
+            gl.attachShader(program, compile(gl.VERTEX_SHADER, vertSrc));
+            gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragSrc));
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+
+            const a_pos = gl.getAttribLocation(program, 'a_pos');
+            buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+            gl.enableVertexAttribArray(a_pos);
+            gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+
+            tex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // This is important for coordinate systems
+
+            maskTex = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, maskTex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        }
+        
+        const U_CACHE = {};
+        function getU(name) { return U_CACHE[name] || (U_CACHE[name] = gl.getUniformLocation(program, name)); }
+
+        function uploadVideoTexture() {
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch (e) { /* stale video frame */ }
+            gl.uniform1i(getU('u_tex'), 0);
+        }
+
+        function uploadMaskTexture() {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, maskTex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+            gl.uniform1i(getU('u_maskTex'), 1);
+        }
+        
+        function drawMaskFromMesh() {
+            const W = maskCanvas.width, H = maskCanvas.height;
+            maskCtx.clearRect(0, 0, W, H);
+            
+            if (lastFacesMesh.length > 0) {
+                maskCtx.fillStyle = '#fff';
+                maskCtx.beginPath();
+                
+                const padding = parseFloat(ui.pad.value || 0);
+                const landmarks = lastFacesMesh;
+                
+                // Find bounding box to calculate center for padding
+                let minX = W, minY = H, maxX = 0, maxY = 0;
+                for (const p of landmarks) {
+                    minX = Math.min(minX, p.x * W);
+                    minY = Math.min(minY, p.y * H);
+                    maxX = Math.max(maxX, p.x * W);
+                    maxY = Math.max(maxY, p.y * H);
+                }
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+
+                const p0 = landmarks[FACE_OVAL_INDICES[0]];
+                let startX = p0.x * W;
+                let startY = p0.y * H;
+                if (padding !== 0) {
+                    let dx = startX - centerX;
+                    let dy = startY - centerY;
+                    let len = Math.sqrt(dx*dx + dy*dy);
+                    startX += (dx/len) * padding;
+                    startY += (dy/len) * padding;
+                }
+                maskCtx.moveTo(startX, startY);
+
+                for (let i = 1; i < FACE_OVAL_INDICES.length; i++) {
+                    const p = landmarks[FACE_OVAL_INDICES[i]];
+                    let px = p.x * W;
+                    let py = p.y * H;
+
+                    if (padding !== 0) {
+                       let dx = px - centerX;
+                       let dy = py - centerY;
+                       let len = Math.sqrt(dx*dx + dy*dy);
+                       px += (dx/len) * padding;
+                       py += (dy/len) * padding;
+                    }
+                    maskCtx.lineTo(px, py);
+                }
+                maskCtx.closePath();
+                maskCtx.fill();
+            }
+        }
+
+        function setUniforms(timeSec) {
+            gl.useProgram(program);
+            
+            // Globals
+            gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
+            gl.uniform1f(getU('u_time'), timeSec);
+            gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
+            gl.uniform1f(getU('u_masterMix'), parseFloat(ui.mix.value));
+            gl.uniform1i(getU('u_mirror'), ui.mirrorChk.checked);
+
+            // Mask
+            gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
+            gl.uniform1i(getU('u_usePreciseMask'), ui.preciseMaskChk.checked);
+            gl.uniform1i(getU('u_invertMask'), ui.invertMaskChk.checked);
+            gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
+            
+            // Per-effect uniforms
+            for (const key in effects) {
+                const enabled = ui[`chk_${key}`] && ui[`chk_${key}`].checked;
+                gl.uniform1i(getU(`u_${key}_enabled`), enabled);
+                if (enabled) {
+                    effects[key].controls.forEach(c => {
+                        const uniformType = (c.step === 1 && c.max > 1) ? '1i' : '1f';
+                        gl[`uniform${uniformType}`](getU(`u_${c.id}`), parseFloat(ui[c.id].value));
+                    });
+                }
+            }
+        }
+        
+        async function start() {
+            if (!navigator.mediaDevices?.getUserMedia) { setMsg('Camera access (getUserMedia) not supported.', true); return; }
+            if (!window.isSecureContext) { setMsg('Page not secure (HTTPS). Camera access will be blocked.', true); return; }
+            
+            try {
+                setStatus('Requesting camera…');
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                video.srcObject = stream;
+                await video.play();
+                fit();
+                window.addEventListener('resize', fit, false);
+
+                await initFaceMesh();
+                createGL();
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                setMsg('');
+                loop();
+            } catch (err) {
+                let hint = '';
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    hint = ' • Permission blocked. Check browser settings.';
+                } else if (err.name === 'NotFoundError') {
+                    hint = ' • No camera found.';
+                }
+                setMsg(`Could not start camera: ${err.message}${hint}`, true);
+                setStatus('Error');
+            }
+        }
+
+        function stop() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = null;
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = null;
+            video.srcObject = null;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            setStatus('Stopped');
+        }
+
+        function loop() {
+            rafId = requestAnimationFrame(loop);
+            
+            if (!video.videoWidth || video.paused || video.ended) return;
+
+            const now = performance.now();
+            if (ui.preciseMaskChk.checked && faceMeshReady && !fmBusy && (now - lastFmTime > FM_MIN_INTERVAL)) {
+                fmBusy = true;
+                lastFmTime = now;
+                faceMesh.send({ image: video });
+            }
+            
+            if (canvas.width === 0) fit();
+
+            if (ui.preciseMaskChk.checked && lastFacesMesh.length) {
+                drawMaskFromMesh();
+                uploadMaskTexture();
+            }
+            
+            uploadVideoTexture();
+            
+            const timeSec = ui.animateChk.checked ? now / 1000 : 0;
+            setUniforms(timeSec);
+            
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            const activeEffects = Object.keys(effects).filter(k => ui[`chk_${k}`].checked).length;
+            setStatus(`${canvas.width}×${canvas.height} | ${activeEffects} effects active`);
+        }
+
+        // --- Preset Management ---
+        function collectSettings() {
+            const settings = {};
+            // Collect global settings
+            document.querySelectorAll('#globalControls input').forEach(input => {
+                settings[input.id] = input.type === 'checkbox' ? input.checked : input.value;
+            });
+            // Collect effect settings
+            for (const key in effects) {
+                settings[`chk_${key}`] = ui[`chk_${key}`].checked;
+                effects[key].controls.forEach(c => {
+                    settings[c.id] = ui[c.id].value;
+                });
+            }
+            return settings;
+        }
+
+        function applySettings(settings) {
+            // Apply global settings
+            document.querySelectorAll('#globalControls input').forEach(input => {
+                if (settings[input.id] !== undefined) {
+                    if (input.type === 'checkbox') {
+                        input.checked = settings[input.id];
+                    } else {
+                        input.value = settings[input.id];
+                    }
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+             // Apply effect settings
+            for (const key in effects) {
+                if (settings[`chk_${key}`] !== undefined) {
+                     ui[`chk_${key}`].checked = settings[`chk_${key}`];
+                     ui[`chk_${key}`].dispatchEvent(new Event('change'));
+                }
+                effects[key].controls.forEach(c => {
+                    if (settings[c.id] !== undefined) {
+                        ui[c.id].value = settings[c.id];
+                        ui[c.id].dispatchEvent(new Event('input'));
+                    }
+                });
+            }
+        }
+        
+        function renderPresetList() {
+            const listEl = document.getElementById('presetList');
+            listEl.innerHTML = '';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('faceglitch_preset_')) {
+                    const name = key.replace('faceglitch_preset_', '');
+                    const item = document.createElement('div');
+                    item.className = 'preset-item';
+                    item.textContent = name;
+                    item.onclick = () => {
+                        const settings = JSON.parse(localStorage.getItem(key));
+                        applySettings(settings);
+                        setMsg(`Loaded preset: ${name}`);
+                    };
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'preset-delete-btn';
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete preset "${name}"?`)) {
+                            localStorage.removeItem(key);
+                            renderPresetList();
+                        }
+                    };
+                    item.appendChild(deleteBtn);
+                    listEl.appendChild(item);
+                }
+            }
+        }
+
+        function savePreset() {
+            const nameEl = document.getElementById('presetName');
+            const name = nameEl.value.trim();
+            if (!name) {
+                setMsg('Please enter a name for the preset.', true);
+                return;
+            }
+            const settings = collectSettings();
+            localStorage.setItem(`faceglitch_preset_${name}`, JSON.stringify(settings));
+            nameEl.value = '';
+            renderPresetList();
+            setMsg(`Preset "${name}" saved.`);
+        }
+
+        // --- Event Listeners ---
+        startBtn.addEventListener('click', start);
+        stopBtn.addEventListener('click', stop);
+        document.getElementById('savePresetBtn').addEventListener('click', savePreset);
+        document.getElementById('randomBtn').addEventListener('click', () => {
+             const randomSettings = {};
+             // Randomize globals
+             randomSettings.mix = (0.5 + Math.random() * 0.5).toFixed(2);
+             randomSettings.speed = (Math.random() * 4).toFixed(2);
+             randomSettings.feather = Math.floor(Math.random() * 100);
+             randomSettings.pad = Math.floor(Math.random() * 100 - 20);
+             randomSettings.invertMaskChk = Math.random() > 0.8;
+             
+             // Randomize effects
+             for(const key in effects) {
+                 randomSettings[`chk_${key}`] = Math.random() > 0.4;
+                 effects[key].controls.forEach(c => {
+                    const min = parseFloat(c.min);
+                    const max = parseFloat(c.max);
+                    const val = min + Math.random() * (max - min);
+                    randomSettings[c.id] = val;
+                 });
+             }
+             applySettings(randomSettings);
+             setMsg('Settings randomized!');
+        });
+
+        // --- Initialization ---
+        createEffectUI();
+        renderPresetList();
+        
+        // Auto-start if camera permission was already granted
+        (async () => {
+            if (navigator.permissions) {
+                try {
+                    const permission = await navigator.permissions.query({ name: 'camera' });
+                    if (permission.state === 'granted') {
+                        start();
+                    }
+                } catch(e) { /* ignore */ }
+            }
+        })();
+
+    })();
+    </script>
+</body>
+</html>
