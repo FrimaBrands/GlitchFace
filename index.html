@@ -1,763 +1,256 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Face Glitch Effect</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Courier New', monospace;
-            background: #000;
-            color: #0ff;
-            overflow: hidden;
-            position: relative;
-        }
-
-        #container {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        video {
-            position: absolute;
-            display: none;
-        }
-
-        canvas {
-            display: block;
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
-            height: auto;
-        }
-
-        #controls {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border: 2px solid #0ff;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
-            z-index: 10;
-            max-width: 300px;
-        }
-
-        h2 {
-            margin-bottom: 15px;
-            text-shadow: 0 0 10px #0ff;
-            font-size: 1.2em;
-        }
-
-        .control-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            background: #111;
-            outline: none;
-            -webkit-appearance: none;
-            height: 5px;
-            border-radius: 5px;
-            border: 1px solid #0ff;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #0ff;
-            cursor: pointer;
-            box-shadow: 0 0 10px #0ff;
-        }
-
-        input[type="range"]::-moz-range-thumb {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            background: #0ff;
-            cursor: pointer;
-            box-shadow: 0 0 10px #0ff;
-        }
-
-        select {
-            width: 100%;
-            padding: 5px;
-            background: #111;
-            color: #0ff;
-            border: 1px solid #0ff;
-            border-radius: 3px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-        }
-
-        button {
-            width: 100%;
-            padding: 10px;
-            background: #111;
-            color: #0ff;
-            border: 2px solid #0ff;
-            border-radius: 5px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            font-weight: bold;
-        }
-
-        button:hover:not(:disabled) {
-            background: #0ff;
-            color: #000;
-            box-shadow: 0 0 15px #0ff;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        #startScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 20;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 40px;
-            border: 2px solid #0ff;
-            border-radius: 10px;
-            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
-        }
-
-        #startScreen h1 {
-            margin-bottom: 20px;
-            font-size: 2em;
-            text-shadow: 0 0 20px #0ff;
-        }
-
-        #startScreen p {
-            margin-bottom: 30px;
-            opacity: 0.8;
-        }
-
-        .glitch-text {
-            animation: glitch 2s infinite;
-        }
-
-        @keyframes glitch {
-            0%, 100% { text-shadow: 2px 0 #f0f, -2px 0 #0ff; }
-            25% { text-shadow: -2px 0 #f0f, 2px 0 #0ff; }
-            50% { text-shadow: 2px 0 #0ff, -2px 0 #f0f; }
-            75% { text-shadow: -2px 0 #0ff, 2px 0 #f0f; }
-        }
-
-        .status {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border: 1px solid #0ff;
-            border-radius: 5px;
-            font-size: 0.9em;
-        }
-
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .loading-models {
-            color: #ff0;
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Webcam Face Blur</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --fg: #e5e7eb;
+      --muted: #9aa0aa;
+      --accent: #6ee7b7;
+      --danger: #f87171;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: grid; place-items: center;
+    }
+    .wrap { width: min(960px, 96vw); }
+    .panel {
+      background: #11141a; border: 1px solid #1f2430; border-radius: 16px; padding: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, select, .badge {
+      background: #0b0e13; color: var(--fg); border: 1px solid #1f2430; border-radius: 12px; padding: 8px 12px; cursor: pointer;
+    }
+    button:hover { border-color: #2e3748; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .badge { font-size: 12px; }
+    #stage { position: relative; aspect-ratio: 16/9; background: #0c1016; border-radius: 16px; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    #video { display: none; }
+    .note { color: var(--muted); margin-top: 10px; font-size: 13px; }
+    .error { color: var(--danger); }
+    footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
-    <div id="container">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="canvas"></canvas>
-        
-        <div id="startScreen">
-            <h1 class="glitch-text">FACE GLITCH</h1>
-            <p>Apply real-time glitch effects with face tracking</p>
-            <p id="loadStatus" class="loading-models hidden">Loading face detection models...</p>
-            <button id="initBtn">START CAMERA</button>
+  <div class="wrap">
+    <div class="panel">
+      <header>
+        <h1>Webcam Face Blur</h1>
+        <div class="controls">
+          <button id="startBtn">Start camera</button>
+          <button id="stopBtn" disabled>Stop</button>
+          <label class="badge"><input type="checkbox" id="mirrorChk" checked> Mirror</label>
+          <span id="status" class="badge">Idle</span>
         </div>
-        
-        <div id="controls" class="hidden">
-            <h2 class="glitch-text">CONTROLS</h2>
-            
-            <div class="control-group">
-                <label>Effect Type</label>
-                <select id="effectType">
-                    <option value="rgb">RGB Split</option>
-                    <option value="pixelate">Pixelate</option>
-                    <option value="noise">Digital Noise</option>
-                    <option value="wave">Wave Distortion</option>
-                    <option value="corrupt">Data Corruption</option>
-                    <option value="scanner">Scanner Lines</option>
-                    <option value="all">All Effects</option>
-                </select>
-            </div>
-            
-            <div class="control-group">
-                <label>Intensity: <span id="intensityValue">50</span>%</label>
-                <input type="range" id="intensity" min="0" max="100" value="50">
-            </div>
-            
-            <div class="control-group">
-                <label>Blur: <span id="blurValue">0</span>px</label>
-                <input type="range" id="blur" min="0" max="20" value="0">
-            </div>
-            
-            <div class="control-group">
-                <label>Glitch Speed: <span id="speedValue">50</span>%</label>
-                <input type="range" id="speed" min="0" max="100" value="50">
-            </div>
-
-            <div class="control-group">
-                <label>Face Padding: <span id="paddingValue">30</span>px</label>
-                <input type="range" id="padding" min="0" max="100" value="30">
-            </div>
-
-            <div class="control-group">
-                <label>Detection Mode</label>
-                <select id="detectionMode">
-                    <option value="auto">Auto (Face Tracked)</option>
-                    <option value="center">Center Region</option>
-                    <option value="full">Full Frame</option>
-                    <option value="mouse">Mouse Position</option>
-                </select>
-            </div>
-
-            <div class="checkbox-group">
-                <input type="checkbox" id="showBounds">
-                <label for="showBounds">Show Effect Region</label>
-            </div>
-        </div>
-
-        <div class="status hidden" id="status">
-            FPS: <span id="fps">0</span> | 
-            Mode: <span id="currentMode">Auto</span> |
-            Effect: <span id="currentEffect">RGB</span>
-        </div>
+      </header>
+      <div id="stage">
+        <video id="video" playsinline muted></video>
+        <canvas id="canvas" aria-label="camera with face blur"></canvas>
+      </div>
+      <div id="msg" class="note"></div>
+      <footer>
+        <span>Runs entirely in your browser. HTTPS required for camera access.</span>
+        <span>Built for Chrome; uses the Shape Detection <code>FaceDetector</code> API.</span>
+      </footer>
     </div>
+  </div>
 
-    <!-- Load face-api.js from CDN -->
-    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    
-    <script>
-        let video, canvas, ctx;
-        let frameCount = 0;
-        let isRunning = false;
-        let lastTime = performance.now();
-        let fps = 0;
-        let currentRegion = null;
-        let mouseX = 0, mouseY = 0;
-        let faceApiReady = false;
-        let lastDetection = null;
-        let detectionCounter = 0;
-        
-        let settings = {
-            effectType: 'rgb',
-            intensity: 50,
-            blur: 0,
-            speed: 50,
-            padding: 30,
-            detectionMode: 'auto',
-            showBounds: false
-        };
+<script>
+(() => {
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: false });
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const mirrorChk = document.getElementById('mirrorChk');
+  const statusEl = document.getElementById('status');
+  const msgEl = document.getElementById('msg');
 
-        // Track mouse position
-        document.addEventListener('mousemove', (e) => {
-            const rect = canvas ? canvas.getBoundingClientRect() : null;
-            if (rect) {
-                mouseX = ((e.clientX - rect.left) / rect.width) * canvas.width;
-                mouseY = ((e.clientY - rect.top) / rect.height) * canvas.height;
-            }
+  let stream = null;
+  let rafId = null;
+  let detector = null;
+  let lastDetections = [];
+  let lastDetTime = 0;
+  const DETECT_EVERY_MS = 120; // run face detection ~8 FPS for performance
+
+  const faceApiAvailable = 'FaceDetector' in window;
+
+  function setStatus(text) { statusEl.textContent = text; }
+  function setMsg(text, isError=false) {
+    msgEl.textContent = text || '';
+    msgEl.classList.toggle('error', !!isError);
+  }
+
+  function fitCanvasToVideo() {
+    if (!video.videoWidth) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
+  }
+
+  async function initDetector() {
+    if (!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.');
+    detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 5 });
+  }
+
+  async function start() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMsg('getUserMedia is not supported in this browser. Try Chrome, Edge, or a modern browser.', true);
+      return;
+    }
+
+    try {
+      setStatus('Requesting camera...');
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      fitCanvasToVideo();
+      window.addEventListener('resize', fitCanvasToVideo);
+
+      // Initialize detector (or tell the user if missing)
+      try {
+        await initDetector();
+        setMsg('');
+      } catch (e) {
+        console.warn(e);
+        setMsg('FaceDetector API not available. Use Chrome (latest) and make sure "Experimental Web Platform features" are enabled, or ask me for a MediaPipe fallback.', true);
+      }
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      loop();
+    } catch (err) {
+      console.error(err);
+      const httpsHint = location.protocol !== 'https:' ? ' • Tip: GitHub Pages serves over HTTPS; local files or insecure HTTP will block the camera.' : '';
+      setMsg('Could not start camera: ' + err.message + httpsHint, true);
+      setStatus('Error');
+    }
+  }
+
+  function stop() {
+    if (rafId) cancelAnimationFrame(rafId), rafId = null;
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setStatus('Stopped');
+  }
+
+  function drawFrame() {
+    if (!video.videoWidth) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.save();
+    // Mirror if requested
+    if (mirrorChk.checked) {
+      ctx.translate(w, 0);
+      ctx.scale(-1, 1);
+    }
+
+    // Draw the base video frame
+    ctx.drawImage(video, 0, 0, w, h);
+
+    // Overlay blurred patches where faces are
+    if (lastDetections && lastDetections.length) {
+      for (const face of lastDetections) {
+        const { x, y, width, height } = face.boundingBox || face.boundingBox || face; // be liberal
+
+        // Grow the blur box a bit to cover hair/edges
+        const grow = Math.round(Math.max(width, height) * 0.15);
+        const bx = Math.max(0, x - grow);
+        const by = Math.max(0, y - grow);
+        const bw = Math.min(w - bx, width + 2*grow);
+        const bh = Math.min(h - by, height + 2*grow);
+
+        // Clip to a rounded rectangle so blur looks nicer
+        const r = Math.floor(Math.min(bw, bh) * 0.12);
+        roundedRect(ctx, bx, by, bw, bh, r);
+        ctx.clip();
+
+        // Draw the same region with a blur filter
+        ctx.filter = 'blur(22px)';
+        ctx.drawImage(video, bx, by, bw, bh, bx, by, bw, bh);
+
+        ctx.filter = 'none';
+        ctx.beginPath(); // reset clip
+        ctx.restore();
+        ctx.save();
+        if (mirrorChk.checked) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  async function detectFaces(now) {
+    if (!detector) return [];
+    try {
+      const faces = await detector.detect(video);
+      // FaceDetector returns an array of {boundingBox: {x,y,width,height}, landmarks:[...]}
+      return faces || [];
+    } catch (e) {
+      // Detection can fail sporadically between frames; swallow and keep going
+      return [];
+    }
+  }
+
+  async function loop(now) {
+    rafId = requestAnimationFrame(loop);
+
+    // Draw current frame
+    drawFrame();
+
+    // Throttle detection
+    if (!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS) {
+      lastDetTime = performance.now();
+      if (detector) {
+        setStatus('Detecting…');
+        detectFaces().then(faces => {
+          lastDetections = faces.map(f => ({ boundingBox: f.boundingBox }));
+          setStatus(faces.length ? `Faces: ${faces.length}` : 'No face');
         });
+      } else {
+        setStatus('Camera on');
+      }
+    }
+  }
 
-        // Load face-api models
-        async function loadFaceModels() {
-            try {
-                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-                faceApiReady = true;
-                console.log('Face detection models loaded');
-            } catch (error) {
-                console.warn('Face-api.js failed to load, using fallback detection');
-                faceApiReady = false;
-            }
-        }
+  startBtn.addEventListener('click', start);
+  stopBtn.addEventListener('click', stop);
 
-        // Get region based on detection mode
-        function getEffectRegion() {
-            const width = canvas.width;
-            const height = canvas.height;
-            
-            switch(settings.detectionMode) {
-                case 'center':
-                    return {
-                        x: width * 0.25,
-                        y: height * 0.2,
-                        width: width * 0.5,
-                        height: height * 0.6
-                    };
-                    
-                case 'full':
-                    return {
-                        x: 0,
-                        y: 0,
-                        width: width,
-                        height: height
-                    };
-                    
-                case 'mouse':
-                    const size = 200 + settings.padding;
-                    return {
-                        x: Math.max(0, Math.min(width - size, mouseX - size/2)),
-                        y: Math.max(0, Math.min(height - size, mouseY - size/2)),
-                        width: size,
-                        height: size
-                    };
-                    
-                case 'auto':
-                default:
-                    // Try face detection
-                    if (lastDetection) {
-                        return lastDetection;
-                    }
-                    // Fallback to center
-                    return {
-                        x: width * 0.25,
-                        y: height * 0.2,
-                        width: width * 0.5,
-                        height: height * 0.6
-                    };
-            }
-        }
-
-        // Detect face using face-api.js
-        async function detectFace() {
-            if (!faceApiReady || settings.detectionMode !== 'auto') return;
-            
-            detectionCounter++;
-            // Only detect every 5 frames for performance
-            if (detectionCounter % 5 !== 0) return;
-            
-            try {
-                const detections = await faceapi.detectAllFaces(
-                    video, 
-                    new faceapi.TinyFaceDetectorOptions({
-                        inputSize: 320,
-                        scoreThreshold: 0.3
-                    })
-                );
-                
-                if (detections.length > 0) {
-                    const face = detections[0].box;
-                    const padding = settings.padding;
-                    
-                    lastDetection = {
-                        x: Math.max(0, face.x - padding),
-                        y: Math.max(0, face.y - padding),
-                        width: Math.min(canvas.width - face.x + padding, face.width + padding * 2),
-                        height: Math.min(canvas.height - face.y + padding, face.height + padding * 2)
-                    };
-                }
-            } catch (error) {
-                console.warn('Face detection error:', error);
-            }
-        }
-
-        function applyRGBSplit(imageData, region, intensity) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const shift = Math.floor(intensity / 5);
-            const tempData = new Uint8ClampedArray(data);
-            
-            const startY = Math.floor(region.y);
-            const endY = Math.min(imageData.height, Math.floor(region.y + region.height));
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    const idx = (y * width + x) * 4;
-                    
-                    if (x > startX + shift) {
-                        const shiftIdx = (y * width + (x - shift)) * 4;
-                        data[idx] = tempData[shiftIdx];
-                    }
-                    
-                    if (x < endX - shift) {
-                        const shiftIdx = (y * width + (x + shift)) * 4;
-                        data[idx + 2] = tempData[shiftIdx + 2];
-                    }
-                }
-            }
-        }
-
-        function applyPixelate(imageData, region, intensity) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const pixelSize = Math.max(2, Math.floor(intensity / 4));
-            
-            const startY = Math.floor(region.y);
-            const endY = Math.min(imageData.height, Math.floor(region.y + region.height));
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = startY; y < endY; y += pixelSize) {
-                for (let x = startX; x < endX; x += pixelSize) {
-                    const idx = (y * width + x) * 4;
-                    const r = data[idx];
-                    const g = data[idx + 1];
-                    const b = data[idx + 2];
-                    
-                    for (let py = 0; py < pixelSize && y + py < endY; py++) {
-                        for (let px = 0; px < pixelSize && x + px < endX; px++) {
-                            const pidx = ((y + py) * width + (x + px)) * 4;
-                            data[pidx] = r;
-                            data[pidx + 1] = g;
-                            data[pidx + 2] = b;
-                        }
-                    }
-                }
-            }
-        }
-
-        function applyNoise(imageData, region, intensity) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const noiseLevel = intensity * 2;
-            
-            const startY = Math.floor(region.y);
-            const endY = Math.min(imageData.height, Math.floor(region.y + region.height));
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = startY; y < endY; y++) {
-                for (let x = startX; x < endX; x++) {
-                    if (Math.random() < intensity / 100) {
-                        const idx = (y * width + x) * 4;
-                        const noise = (Math.random() - 0.5) * noiseLevel;
-                        data[idx] = Math.min(255, Math.max(0, data[idx] + noise));
-                        data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + noise));
-                        data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + noise));
-                    }
-                }
-            }
-        }
-
-        function applyWave(imageData, region, intensity, frame) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const tempData = new Uint8ClampedArray(data);
-            const amplitude = intensity / 5;
-            const frequency = 0.02;
-            
-            const startY = Math.floor(region.y);
-            const endY = Math.min(imageData.height, Math.floor(region.y + region.height));
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = startY; y < endY; y++) {
-                const offset = Math.sin((y + frame) * frequency) * amplitude;
-                for (let x = startX; x < endX; x++) {
-                    const srcX = Math.floor(x + offset);
-                    if (srcX >= startX && srcX < endX) {
-                        const idx = (y * width + x) * 4;
-                        const srcIdx = (y * width + srcX) * 4;
-                        data[idx] = tempData[srcIdx];
-                        data[idx + 1] = tempData[srcIdx + 1];
-                        data[idx + 2] = tempData[srcIdx + 2];
-                    }
-                }
-            }
-        }
-
-        function applyCorruption(imageData, region, intensity) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const corruptionChance = intensity / 500;
-            
-            const startY = Math.floor(region.y);
-            const endY = Math.min(imageData.height, Math.floor(region.y + region.height));
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = startY; y < endY; y++) {
-                if (Math.random() < corruptionChance) {
-                    const barHeight = Math.floor(Math.random() * 5) + 1;
-                    for (let by = 0; by < barHeight && y + by < endY; by++) {
-                        for (let x = startX; x < endX; x++) {
-                            const idx = ((y + by) * width + x) * 4;
-                            if (Math.random() < 0.5) {
-                                data[idx] = Math.random() * 255;
-                                data[idx + 1] = Math.random() * 255;
-                                data[idx + 2] = Math.random() * 255;
-                            }
-                        }
-                    }
-                    y += barHeight;
-                }
-            }
-        }
-
-        function applyScanner(imageData, region, intensity, frame) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const scanSpeed = 0.02 * (settings.speed / 50);
-            const scanPosition = ((Math.sin(frame * scanSpeed) + 1) / 2) * region.height + region.y;
-            const scanThickness = Math.max(2, intensity / 10);
-            
-            const startX = Math.floor(region.x);
-            const endX = Math.min(width, Math.floor(region.x + region.width));
-            
-            for (let y = Math.floor(scanPosition - scanThickness); y < Math.floor(scanPosition + scanThickness); y++) {
-                if (y >= region.y && y < region.y + region.height) {
-                    for (let x = startX; x < endX; x++) {
-                        const idx = (y * width + x) * 4;
-                        data[idx] = 255 - data[idx];
-                        data[idx + 1] = 255 - data[idx + 1];
-                        data[idx + 2] = 255 - data[idx + 2];
-                    }
-                }
-            }
-        }
-
-        async function setupCamera() {
-            video = document.getElementById('video');
-            canvas = document.getElementById('canvas');
-            ctx = canvas.getContext('2d', { alpha: false });
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user'
-                    }
-                });
-                
-                video.srcObject = stream;
-                
-                return new Promise((resolve, reject) => {
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        canvas.width = video.videoWidth;
-                        canvas.height = video.videoHeight;
-                        console.log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
-                        resolve();
-                    };
-                    
-                    video.onerror = reject;
-                });
-            } catch (error) {
-                console.error('Camera error:', error);
-                throw new Error('Camera access denied or not available');
-            }
-        }
-
-        function updateFPS() {
-            const currentTime = performance.now();
-            const delta = currentTime - lastTime;
-            fps = Math.round(1000 / delta);
-            lastTime = currentTime;
-            document.getElementById('fps').textContent = fps;
-        }
-
-        async function animate() {
-            if (!isRunning) return;
-            
-            updateFPS();
-            
-            // Draw video to canvas
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Detect face if in auto mode
-            await detectFace();
-            
-            // Get effect region
-            currentRegion = getEffectRegion();
-            
-            // Get image data
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            
-            // Apply effects
-            const speedMultiplier = settings.speed / 50;
-            const adjustedFrame = frameCount * speedMultiplier;
-            
-            switch(settings.effectType) {
-                case 'rgb':
-                    applyRGBSplit(imageData, currentRegion, settings.intensity);
-                    break;
-                case 'pixelate':
-                    applyPixelate(imageData, currentRegion, settings.intensity);
-                    break;
-                case 'noise':
-                    applyNoise(imageData, currentRegion, settings.intensity);
-                    break;
-                case 'wave':
-                    applyWave(imageData, currentRegion, settings.intensity, adjustedFrame);
-                    break;
-                case 'corrupt':
-                    applyCorruption(imageData, currentRegion, settings.intensity);
-                    break;
-                case 'scanner':
-                    applyScanner(imageData, currentRegion, settings.intensity, adjustedFrame);
-                    break;
-                case 'all':
-                    if (Math.random() < 0.3) applyRGBSplit(imageData, currentRegion, settings.intensity / 2);
-                    if (Math.random() < 0.3) applyPixelate(imageData, currentRegion, settings.intensity / 3);
-                    if (Math.random() < 0.5) applyNoise(imageData, currentRegion, settings.intensity / 2);
-                    if (Math.sin(adjustedFrame * 0.05) > 0) applyWave(imageData, currentRegion, settings.intensity / 2, adjustedFrame);
-                    if (Math.random() < 0.1) applyCorruption(imageData, currentRegion, settings.intensity);
-                    applyScanner(imageData, currentRegion, settings.intensity / 3, adjustedFrame);
-                    break;
-            }
-            
-            // Put image data back
-            ctx.putImageData(imageData, 0, 0);
-            
-            // Apply blur if needed
-            if (settings.blur > 0) {
-                ctx.filter = `blur(${settings.blur}px)`;
-                ctx.drawImage(canvas, 0, 0);
-                ctx.filter = 'none';
-            }
-            
-            // Draw bounds if enabled
-            if (settings.showBounds && currentRegion) {
-                ctx.strokeStyle = '#0ff';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.strokeRect(currentRegion.x, currentRegion.y, currentRegion.width, currentRegion.height);
-                ctx.setLineDash([]);
-            }
-            
-            frameCount++;
-            requestAnimationFrame(animate);
-        }
-
-        async function init() {
-            const initBtn = document.getElementById('initBtn');
-            const startScreen = document.getElementById('startScreen');
-            const controls = document.getElementById('controls');
-            const status = document.getElementById('status');
-            const loadStatus = document.getElementById('loadStatus');
-            
-            // Load face detection models in background
-            loadStatus.classList.remove('hidden');
-            loadFaceModels().then(() => {
-                loadStatus.textContent = faceApiReady ? 'Face detection ready!' : 'Using fallback detection';
-                setTimeout(() => loadStatus.classList.add('hidden'), 2000);
-            });
-            
-            initBtn.addEventListener('click', async () => {
-                initBtn.disabled = true;
-                initBtn.textContent = 'INITIALIZING...';
-                
-                try {
-                    await setupCamera();
-                    
-                    // Hide start screen, show controls
-                    startScreen.classList.add('hidden');
-                    controls.classList.remove('hidden');
-                    status.classList.remove('hidden');
-                    
-                    // Start animation
-                    isRunning = true;
-                    animate();
-                    
-                } catch (error) {
-                    initBtn.textContent = 'CAMERA ERROR - RETRY';
-                    initBtn.disabled = false;
-                    alert('Error: ' + error.message + '\n\nPlease ensure camera permissions are granted.');
-                }
-            });
-            
-            // Set up controls
-            document.getElementById('effectType').addEventListener('change', (e) => {
-                settings.effectType = e.target.value;
-                document.getElementById('currentEffect').textContent = e.target.options[e.target.selectedIndex].text;
-            });
-            
-            document.getElementById('intensity').addEventListener('input', (e) => {
-                settings.intensity = parseInt(e.target.value);
-                document.getElementById('intensityValue').textContent = settings.intensity;
-            });
-            
-            document.getElementById('blur').addEventListener('input', (e) => {
-                settings.blur = parseInt(e.target.value);
-                document.getElementById('blurValue').textContent = settings.blur;
-            });
-            
-            document.getElementById('speed').addEventListener('input', (e) => {
-                settings.speed = parseInt(e.target.value);
-                document.getElementById('speedValue').textContent = settings.speed;
-            });
-            
-            document.getElementById('padding').addEventListener('input', (e) => {
-                settings.padding = parseInt(e.target.value);
-                document.getElementById('paddingValue').textContent = settings.padding;
-            });
-            
-            document.getElementById('detectionMode').addEventListener('change', (e) => {
-                settings.detectionMode = e.target.value;
-                document.getElementById('currentMode').textContent = e.target.options[e.target.selectedIndex].text;
-                lastDetection = null; // Reset detection when mode changes
-            });
-            
-            document.getElementById('showBounds').addEventListener('change', (e) => {
-                settings.showBounds = e.target.checked;
-            });
-        }
-
-        // Start
-        init();
-    </script>
+  // Auto-start if permissions are already granted
+  (async () => {
+    try {
+      const p = await navigator.permissions.query({ name: 'camera' });
+      if (p.state === 'granted') start();
+    } catch {}
+  })();
+})();
+</script>
 </body>
 </html>
