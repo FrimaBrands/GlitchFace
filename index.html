@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>REDO: Face Glitch AR</title>
+    <title>Face Glitch V2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #0d0f13;
+            --bg: #0b0d11;
             --panel: #11141a;
             --stroke: #1f2430;
             --fg: #e5e7eb;
@@ -27,7 +27,7 @@
         }
         
         * { box-sizing: border-box; }
-        html, body { height: 100%; margin: 0; font-family: 'Montserrat', sans-serif; background: var(--bg); color: var(--text-color); }
+        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--text-color); }
         
         body {
             display: flex;
@@ -102,6 +102,7 @@
             font-size: 14px;
             cursor: pointer;
             transition: background-color 0.2s, border-color 0.2s;
+            font-family: 'Poppins', sans-serif;
         }
         
         .btn:hover:not(:disabled) {
@@ -125,71 +126,67 @@
             background-color: #55d4a6;
             border-color: #55d4a6;
         }
-
-        .controls-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
+        
+        .section-heading {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        .effect-card {
+        .effect-selector {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-            border-radius: var(--radius-sm);
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .effect-btn {
             background: var(--primary-bg);
             border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.2s;
         }
-        
-        .effect-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        
-        .effect-card.active {
+
+        .effect-btn:hover {
             border-color: var(--primary-color);
             background: rgba(110, 231, 183, 0.1);
         }
 
-        .effect-card .icon {
-            width: 40px;
-            height: 40px;
-            margin-bottom: 8px;
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
+        .effect-btn.active {
+            border-color: var(--primary-color);
+            background: rgba(110, 231, 183, 0.2);
+            color: var(--primary-color);
         }
-        
-        .effect-card .label {
-            font-size: 12px;
-            font-weight: 600;
-            text-align: center;
-            color: var(--fg);
-        }
-        
-        .icon-glitch { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 17a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l4 4v1.5'/%3E%3Cpath d='M12 11h4l-4 4h4'/%3E%3C/svg%3E"); }
-        .icon-distort { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 18v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2'/%3E%3Cpath d='M4 6v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6'/%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3C/svg%3E"); }
-        .icon-blur { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a10 10 0 0 0 0 20'/%3E%3Cpath d='M12 2a10 10 0 0 1 0 20'/%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M4 12c0-2.2 4-4 8-4s8 1.8 8 4'/%3E%3Cpath d='M4 12c0 2.2 4 4 8 4s8-1.8 8-4'/%3E%3C/svg%3E"); }
-        .icon-pixelate { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='3' y1='9' x2='21' y2='9'/%3E%3Cline x1='3' y1='15' x2='21' y2='15'/%3E%3Cline x1='9' y1='3' x2='9' y2='21'/%3E%3Cline x1='15' y1='3' x2='15' y2='21'/%3E%3C/svg%3E"); }
-        .icon-combo { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='12' y1='3' x2='12' y2='21'/%3E%3Cline x1='3' y1='12' x2='21' y2='12'/%3E%3Cpath d='M18 18c-2.8-2.8-2.8-7.2 0-10'/%3E%3Cpath d='M6 6c2.8 2.8 2.8 7.2 0 10'/%3E%3C/svg%3E"); }
-        .icon-smear { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M18 6a6 6 0 0 0-12 0'/%3E%3Cpath d='M18 18a6 6 0 0 1-12 0'/%3E%3C/svg%3E"); }
-        .icon-radial-blur { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='M4.9 4.9l1.4 1.4'/%3E%3Cpath d='M17.7 17.7l1.4 1.4'/%3E%3Cpath d='M4.9 19.1l1.4-1.4'/%3E%3Cpath d='M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E"); }
-        .icon-swirl { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2a10 10 0 0 1 0 20'/%3E%3Cpath d='M12 2a10 10 0 0 0 0 20'/%3E%3Cpath d='M12 2c-2.2 0-4 1.8-4 4s1.8 4 4 4s4-1.8 4-4s-1.8-4-4-4z'/%3E%3C/svg%3E"); }
-        .icon-noise { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M18 6a6 6 0 0 0-12 0'/%3E%3Cpath d='M18 18a6 6 0 0 1-12 0'/%3E%3C/svg%3E"); }
 
+        .dynamic-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
         .control-group {
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             margin-bottom: 16px;
             overflow: hidden;
             background: var(--primary-bg);
+            opacity: 0;
+            visibility: hidden;
+            max-height: 0;
+            transition: all 0.3s ease-in-out;
         }
 
+        .control-group.active {
+            opacity: 1;
+            visibility: visible;
+            max-height: 500px; /* Needs to be large enough to contain all content */
+        }
+        
         .control-group-header {
             padding: 12px 16px;
             display: flex;
@@ -216,13 +213,9 @@
         }
 
         .control-group-content {
-            display: none;
+            overflow: hidden;
             padding: 12px 16px;
             border-top: 1px solid var(--border-color);
-        }
-        
-        .control-group.expanded .control-group-content {
-            display: block;
         }
         
         .control-grid {
@@ -348,58 +341,150 @@
         </div>
         <div class="controls-panel">
             <div class="header">
-                <h1>Face Glitch AR</h1>
+                <h1>Face Glitch V2</h1>
                 <div class="header-actions">
                     <button id="startBtn" class="btn btn-primary">Start Camera</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
                 </div>
             </div>
 
-            <div class="controls-section">
-                <h3>Effects</h3>
-                <div class="controls-grid" id="effectSelector">
-                    <div class="effect-card active" data-effect="0">
-                        <div class="icon icon-glitch"></div>
-                        <span class="label">Glitch</span>
+            <div class="effect-selector">
+                <button class="effect-btn active" data-effect="5">Smear</button>
+                <button class="effect-btn" data-effect="6">Radial Blur</button>
+                <button class="effect-btn" data-effect="8">Noise Flow</button>
+                <button class="effect-btn" data-effect="0">Glitch</button>
+                <button class="effect-btn" data-effect="1">Wavy Distort</button>
+                <button class="effect-btn" data-effect="7">Swirl</button>
+                <button class="effect-btn" data-effect="2">Box Blur</button>
+                <button class="effect-btn" data-effect="3">Pixelate</button>
+            </div>
+
+            <div class="dynamic-controls">
+                <div id="smearControls" class="control-group active" data-effect="5">
+                    <div class="control-group-header">Smear Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Smear Length (px)<span id="smLenVal">40</span></label>
+                                <input type="range" id="smLen" min="0" max="120" step="1" value="40" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Smear Angle (°)<span id="smAngVal">0</span></label>
+                                <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Samples<span id="samplesVal">12</span></label>
+                                <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="1">
-                        <div class="icon icon-distort"></div>
-                        <span class="label">Distort</span>
+                </div>
+
+                <div id="radialBlurControls" class="control-group" data-effect="6">
+                    <div class="control-group-header">Radial Blur Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Blur Radius (px)<span id="smLenVal_b">40</span></label>
+                                <input type="range" id="smLen_b" min="0" max="120" step="1" value="40" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Samples<span id="samplesVal_b">12</span></label>
+                                <input type="range" id="samples_b" min="1" max="32" step="1" value="12" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="2">
-                        <div class="icon icon-blur"></div>
-                        <span class="label">Blur</span>
+                </div>
+                
+                <div id="noiseFlowControls" class="control-group" data-effect="8">
+                    <div class="control-group-header">Noise Flow Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Noise Scale<span id="nScaleVal">3.0</span></label>
+                                <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Noise Strength (px)<span id="nStrengthVal">18</span></label>
+                                <input type="range" id="nStrength" min="0" max="60" step="1" value="18" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="3">
-                        <div class="icon icon-pixelate"></div>
-                        <span class="label">Pixelate</span>
+                </div>
+
+                <div id="glitchControls" class="control-group" data-effect="0">
+                    <div class="control-group-header">Glitch Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Glitch Block (px)<span id="blockVal">22</span></label>
+                                <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Glitch Probability<span id="probVal">0.45</span></label>
+                                <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="4">
-                        <div class="icon icon-combo"></div>
-                        <span class="label">Combo</span>
+                </div>
+
+                <div id="distortControls" class="control-group" data-effect="1">
+                    <div class="control-group-header">Wavy Distort Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Wave Freq<span id="freqVal">12.0</span></label>
+                                <input type="range" id="freq" min="0" max="60" step="0.5" value="12" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Wave Amp (px)<span id="ampVal">16</span></label>
+                                <input type="range" id="amp" min="0" max="60" step="1" value="16" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="5">
-                        <div class="icon icon-smear"></div>
-                        <span class="label">Smear</span>
+                </div>
+
+                <div id="swirlControls" class="control-group" data-effect="7">
+                    <div class="control-group-header">Swirl Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Swirl Amount<span id="swirlVal">2.20</span></label>
+                                <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="2.2" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="6">
-                        <div class="icon icon-radial-blur"></div>
-                        <span class="label">Radial Blur</span>
+                </div>
+
+                <div id="boxBlurControls" class="control-group" data-effect="2">
+                    <div class="control-group-header">Box Blur Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Blur Radius (px)<span id="blurVal">16</span></label>
+                                <input type="range" id="blur" min="0" max="48" step="1" value="16" class="slider-input">
+                            </div>
+                        </div>
                     </div>
-                    <div class="effect-card" data-effect="7">
-                        <div class="icon icon-swirl"></div>
-                        <span class="label">Swirl</span>
-                    </div>
-                    <div class="effect-card" data-effect="8">
-                        <div class="icon icon-noise"></div>
-                        <span class="label">Noise Flow</span>
+                </div>
+
+                <div id="pixelateControls" class="control-group" data-effect="3">
+                    <div class="control-group-header">Pixelate Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
+                                <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-            
-            <div class="control-group expanded" data-group="core">
-                <div class="control-group-header">Core Controls</div>
-                <div class="control-group-content">
+
+            <div class="section-heading">Global Controls</div>
+            <div class="control-group expanded">
+                <div class="control-group-header">Core & Masking</div>
+                <div class="control-group-content options-list">
                     <div class="control-grid">
                         <div class="control-item">
                             <label class="slider-label">Intensity<span id="intensityVal">0.90</span></label>
@@ -410,123 +495,56 @@
                             <input type="range" id="speed" min="0" max="5" step="0.01" value="1.2" class="slider-input">
                         </div>
                         <div class="control-item">
-                            <label class="slider-label">Feather<span id="featherVal">18</span></label>
-                            <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
+                            <label class="slider-label">Chroma Shift (px)<span id="chromaVal">6</span></label>
+                            <input type="range" id="chroma" min="0" max="20" step="1" value="6" class="slider-input">
                         </div>
                         <div class="control-item">
                             <label class="slider-label">Mix (Opacity)<span id="mixVal">1.00</span></label>
                             <input type="range" id="mix" min="0" max="1" step="0.01" value="1" class="slider-input">
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-group" data-group="glitch">
-                <div class="control-group-header">Glitch & Distortion</div>
-                <div class="control-group-content">
-                    <div class="control-grid">
                         <div class="control-item">
-                            <label class="slider-label">Glitch Block (px)<span id="blockVal">22</span></label>
-                            <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Glitch Probability<span id="probVal">0.45</span></label>
-                            <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Chroma Shift (px)<span id="chromaVal">6</span></label>
-                            <input type="range" id="chroma" min="0" max="20" step="1" value="6" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Wave Freq<span id="freqVal">12.0</span></label>
-                            <input type="range" id="freq" min="0" max="60" step="0.5" value="12" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Wave Amp (px)<span id="ampVal">16</span></label>
-                            <input type="range" id="amp" min="0" max="60" step="1" value="16" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
-                            <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-group" data-group="smear-blur">
-                <div class="control-group-header">Smear & Blur</div>
-                <div class="control-group-content">
-                    <div class="control-grid">
-                        <div class="control-item">
-                            <label class="slider-label">Smear Length (px)<span id="smLenVal">40</span></label>
-                            <input type="range" id="smLen" min="0" max="120" step="1" value="40" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Smear Angle (°)<span id="smAngVal">0</span></label>
-                            <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Blur Radius (px)<span id="blurVal">16</span></label>
-                            <input type="range" id="blur" min="0" max="48" step="1" value="16" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Samples<span id="samplesVal">12</span></label>
-                            <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Swirl Amount<span id="swirlVal">2.20</span></label>
-                            <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="2.2" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Noise Scale<span id="nScaleVal">3.0</span></label>
-                            <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Noise Strength<span id="nStrengthVal">18</span></label>
-                            <input type="range" id="nStrength" min="0" max="60" step="1" value="18" class="slider-input">
+                            <label class="slider-label">Feather<span id="featherVal">18</span></label>
+                            <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
                         </div>
                         <div class="control-item">
                             <label class="slider-label">Seed<span id="seedVal">7</span></label>
                             <input type="range" id="seed" min="0" max="100" step="1" value="7" class="slider-input">
                         </div>
+                        <div class="control-item">
+                            <label class="slider-label">Mask Padding (px)<span id="padVal">16</span></label>
+                            <input type="range" id="pad" min="0" max="120" step="1" value="16" class="slider-input">
+                        </div>
+                    </div>
+                    <div class="control-grid">
+                        <label>
+                            <input type="checkbox" id="mirrorChk" checked> Mirror Camera
+                        </label>
+                        <label>
+                            <input type="checkbox" id="animateChk" checked> Animate Effects
+                        </label>
+                        <label>
+                            <input type="checkbox" id="trackCenterChk" checked> Track Center of Face
+                        </label>
+                        <label>
+                            <input type="checkbox" id="preciseMaskChk"> Precise Face Mesh Mask
+                        </label>
+                        <label>
+                            <input type="checkbox" id="invert"> Invert Mask
+                        </label>
+                        <label>
+                            Mask Shape (Fallback):
+                            <select id="shape" class="btn">
+                                <option value="0">Rounded Rect</option>
+                                <option value="1">Ellipse</option>
+                            </select>
+                        </label>
                     </div>
                 </div>
             </div>
-
-            <div class="control-group" data-group="mask-options">
-                <div class="control-group-header">Mask & Tracking</div>
-                <div class="control-group-content options-list">
-                    <label>
-                        <input type="checkbox" id="mirrorChk" checked> Mirror Camera
-                    </label>
-                    <label>
-                        <input type="checkbox" id="animateChk" checked> Animate Effects
-                    </label>
-                    <label>
-                        <input type="checkbox" id="trackCenterChk" checked> Track Center of Face
-                    </label>
-                    <label>
-                        <input type="checkbox" id="preciseMaskChk"> Precise Face Mesh Mask
-                    </label>
-                    <label>
-                        <input type="checkbox" id="invert"> Invert Mask
-                    </label>
-                    <label>
-                        Mask Shape (Fallback):
-                        <select id="shape" class="btn">
-                            <option value="0">Rounded Rect</option>
-                            <option value="1">Ellipse</option>
-                        </select>
-                    </label>
-                    <div class="control-item">
-                        <label class="slider-label">Mask Padding (px)<span id="padVal">16</span></label>
-                        <input type="range" id="pad" min="0" max="120" step="1" value="16" class="slider-input">
-                    </div>
-                </div>
-            </div>
-
-            <div class="control-group" data-group="presets">
-                <div class="control-group-header">Presets & Tools</div>
+            
+            <div class="section-heading">Presets & Tools</div>
+            <div class="control-group expanded">
+                <div class="control-group-header">Presets</div>
                 <div class="control-group-content">
                     <div class="control-grid">
                         <button id="presetSoft" class="btn">Soft Blur</button>
@@ -558,12 +576,10 @@
     const invertChk = document.getElementById('invert');
     const shapeSel = document.getElementById('shape');
     const effectSelector = document.getElementById('effectSelector');
-
-    document.querySelectorAll('.control-group-header').forEach(header => {
-        header.addEventListener('click', () => {
-            header.parentElement.classList.toggle('expanded');
-        });
-    });
+    const dynamicControls = document.querySelectorAll('.dynamic-controls .control-group');
+    const effectBtns = document.querySelectorAll('.effect-btn');
+    const controlsPanel = document.querySelector('.controls-panel');
+    let currentEffect = '5'; // Initial active effect
 
     function hook(id, outId) {
         const el = document.getElementById(id);
@@ -580,12 +596,13 @@
         return el;
     }
 
+    // Dynamic UI object creation
     const ui = {
         effect: (() => {
             const sel = document.createElement('select');
             sel.id = 'effect-hidden';
             sel.style.display = 'none';
-            const effects = ['Glitch (blocks + chroma)', 'Distort (wave)', 'Blur (box)', 'Pixelate', 'Combo: Glitch + Distort + Chroma', 'Smear — Directional', 'Blur — Radial', 'Warp — Swirl', 'Displace — Noise Flow'];
+            const effects = ['Glitch', 'Wavy Distort', 'Box Blur', 'Pixelate', 'Combo: Glitch + Distort + Chroma', 'Smear', 'Radial Blur', 'Swirl', 'Noise Flow'];
             effects.forEach((name, i) => {
                 const opt = document.createElement('option');
                 opt.value = i;
@@ -614,6 +631,8 @@
         swirl: hook('swirl', 'swirlVal'),
         nScale: hook('nScale', 'nScaleVal'),
         nStrength: hook('nStrength', 'nStrengthVal'),
+        smLen_b: hook('smLen_b', 'smLenVal_b'),
+        samples_b: hook('samples_b', 'samplesVal_b')
     };
 
     let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
@@ -766,12 +785,12 @@
         gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
         gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
         gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
-        gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
-        gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value) * 3.14159265 / 180.0);
-        gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value,10));
-        gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
-        gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
-        gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
+        gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen ? ui.smLen.value : 0));
+        gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng ? ui.smAng.value : 0) * 3.14159265 / 180.0);
+        gl.uniform1i(getU('u_samples'), parseInt(ui.samples ? ui.samples.value : 1,10));
+        gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl ? ui.swirl.value : 0));
+        gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale ? ui.nScale.value : 1));
+        gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength ? ui.nStrength.value : 0));
         gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
         gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
         gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
@@ -845,44 +864,63 @@
             gl.uniform1i(getU('u_faceCount'), 0);
         }
         const t = animateChk.checked ? performance.now()/1000 : 0;
-        if (ui.intensity) setCommonUniforms(t); // Only call if ui is properly initialized
+        setCommonUniforms(t);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         status2El.textContent = `${canvas.width}×${canvas.height} • Effect: ${ui.effect.options[ui.effect.selectedIndex].textContent}${preciseMaskChk.checked ? ' • Mesh mask' : ''}`;
     }
+    
+    // UI Logic for dynamic panels and effect selection
+    function updateEffectUI(effectId) {
+        dynamicControls.forEach(panel => {
+            if (panel.dataset.effect === effectId) {
+                panel.classList.add('active');
+            } else {
+                panel.classList.remove('active');
+            }
+        });
+        ui.effect.value = effectId;
+        controlsPanel.scrollTop = 0; // Scroll to top of controls
+    }
 
-    effectSelector.addEventListener('click', (e) => {
-        const card = e.target.closest('.effect-card');
-        if (card) {
-            document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active'));
-            card.classList.add('active');
-            const newEffectValue = card.dataset.effect;
-            ui.effect.value = newEffectValue;
-            ui.effect.dispatchEvent(new Event('input'));
-        }
+    effectBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            effectBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateEffectUI(btn.dataset.effect);
+        });
     });
 
-    startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
+    document.querySelectorAll('.control-group-header').forEach(header => {
+        header.addEventListener('click', () => {
+            header.parentElement.classList.toggle('expanded');
+        });
+    });
 
+    // Start/Stop
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+
+    // Presets & Randomize
     document.getElementById('presetSoft').addEventListener('click', () => {
-        const effectCard = document.querySelector('[data-effect="2"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        ui.effect.value='2'; ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.samples.value=12; ui.smLen.value=20; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
+        const effectCard = document.querySelector('[data-effect="2"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        updateEffectUI('2'); ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.samples.value=12; ui.smLen.value=20; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
         [ui.blur, ui.intensity, ui.chroma, ui.feather, ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng, ui.swirl, ui.nScale, ui.nStrength].forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('presetGlitch').addEventListener('click', () => {
-        const effectCard = document.querySelector('[data-effect="0"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        ui.effect.value='0'; ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.samples.value=8; ui.smLen.value=12; ui.smAng.value=0;
+        const effectCard = document.querySelector('[data-effect="0"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        updateEffectUI('0'); ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.samples.value=8; ui.smLen.value=12; ui.smAng.value=0;
         [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather,ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng].forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('presetSmear').addEventListener('click', () => {
-        const effectCard = document.querySelector('[data-effect="5"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        ui.effect.value='5'; ui.smLen.value=80; ui.smAng.value=0; ui.samples.value=24; ui.intensity.value=1; ui.mix.value=1; ui.chroma.value=4; ui.feather.value=16; ui.pad.value=12;
+        const effectCard = document.querySelector('[data-effect="5"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        updateEffectUI('5'); ui.smLen.value=80; ui.smAng.value=0; ui.samples.value=24; ui.intensity.value=1; ui.mix.value=1; ui.chroma.value=4; ui.feather.value=16; ui.pad.value=12;
         [ui.smLen, ui.smAng, ui.samples, ui.intensity, ui.mix, ui.chroma, ui.feather, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('randomBtn').addEventListener('click', () => {
         const randEffect = String(Math.floor(Math.random()*9));
-        const effectCard = document.querySelector(`[data-effect="${randEffect}"]`); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        ui.effect.value = randEffect;
-        const setRand=(el,min,max,step=1)=>{ const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
+        const effectCard = document.querySelector(`[data-effect="${randEffect}"]`); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        updateEffectUI(randEffect);
+        const setRand=(el,min,max,step=1)=>{ if(!el) return; const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
         setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1);
         shapeSel.value = Math.random() < 0.5 ? '0' : '1'; invertChk.checked = Math.random() < 0.2; preciseMaskChk.checked = Math.random() < 0.7; trackCenterChk.checked = Math.random() < 0.8;
     });
