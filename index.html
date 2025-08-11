@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Face Blur Camera</title>
+  <title>Face Blur Camera (with fallback)</title>
   <style>
     :root { --bg:#0b0d10; --fg:#e7eaee; --muted:#98a2b3; --card:#12161b; --accent:#6ea8fe; }
     * { box-sizing: border-box; }
@@ -12,7 +12,7 @@
     .card { width: min(960px, 92vw); background: var(--card); border: 1px solid #1d232c; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: hidden; }
     .stage { position: relative; background: #000; aspect-ratio: 16/9; }
     video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-    video { opacity: 0; pointer-events: none; } /* we draw to canvas instead */
+    video { opacity: 0; pointer-events: none; } /* draw to canvas */
     .ui { display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 14px 16px; align-items: center; border-top: 1px solid #1d232c; }
     .ui .spacer { flex: 1 1 auto; }
     .btn { appearance: none; border: 1px solid #223; background: #10151b; color: var(--fg); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; }
@@ -24,6 +24,8 @@
     details { padding: 0 16px 14px; color: var(--muted); }
     kbd { background:#0c1016; padding:2px 6px; border-radius:6px; border:1px solid #1d232c; }
   </style>
+  <!-- MediaPipe fallback (loads only if needed) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -49,11 +51,11 @@
       <details>
         <summary>Troubleshooting</summary>
         <ul>
-          <li>Run from a server (e.g. VS Code <b>Live Server</b>) — <code>file://</code> won’t work.</li>
-          <li>Grant camera permission and make sure no other app is using it.</li>
-          <li>Best in Chrome/Edge. If your browser lacks <code>FaceDetector</code>, I can switch this to a MediaPipe fallback.</li>
+          <li>Run from a server (VS Code <b>Live Server</b> is fine) — <code>file://</code> won’t work.</li>
+          <li><b>Fallback:</b> automatically uses MediaPipe Face Detection if <code>FaceDetector</code> is missing.</li>
+          <li>If the preview is black, ensure camera permission is granted and no other app is using the webcam.</li>
         </ul>
-        <div>Shortcuts: <kbd>Space</kbd> = Start/Stop, <kbd>M</kbd> = Mirror, <kbd>B</kbd> = toggle boxes.</div>
+        <div>Shortcuts: <kbd>Space</kbd> start/stop, <kbd>M</kbd> mirror, <kbd>B</kbd> boxes.</div>
       </details>
     </div>
   </div>
@@ -62,7 +64,6 @@
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
-
     const startBtn = document.getElementById('startBtn');
     const stopBtn  = document.getElementById('stopBtn');
     const blurStrength = document.getElementById('blurStrength');
@@ -72,42 +73,32 @@
 
     let stream = null;
     let rafId = null;
-    let detectTimer = 0;
-    let lastDetections = [];
-    const detectIntervalMs = 90; // throttle detector (~11 fps)
-    const pad = 28;              // extra blur padding around face (px)
-    let detector = null;
+    let lastDetections = [];      // {x,y,width,height} in pixels
+    let detTimer = 0;
+    const detectIntervalMs = 90;  // ~11 fps
+    const pad = 28;               // extra blur around face
+    let provider = 'none';        // 'shape' or 'mediapipe'
+    let shapeDetector = null;     // FaceDetector
+    let mpDetector = null;        // MediaPipe FaceDetection
+    let mpInFlight = false;
 
-    // Offscreen canvas for blurred frame
     const blurCanvas = document.createElement('canvas');
-    const blurCtx = blurCanvas.getContext('2d', { willReadFrequently: false });
-
-    function supportCheck() {
-      if (!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('getUserMedia not supported in this browser.');
-      }
-      if (!('FaceDetector' in window)) {
-        throw new Error('FaceDetector API is not available. Use Chrome/Edge, or ask me for a MediaPipe version.');
-      }
-    }
+    const blurCtx = blurCanvas.getContext('2d');
 
     function setStatus(msg) { statusEl.textContent = msg; }
 
     function fitCanvasToVideo() {
       const w = video.videoWidth || 1280;
       const h = video.videoHeight || 720;
-      canvas.width = w;
-      canvas.height = h;
-      blurCanvas.width = w;
-      blurCanvas.height = h;
+      canvas.width = w; canvas.height = h;
+      blurCanvas.width = w; blurCanvas.height = h;
     }
 
     function mirrorX(x, width, totalWidth) {
-      // Convert FaceDetector coords to mirrored coords if needed
       return totalWidth - (x + width);
     }
 
-    function roundRectPath(c, x, y, w, h, r=18) {
+    function roundRectPath(c, x, y, w, h, r=22) {
       if (c.roundRect) { c.beginPath(); c.roundRect(x, y, w, h, r); return; }
       const rr = Math.min(r, w/2, h/2);
       c.beginPath();
@@ -119,26 +110,56 @@
       c.closePath();
     }
 
+    async function initDetector() {
+      if ('FaceDetector' in window) {
+        shapeDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 5 });
+        provider = 'shape';
+        setStatus('Camera running. Detecting (Shape Detection)…');
+        return;
+      }
+      // MediaPipe fallback
+      if (window.FaceDetection && window.FaceDetection.FaceDetection) {
+        mpDetector = new window.FaceDetection.FaceDetection({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/${file}`
+        });
+        mpDetector.setOptions({
+          model: 'short',               // fast, near-range
+          minDetectionConfidence: 0.6
+        });
+        mpDetector.onResults((res) => {
+          const w = canvas.width, h = canvas.height;
+          lastDetections = (res.detections || []).map(d => {
+            const bb = d.locationData.relativeBoundingBox;
+            return {
+              x: Math.max(0, bb.xMin * w),
+              y: Math.max(0, bb.yMin * h),
+              width: Math.min(w, bb.width * w),
+              height: Math.min(h, bb.height * h)
+            };
+          });
+        });
+        provider = 'mediapipe';
+        setStatus('Camera running. Detecting (MediaPipe)…');
+        return;
+      }
+      throw new Error('No face detection available (Shape Detection & MediaPipe missing).');
+    }
+
     async function start() {
       try {
-        supportCheck();
         setStatus('Requesting camera…');
         startBtn.disabled = true;
-
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
         video.srcObject = stream;
 
-        // Wait until metadata so we have the correct dimensions
         await new Promise(res => video.onloadedmetadata = res);
         await video.play();
-
-        detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 5 });
 
         fitCanvasToVideo();
         window.addEventListener('resize', fitCanvasToVideo);
 
+        await initDetector(); // picks shape or mediapipe
         stopBtn.disabled = false;
-        setStatus('Camera running. Detecting…');
 
         loop(performance.now());
       } catch (err) {
@@ -152,14 +173,10 @@
     function stop() {
       cancelAnimationFrame(rafId);
       rafId = null;
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-        stream = null;
-      }
-      detector = null;
+      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+      shapeDetector = null; mpDetector = null; provider = 'none';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stopBtn.disabled = true;
-      startBtn.disabled = false;
+      stopBtn.disabled = true; startBtn.disabled = false;
       setStatus('Stopped');
     }
 
@@ -168,48 +185,44 @@
 
       const w = canvas.width, h = canvas.height;
 
-      // Draw the current frame to main canvas, honoring mirror toggle
+      // Draw current frame
       ctx.save();
       if (mirror.checked) { ctx.translate(w, 0); ctx.scale(-1, 1); }
       ctx.drawImage(video, 0, 0, w, h);
       ctx.restore();
 
-      // Prepare blurred copy of the whole frame once per tick
+      // Prepare blurred copy of the frame
       blurCtx.filter = `blur(${+blurStrength.value}px)`;
-      blurCtx.drawImage(canvas, 0, 0, w, h); // blur the already mirrored frame
+      blurCtx.drawImage(canvas, 0, 0, w, h);
 
-      // Throttled face detection
-      if (!detectTimer || (now - detectTimer) > detectIntervalMs) {
-        detectTimer = now;
-        try {
-          // Detect on the *unmirrored* source (video element)
-          lastDetections = detector ? await detector.detect(video) : [];
-        } catch (e) {
-          // Some frames may fail; keep lastDetections
-          // console.warn(e);
+      // Throttled detection
+      if (!detTimer || (now - detTimer) > detectIntervalMs) {
+        detTimer = now;
+        if (provider === 'shape' && shapeDetector) {
+          try {
+            const ds = await shapeDetector.detect(video);
+            // Normalize to pixel boxes
+            lastDetections = (ds || []).map(d => d.boundingBox);
+          } catch (e) { /* ignore transient errors */ }
+        } else if (provider === 'mediapipe' && mpDetector && !mpInFlight) {
+          mpInFlight = true;
+          mpDetector.send({ image: video }).finally(() => { mpInFlight = false; });
         }
       }
 
-      // Draw blur on detected faces
-      const faces = lastDetections || [];
-      for (const f of faces) {
-        const box = f.boundingBox; // {x, y, width, height} in CSS px, unmirrored
+      // Draw blur over faces
+      for (const box of lastDetections) {
         let x = box.x, y = box.y, wBox = box.width, hBox = box.height;
-
-        // Convert to mirrored coords if we mirrored the canvas
         if (mirror.checked) x = mirrorX(x, wBox, w);
-
-        // Add padding & clamp
         x = Math.max(0, Math.floor(x - pad));
         y = Math.max(0, Math.floor(y - pad));
         wBox = Math.min(w - x, Math.ceil(wBox + pad * 2));
         hBox = Math.min(h - y, Math.ceil(hBox + pad * 2));
 
-        // Clip to rounded rect and paint from the blurred frame
         ctx.save();
         roundRectPath(ctx, x, y, wBox, hBox, 22);
         ctx.clip();
-        ctx.drawImage(blurCanvas, 0, 0); // draw only inside the clipped region
+        ctx.drawImage(blurCanvas, 0, 0);
         ctx.restore();
 
         if (showBoxes.checked) {
@@ -225,20 +238,13 @@
       rafId = requestAnimationFrame(loop);
     }
 
-    // UI wires
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
 
-    // Nice keyboard shortcuts
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        (stream ? stop : start)();
-      } else if (e.key.toLowerCase() === 'm') {
-        mirror.checked = !mirror.checked;
-      } else if (e.key.toLowerCase() === 'b') {
-        showBoxes.checked = !showBoxes.checked;
-      }
+      if (e.code === 'Space') { e.preventDefault(); (stream ? stop : start)(); }
+      else if (e.key.toLowerCase() === 'm') { mirror.checked = !mirror.checked; }
+      else if (e.key.toLowerCase() === 'b') { showBoxes.checked = !showBoxes.checked; }
     });
   </script>
 </body>
