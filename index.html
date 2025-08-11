@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V4.1 - Artist Edition</title>
+    <title>Face Glitch V4.2 - Artist Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -67,7 +67,7 @@
         </div>
         <div class="controls-panel">
             <div class="header">
-                <h1>Glitch V4.1</h1>
+                <h1>Glitch V4.2</h1>
                 <div class="header-actions">
                     <button id="startBtn" class="btn btn-primary">Start Camera</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
@@ -232,7 +232,7 @@
     // --- PING-PONG FRAMEBUFFERS FOR DATA MOSHING ---
     let fbos = [], textures = [], currentFBO = 0;
 
-    // --- GLSL SHADERS V4.1 ---
+    // --- GLSL SHADERS V4.2 ---
     const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ gl_Position = vec4(2.0 * a_pos - 1.0, 0.0, 1.0); v_uv = a_pos; }`;
     const fragSrc = `
         precision highp float;
@@ -358,7 +358,6 @@
         }
     `;
     
-    // ** FIX: Added setStatus function definition **
     function setStatus(text){ status2El.textContent = text; }
     function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.classList.toggle('status-error', isError); }
     
@@ -394,6 +393,10 @@
         const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), gl.STATIC_DRAW);
         const posLoc = gl.getAttribLocation(program, 'a_pos');
         gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        
+        // ** FIX: Restore correct global flip state for video textures **
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        
         tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         maskTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, maskTex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     }
@@ -433,7 +436,6 @@
             else U(key, parseFloat(el.value), 'f');
         });
         
-        // Reset all effect flags before setting active ones
         ['DataMosh', 'JitterSmear', 'NoiseTear', 'SliceGlitch', 'PixelDecay'].forEach(name => U('enable' + name, false, 'b'));
         activeEffects.forEach(id => {
             const name = document.querySelector(`.effect-btn[data-effect="${id}"]`).dataset.name;
@@ -478,9 +480,9 @@
         }
         if (trackCenterChk.checked && hasFace) {
             let finalX = center.x;
-            let finalY = 1.0 - center.y; // FIX: Invert Y axis
+            let finalY = 1.0 - center.y;
             if (mirrorChk.checked) {
-                finalX = 1.0 - finalX; // FIX: Invert X axis if mirrored
+                finalX = 1.0 - finalX;
             }
             effectCenter = { x: finalX, y: finalY };
         } else if (!trackCenterChk.checked) {
@@ -489,51 +491,4 @@
     }
 
     function loop(time) {
-        rafId = requestAnimationFrame(loop);
-        if (video.paused || video.ended || video.readyState < 2) return;
-        
-        updateFaceData();
-
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // For FBOs
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-        
-        const timeSec = animateChk.checked ? time / 1000 : 0;
-        setUniforms(timeSec);
-
-        // Ping-pong rendering for Data Mosh
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, textures[1 - currentFBO].tex);
-        gl.uniform1i(gl.getUniformLocation(program, 'u_prevFrame'), 2);
-        gl.uniform1i(gl.getUniformLocation(program, 'u_tex'), 0);
-        gl.uniform1i(gl.getUniformLocation(program, 'u_maskTex'), 1);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[currentFBO]);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        // Render to screen
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        currentFBO = 1 - currentFBO;
-        status2El.textContent = `${gl.drawingBufferWidth}×${gl.drawingBufferHeight}`;
-    }
-    
-    async function ensureFaceMesh(){ if(faceMeshReady)return; if(typeof window.FaceMesh==='undefined'){await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});} faceMesh=new window.FaceMesh({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`}); faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5}); await faceMesh.initialize(); faceMeshReady=true; }
-    
-    // --- UI EVENT LISTENERS & PRESETS ---
-    effectBtns.forEach(btn=>{btn.addEventListener('click',()=>{const effectId=btn.dataset.effect; btn.classList.toggle('active-stack'); if(activeEffects.includes(effectId)){activeEffects=activeEffects.filter(id=>id!==effectId);}else{activeEffects.push(effectId);} document.querySelector(`.control-group[data-effect="${effectId}"]`).classList.toggle('active', btn.classList.contains('active-stack')); activeEffectsListEl.textContent = "Active: " + activeEffects.map(id=>document.querySelector(`[data-effect="${id}"]`).dataset.name).join(', ') || 'None';});});
-    document.querySelectorAll('.control-group-header').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('expanded'));
-    const presetNameInput=document.getElementById('presetName'),savePresetBtn=document.getElementById('savePresetBtn'),deletePresetBtn=document.getElementById('deletePresetBtn'),presetSelect=document.getElementById('presetSelect');
-    function getPresets(){try{return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY)||'{}');}catch{return{};}}
-    function populatePresetList(){const presets=getPresets();presetSelect.innerHTML='<option value="">Load preset...</option>';Object.keys(presets).sort().forEach(name=>{const o=document.createElement('option');o.value=name;o.textContent=name;presetSelect.appendChild(o);});}
-    savePresetBtn.addEventListener('click',()=>{const name=presetNameInput.value.trim();if(!name)return;const settings={activeEffects:[...activeEffects]};document.querySelectorAll('[data-control-id]').forEach(el=>settings[el.id]=el.type==='checkbox'?el.checked:el.value);const presets=getPresets();presets[name]=settings;localStorage.setItem(PRESET_STORAGE_KEY,JSON.stringify(presets));populatePresetList();presetSelect.value=name;});
-    deletePresetBtn.addEventListener('click',()=>{const name=presetSelect.value;if(!name)return;const presets=getPresets();delete presets[name];localStorage.setItem(PRESET_STORAGE_KEY,JSON.stringify(presets));populatePresetList();presetNameInput.value='';});
-    presetSelect.addEventListener('change',()=>{const name=presetSelect.value;if(!name)return;const settings=getPresets()[name];if(!settings)return;Object.keys(settings).forEach(id=>{const el=document.getElementById(id);if(el){el[el.type==='checkbox'?'checked':'value']=settings[id];el.dispatchEvent(new Event('input',{bubbles:true}));}});activeEffects=settings.activeEffects||[];effectBtns.forEach(btn=>btn.classList.toggle('active-stack',activeEffects.includes(btn.dataset.effect)));document.querySelectorAll('.control-group[data-effect]').forEach(cg=>cg.classList.remove('active'));activeEffects.forEach(id=>document.querySelector(`.control-group[data-effect="${id}"]`).classList.add('active'));activeEffectsListEl.textContent="Active: "+activeEffects.map(id=>document.querySelector(`[data-effect="${id}"]`).dataset.name).join(', ')||'None';});
-    
-    startBtn.onclick = start; stopBtn.onclick = stop;
-    populatePresetList();
-})();
-</script>
-</body>
-</html>
+        raf
