@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V3</title>
+    <title>Face Glitch V3.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -318,7 +318,7 @@
         <div class="left-panel">
             <header>
                 <h1>Face Glitch</h1>
-                <p style="color:var(--muted); font-size:12px; margin:4px 0 16px">V3. Live GLSL Effects</p>
+                <p style="color:var(--muted); font-size:12px; margin:4px 0 16px">V3.1. Live GLSL Effects</p>
                 <div style="display:flex; gap:8px; margin-bottom:16px;">
                     <button id="startBtn" class="btn btn-primary">Start</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
@@ -590,6 +590,23 @@
                             </select>
                         </label>
                     </div>
+                    <div class="options-list">
+                        <label>
+                            <input type="checkbox" id="mirrorChk" checked> Mirror Camera
+                        </label>
+                        <label>
+                            <input type="checkbox" id="animateChk" checked> Animate Effects
+                        </label>
+                        <label>
+                            <input type="checkbox" id="trackCenterChk" checked> Track Center of Face
+                        </label>
+                        <label>
+                            <input type="checkbox" id="preciseMaskChk"> Precise Face Mesh Mask
+                        </label>
+                        <label>
+                            <input type="checkbox" id="invert"> Invert Mask
+                        </label>
+                    </div>
                 </div>
             </div>
             
@@ -605,26 +622,19 @@
     const canvas = document.getElementById('glcanvas');
     const startBtn = document.getElementById('startBtn');
     const stopBtn = document.getElementById('stopBtn');
-    const animateChk = document.getElementById('animateChk');
-    const trackCenterChk = document.getElementById('trackCenterChk');
-    const preciseMaskChk = document.getElementById('preciseMaskChk');
     const status2El = document.getElementById('status2');
     const msgEl = document.getElementById('msg');
-    const invertChk = document.getElementById('invert');
-    const shapeSel = document.getElementById('shape');
     const effectToggles = document.querySelectorAll('.effect-toggles .toggle-item');
     const paramGroups = document.querySelectorAll('.param-group');
     const autoBtns = document.querySelectorAll('.auto-btn');
     const randomBtn = document.getElementById('randomBtn');
+    const presetSoftBtn = document.getElementById('presetSoft');
+    const presetGlitchBtn = document.getElementById('presetGlitch');
+    const presetSmearBtn = document.getElementById('presetSmear');
+    const presetNoiseBtn = document.getElementById('presetNoise');
 
-    // UI state management
     let activeEffect = 'glitch';
     const animatedParams = new Set();
-    const effectMap = {
-        glitch: { id: 0, flag: 1 }, smear: { id: 5, flag: 2 }, noise: { id: 8, flag: 4 },
-        blur: { id: 2, flag: 8 }, distort: { id: 1, flag: 16 }, rgb: { id: -1, flag: 32 },
-        vignette: { id: -1, flag: 64 }, scanlines: { id: -1, flag: 128 }
-    };
     
     function hook(id, outId) {
         const el = document.getElementById(id);
@@ -698,15 +708,21 @@
     const FM_MIN_INTERVAL = 60;
     const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
     
-    // --- SHADER CODE (MODIFIED FOR EFFECT STACKING AND NEW EFFECTS) ---
     const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
     const fragSrc = `
-        precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform sampler2D u_maskTex;
-        uniform vec2 u_resolution; uniform float u_time; uniform vec2 u_center;
-        uniform float u_intensity, u_speed, u_mix, u_feather, u_seed;
+        precision highp float;
+        varying vec2 v_uv;
+        uniform sampler2D u_tex;
+        uniform sampler2D u_maskTex;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform vec2 u_center;
+        uniform float u_intensity, u_speed, u_mix, u_feather;
+        uniform int u_invert, u_maskMode, u_faceCount, u_shape;
+        uniform vec4 u_faces[5];
         uniform float u_block, u_prob, u_smLen, u_smAng, u_samples, u_nScale, u_nStrength, u_blur, u_freq, u_amp, u_rgbSplit, u_vignetteRadius, u_vignetteSoftness, u_scanlineCount, u_scanlineIntensity;
-        uniform int u_faceCount, u_shape, u_invert, u_maskMode, u_effectFlags; uniform vec4 u_faces[5];
-        
+        uniform int u_glitchEnabled, u_smearEnabled, u_noiseEnabled, u_blurEnabled, u_distortEnabled, u_rgbEnabled, u_vignetteEnabled, u_scanlinesEnabled;
+
         float hash(float n){ return fract(sin(n)*43758.5453123); }
         float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
         vec3 hash3(vec2 p){ vec3 q = vec3(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)), dot(p, vec2(419.2,371.9))); return fract(sin(q)*43758.5453); }
@@ -716,7 +732,7 @@
         vec4 applyGlitch(vec4 color, vec2 uv){
             float rows = u_resolution.y / max(1.0, u_block);
             float row = floor(uv.y * rows);
-            float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0);
+            float t = floor(u_time * (2.0 + u_speed*20.0));
             float r = hash(row + t*13.17);
             float active = step(1.0 - u_prob, r);
             float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active;
@@ -789,30 +805,14 @@
             
             vec4 effectColor = baseColor;
 
-            if ((u_effectFlags & 1) > 0) { // Glitch
-                effectColor = mix(effectColor, applyGlitch(finalColor, uv), u_intensity);
-            }
-            if ((u_effectFlags & 2) > 0) { // Smear
-                effectColor = mix(effectColor, applySmear(finalColor, uv), u_intensity);
-            }
-            if ((u_effectFlags & 4) > 0) { // Noise Flow
-                effectColor = mix(effectColor, applyNoiseFlow(finalColor, uv), u_intensity);
-            }
-            if ((u_effectFlags & 8) > 0) { // Box Blur
-                effectColor = mix(effectColor, applyBoxBlur(finalColor, uv), u_intensity);
-            }
-            if ((u_effectFlags & 16) > 0) { // Wavy Distort
-                effectColor = mix(effectColor, applyWavyDistort(finalColor, uv), u_intensity);
-            }
-            if ((u_effectFlags & 32) > 0) { // RGB Split
-                effectColor = applyRGBsplit(effectColor, uv);
-            }
-            if ((u_effectFlags & 64) > 0) { // Vignette
-                effectColor = applyVignette(effectColor, uv);
-            }
-            if ((u_effectFlags & 128) > 0) { // Scanlines
-                effectColor = applyScanlines(effectColor, uv);
-            }
+            if (u_glitchEnabled == 1) { effectColor = mix(effectColor, applyGlitch(finalColor, uv), u_intensity); }
+            if (u_smearEnabled == 1) { effectColor = mix(effectColor, applySmear(finalColor, uv), u_intensity); }
+            if (u_noiseEnabled == 1) { effectColor = mix(effectColor, applyNoiseFlow(finalColor, uv), u_intensity); }
+            if (u_blurEnabled == 1) { effectColor = mix(effectColor, applyBoxBlur(finalColor, uv), u_intensity); }
+            if (u_distortEnabled == 1) { effectColor = mix(effectColor, applyWavyDistort(finalColor, uv), u_intensity); }
+            if (u_rgbEnabled == 1) { effectColor = applyRGBsplit(effectColor, uv); }
+            if (u_vignetteEnabled == 1) { effectColor = applyVignette(effectColor, uv); }
+            if (u_scanlinesEnabled == 1) { effectColor = applyScanlines(effectColor, uv); }
 
             float m = faceMask(uv);
             gl_FragColor = mix(baseColor, effectColor, m * u_mix);
@@ -904,7 +904,7 @@
                 const min = parseFloat(el.min);
                 const max = parseFloat(el.max);
                 const range = max - min;
-                const animatedVal = min + (range / 2) * (1 + Math.sin(time * speed * 2 + ui.seed.value));
+                const animatedVal = min + (range / 2) * (1 + Math.sin(time * speed * 2));
                 el.value = animatedVal;
                 el.dispatchEvent(new Event('input'));
             }
@@ -931,7 +931,7 @@
         gl.uniform1f(getU('u_scanlineIntensity'), parseFloat(ui.scanlineIntensity.value));
         gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
         gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
-        gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
+        gl.uniform1f(getU('u_pad'), parseFloat(ui.pad.value));
 
         gl.uniform1i(getU('u_shape'), parseInt(ui.shape.value,10));
         gl.uniform1i(getU('u_invert'), ui.invertChk.checked ? 1 : 0);
@@ -939,17 +939,14 @@
         gl.uniform1f(getU('u_time'), timeSec);
         gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
         
-        let effectFlags = 0;
-        if(ui.glitchChk.checked) effectFlags |= 1;
-        if(ui.smearChk.checked) effectFlags |= 2;
-        if(ui.noiseChk.checked) effectFlags |= 4;
-        if(ui.blurChk.checked) effectFlags |= 8;
-        if(ui.distortChk.checked) effectFlags |= 16;
-        if(ui.rgbChk.checked) effectFlags |= 32;
-        if(ui.vignetteChk.checked) effectFlags |= 64;
-        if(ui.scanlinesChk.checked) effectFlags |= 128;
-
-        gl.uniform1i(getU('u_effectFlags'), effectFlags);
+        gl.uniform1i(getU('u_glitchEnabled'), ui.glitchChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_smearEnabled'), ui.smearChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_noiseEnabled'), ui.noiseChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_blurEnabled'), ui.blurChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_distortEnabled'), ui.distortChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_rgbEnabled'), ui.rgbChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_vignetteEnabled'), ui.vignetteChk.checked ? 1 : 0);
+        gl.uniform1i(getU('u_scanlinesEnabled'), ui.scanlinesChk.checked ? 1 : 0);
     }
 
     async function ensureFaceMesh(){
@@ -1028,7 +1025,6 @@
         status2El.textContent = `${canvas.width}×${canvas.height} • Active effects: ${[...effectToggles].filter(e=>e.classList.contains('active')).length}`;
     }
 
-    // UI Logic for dynamic panels and effect selection
     function updateParamPanel(effect) {
         paramGroups.forEach(panel => {
             if (panel.dataset.effect === effect) {
@@ -1040,11 +1036,37 @@
     }
 
     effectToggles.forEach(toggle => {
+        const checkbox = toggle.querySelector('input[type="checkbox"]');
+        const paramGroup = document.querySelector(`.param-group[data-effect="${toggle.dataset.effect}"]`);
+        
         toggle.addEventListener('click', () => {
-            effectToggles.forEach(t => t.classList.remove('active'));
+             const wasActive = toggle.classList.contains('active');
+             if(wasActive) {
+                paramGroup.style.display = 'none';
+                toggle.classList.remove('active');
+             } else {
+                 effectToggles.forEach(t => t.classList.remove('active'));
+                 paramGroups.forEach(p => p.style.display = 'none');
+                 toggle.classList.add('active');
+                 paramGroup.style.display = 'flex';
+             }
+        });
+        
+        // This is necessary to sync the toggle's active state with its checkbox
+        checkbox.addEventListener('change', (e) => {
+             if(e.target.checked) {
+                 toggle.classList.add('active');
+                 paramGroup.style.display = 'flex';
+             } else {
+                 toggle.classList.remove('active');
+                 paramGroup.style.display = 'none';
+             }
+        });
+
+        if (checkbox.checked) {
             toggle.classList.add('active');
             updateParamPanel(toggle.dataset.effect);
-        });
+        }
     });
 
     autoBtns.forEach(btn => {
@@ -1062,60 +1084,44 @@
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
     
-    // Presets
-    document.getElementById('presetSoft').addEventListener('click', () => {
-        ui.glitchChk.checked = false; ui.glitchChk.dispatchEvent(new Event('change'));
-        ui.smearChk.checked = false; ui.smearChk.dispatchEvent(new Event('change'));
-        ui.noiseChk.checked = false; ui.noiseChk.dispatchEvent(new Event('change'));
-        ui.blurChk.checked = true; ui.blurChk.dispatchEvent(new Event('change'));
+    presetSoftBtn.addEventListener('click', () => {
+        ui.glitchChk.checked = false; ui.smearChk.checked = false; ui.noiseChk.checked = false;
+        ui.blurChk.checked = true;
+        ui.distortChk.checked = false; ui.rgbChk.checked = false; ui.vignetteChk.checked = false; ui.scanlinesChk.checked = false;
         
         ui.blur.value = 24; ui.intensity.value = 1; ui.rgbSplit.value = 2; ui.feather.value = 20; ui.mix.value = 0.95; ui.shape.value = '1'; ui.invertChk.checked = false; ui.pad.value = 18;
         [ui.blur, ui.intensity, ui.rgbSplit, ui.feather, ui.mix, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
-        updateParamPanel('blur');
-        document.querySelector('[data-effect="blur"]').classList.add('active');
     });
-    document.getElementById('presetGlitch').addEventListener('click', () => {
-        ui.glitchChk.checked = true; ui.glitchChk.dispatchEvent(new Event('change'));
-        ui.smearChk.checked = false; ui.smearChk.dispatchEvent(new Event('change'));
-        ui.noiseChk.checked = false; ui.noiseChk.dispatchEvent(new Event('change'));
-        ui.blurChk.checked = false; ui.blurChk.dispatchEvent(new Event('change'));
+    presetGlitchBtn.addEventListener('click', () => {
+        ui.glitchChk.checked = true; ui.smearChk.checked = false; ui.noiseChk.checked = false;
+        ui.blurChk.checked = false; ui.distortChk.checked = false; ui.rgbChk.checked = false; ui.vignetteChk.checked = false; ui.scanlinesChk.checked = false;
         
         ui.block.value = 18; ui.prob.value = 0.6; ui.intensity.value = 1; ui.rgbSplit.value = 10; ui.speed.value = 2.2; ui.feather.value = 10; ui.mix.value = 1; ui.shape.value = '0'; ui.invertChk.checked = false; ui.pad.value = 8;
         [ui.block,ui.prob,ui.intensity,ui.rgbSplit,ui.speed,ui.feather,ui.mix, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
-        updateParamPanel('glitch');
-        document.querySelector('[data-effect="glitch"]').classList.add('active');
     });
-    document.getElementById('presetSmear').addEventListener('click', () => {
-        ui.glitchChk.checked = false; ui.glitchChk.dispatchEvent(new Event('change'));
-        ui.smearChk.checked = true; ui.smearChk.dispatchEvent(new Event('change'));
-        ui.noiseChk.checked = false; ui.noiseChk.dispatchEvent(new Event('change'));
-        ui.blurChk.checked = false; ui.blurChk.dispatchEvent(new Event('change'));
-
+    presetSmearBtn.addEventListener('click', () => {
+        ui.glitchChk.checked = false; ui.smearChk.checked = true; ui.noiseChk.checked = false;
+        ui.blurChk.checked = false; ui.distortChk.checked = false; ui.rgbChk.checked = false; ui.vignetteChk.checked = false; ui.scanlinesChk.checked = false;
+        
         ui.smLen.value = 80; ui.smAng.value = 0; ui.samples.value = 24; ui.intensity.value = 1; ui.mix.value = 1; ui.rgbSplit.value = 4; ui.feather.value = 16; ui.pad.value = 12;
         [ui.smLen, ui.smAng, ui.samples, ui.intensity, ui.mix, ui.rgbSplit, ui.feather, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
-        updateParamPanel('smear');
-        document.querySelector('[data-effect="smear"]').classList.add('active');
     });
-    document.getElementById('presetNoise').addEventListener('click', () => {
-        ui.glitchChk.checked = false; ui.glitchChk.dispatchEvent(new Event('change'));
-        ui.smearChk.checked = false; ui.smearChk.dispatchEvent(new Event('change'));
-        ui.noiseChk.checked = true; ui.noiseChk.dispatchEvent(new Event('change'));
-        ui.blurChk.checked = false; ui.blurChk.dispatchEvent(new Event('change'));
+    presetNoiseBtn.addEventListener('click', () => {
+        ui.glitchChk.checked = false; ui.smearChk.checked = false; ui.noiseChk.checked = true;
+        ui.blurChk.checked = false; ui.distortChk.checked = false; ui.rgbChk.checked = false; ui.vignetteChk.checked = false; ui.scanlinesChk.checked = false;
         
         ui.nScale.value = 3; ui.nStrength.value = 18; ui.intensity.value = 1; ui.mix.value = 1; ui.rgbSplit.value = 4; ui.feather.value = 16; ui.pad.value = 12;
         [ui.nScale, ui.nStrength, ui.intensity, ui.mix, ui.rgbSplit, ui.feather, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
-        updateParamPanel('noise');
-        document.querySelector('[data-effect="noise"]').classList.add('active');
     });
 
     randomBtn.addEventListener('click', () => {
-        const effects = ['glitch', 'smear', 'noise', 'blur', 'distort', 'rgb', 'vignette', 'scanlines'];
+        const effectIds = ['glitch', 'smear', 'noise', 'blur', 'distort', 'rgb', 'vignette', 'scanlines'];
         const activeEffects = new Set();
         while (activeEffects.size < 2) {
-            activeEffects.add(effects[Math.floor(Math.random() * effects.length)]);
+            activeEffects.add(effectIds[Math.floor(Math.random() * effectIds.length)]);
         }
 
-        effects.forEach(effect => {
+        effectIds.forEach(effect => {
             const chk = ui[`${effect}Chk`];
             if (chk) {
                 chk.checked = activeEffects.has(effect);
