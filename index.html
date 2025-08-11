@@ -219,4 +219,187 @@
   void main(){
     vec2 uv = v_uv; // already 0..1
     vec4 base = texture2D(u_tex, uv);
-    bool mask = insideFace(uv
+    bool mask = insideFace(uv);
+    if(!mask){ gl_FragColor = base; return; }
+
+    if(u_effect == 0){ // glitch
+      vec2 guv = glitchUV(uv);
+      vec4 col = sampleChroma(guv, 1.0);
+      // occasional line darken for flavor
+      float line = step(0.98, rand(vec2(floor(uv.y*u_resolution.y), floor(u_time*10.0))));
+      col.rgb *= mix(1.0, 0.7, line * u_intensity);
+      gl_FragColor = mix(base, col, 0.9);
+      return;
+    }
+    if(u_effect == 1){ // distort
+      vec2 duv = distortUV(uv);
+      vec4 col = sampleChroma(duv, 1.0);
+      gl_FragColor = mix(base, col, 1.0);
+      return;
+    }
+    if(u_effect == 2){ // blur
+      vec4 b = doBlur(uv);
+      gl_FragColor = mix(base, b, 1.0);
+      return;
+    }
+    if(u_effect == 3){ // pixelate
+      vec4 p = pixelate(uv);
+      // subtle chroma on pixel edges
+      vec4 c = sampleChroma(uv, 1.0);
+      gl_FragColor = mix(p, c, 0.15*u_intensity);
+      return;
+    }
+    // combo
+    vec2 cuv = glitchUV(distortUV(uv));
+    vec4 cb = doBlur(cuv);
+    vec4 cc = sampleChroma(cuv, 1.0);
+    gl_FragColor = mix(cb, cc, 0.5);
+  }
+  `;
+
+  function setStatus(text){ statusEl.textContent = text; }
+  function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.classList.toggle('error', !!isError); }
+
+  const faceApiAvailable = 'FaceDetector' in window;
+
+  // Warn clearly if not HTTPS / secure context
+  if(!isSecureContext){ setMsg('Page is not secure (HTTPS). Camera access will be blocked by the browser.', true); }
+
+  async function initDetector(){ if(!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.'); detector = new FaceDetector({ fastMode:true, maxDetectedFaces: 5 }); }
+
+  function fit(){ if(!video.videoWidth) return; const w = video.videoWidth, h = video.videoHeight; canvas.width = w; canvas.height = h; if(gl) gl.viewport(0,0,w,h); }
+
+  function createGL(){
+    gl = canvas.getContext('webgl'); if(!gl) throw new Error('WebGL not available');
+    function compile(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ throw new Error(gl.getShaderInfoLog(s)||'shader compile fail'); } return s; }
+    const vs = compile(gl.VERTEX_SHADER, vertSrc); const fs = compile(gl.FRAGMENT_SHADER, fragSrc);
+    program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program); if(!gl.getProgramParameter(program, gl.LINK_STATUS)){ throw new Error(gl.getProgramInfoLog(program)||'link fail'); }
+
+    const a_pos = gl.getAttribLocation(program, 'a_pos');
+    buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    const verts = new Float32Array([ 0,0, 1,0, 0,1, 1,1 ]);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+    gl.useProgram(program);
+    gl.enableVertexAttribArray(a_pos);
+    gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+
+    tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  }
+
+  const U = {}; // uniform cache
+  function getU(name){ return U[name] || (U[name] = gl.getUniformLocation(program, name)); }
+
+  function uploadVideoTexture(){ gl.bindTexture(gl.TEXTURE_2D, tex); try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch(e) { /* ignore between frames */ } }
+
+  function setFacesUniform(){
+    // write up to MAX_FACES from lastDetections, normalized + mirrored
+    const w = canvas.width, h = canvas.height; const mirror = mirrorChk.checked;
+    const maxFaces = Math.min(parseInt(ui.maxfaces.value,10), MAX_FACES);
+    let count = 0;
+    for(let i=0;i<Math.min(lastDetections.length, maxFaces); i++){
+      const bb = lastDetections[i].boundingBox || lastDetections[i];
+      let x = bb.x, y = bb.y, ww = bb.width, hh = bb.height;
+      if(mirror){ x = w - (x + ww); }
+      faceRects[count*4+0] = x / w; faceRects[count*4+1] = y / h; faceRects[count*4+2] = ww / w; faceRects[count*4+3] = hh / h; count++;
+    }
+    // pad remaining with zeros
+    for(let j=count;j<MAX_FACES;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; }
+    gl.uniform1i(getU('u_faceCount'), count);
+    // set each vec4 individually (WebGL1 doesn't have uniform4fv for arrays reliably across some drivers)
+    for(let k=0;k<MAX_FACES;k++){
+      gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]);
+    }
+  }
+
+  function setCommonUniforms(timeSec){
+    gl.uniform1i(getU('u_effect'), parseInt(ui.effect.value,10));
+    gl.uniform1f(getU('u_intensity'), parseFloat(ui.intensity.value));
+    gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
+    gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
+    gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
+    gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
+    gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
+    gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
+    gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
+    gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
+    gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
+    gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
+    gl.uniform1f(getU('u_time'), timeSec);
+  }
+
+  async function start(){
+    if(!navigator.mediaDevices?.getUserMedia){ setMsg('getUserMedia not supported. Try Chrome/Edge/Firefox.', true); return; }
+    if(!isSecureContext){ setMsg('This page is not in a secure context (HTTPS). Camera will be blocked. Use GitHub Pages HTTPS or localhost with HTTPS.', true); return; }
+    try {
+      setStatus('Requesting camera…');
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+      // ⬇️ Ensure dimensions are available before sizing GL/canvas
+      await new Promise((res) => {
+        if (video.videoWidth && video.videoHeight) return res();
+        const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); };
+        video.addEventListener('loadedmetadata', onMeta, { once: true });
+      });
+      fit();
+      window.addEventListener('resize', fit);
+      try { await initDetector(); setMsg(''); } catch(e){ console.warn(e); setMsg('FaceDetector API not available. Use latest Chrome and enable “Experimental Web Platform features”, or ask for a MediaPipe fallback.', true); }
+      createGL();
+      startBtn.disabled = true; stopBtn.disabled = false;
+      loop();
+    } catch(err){
+      console.error(err);
+      let hint = '';
+      if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        hint = ' • Permission blocked. Click the camera icon in the address bar and allow access.';
+      }
+      if (err && err.name === 'NotFoundError') {
+        hint = ' • No camera found. If you have multiple, pick one in site settings.';
+      }
+      const httpsHint = location.protocol !== 'https:' ? ' • Tip: GitHub Pages serves HTTPS; local files/insecure HTTP will block camera.' : '';
+      setMsg('Could not start camera: ' + err.message + hint + httpsHint, true); setStatus('Error');
+    }
+  }
+
+  function stop()(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
+
+  async function detectFaces(){ if(!detector) return []; try { return (await detector.detect(video)) || []; } catch(e){ return []; } }
+
+  function loop(){
+    rafId = requestAnimationFrame(loop);
+    // update detection on a throttle
+    if(!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS){ lastDetTime = performance.now(); if(detector){ detectFaces().then(faces => { lastDetections = faces; statusEl.textContent = faces.length ? `Faces: ${faces.length}` : 'No face'; }); } else { statusEl.textContent = 'Camera on'; } }
+
+    // draw
+    if(!video.videoWidth){ return; }
+    if(canvas.width === 0 || canvas.height === 0){ fit(); }
+    uploadVideoTexture();
+    gl.useProgram(program);
+    setFacesUniform();
+    const t = animateChk.checked ? performance.now()/1000 : 0;
+    setCommonUniforms(t);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    status2El.textContent = `${canvas.width}×${canvas.height} • ${ui.effect.options[ui.effect.selectedIndex].text}`;
+  }
+
+  startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
+
+  // Presets / randomize
+  document.getElementById('presetSoft').addEventListener('click', () => { ui.effect.value='2'; ui.blur.value=16; ui.intensity.value=1; ui.chroma.value=1; ui.feather.value=18; [ui.blur, ui.intensity, ui.chroma, ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
+  document.getElementById('presetGlitch').addEventListener('click', () => { ui.effect.value='0'; ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=8; ui.speed.value=2.5; ui.feather.value=8; [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
+  document.getElementById('presetWavy').addEventListener('click', () => { ui.effect.value='1'; ui.freq.value=14; ui.amp.value=18; ui.speed.value=1.0; ui.chroma.value=3; ui.feather.value=14; [ui.freq,ui.amp,ui.speed,ui.chroma,ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
+  document.getElementById('randomBtn').addEventListener('click', () => { ui.effect.value = String(Math.floor(Math.random()*5)); const setRand=(el,min,max,step=1)=>{ const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));}; setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,24,1); setRand(ui.chroma,0,12,1); setRand(ui.pixel,4,28,1); setRand(ui.freq,0,30,0.5); setRand(ui.amp,0,30,1); setRand(ui.block,4,80,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); });
+
+  // Auto-start if camera already granted
+  (async () => { try { const p = await navigator.permissions.query({ name:'camera' }); if(p.state==='granted') start(); } catch{} })();
+})();
+</script>
+</body>
+</html>
