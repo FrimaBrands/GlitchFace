@@ -70,8 +70,6 @@
         .status-bar { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
         .status-badge { background: var(--primary-bg); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 10px; }
         .status-error { color: var(--danger); }
-        
-        /* WIGGLE SYSTEM STYLES */
         .slider-container { display: flex; flex-direction: column; gap: 4px; }
         .slider-main-line { display: flex; align-items: center; gap: 8px; }
         .wiggle-btn { background: none; border: 1px solid var(--border-color); color: var(--muted); cursor: pointer; border-radius: 4px; width: 24px; height: 24px; font-weight: bold; font-family: 'JetBrains Mono', monospace; transition: all 0.2s; }
@@ -141,7 +139,7 @@
                      <div class="control-group-header">Pixelate Controls</div>
                      <div class="control-group-content">
                          <div class="control-grid">
-                             <div class="control-item" data-control-id="pixelSize"></div>
+                             <div class="control-item full-width" data-control-id="pixelSize"></div>
                          </div>
                      </div>
                  </div>
@@ -158,7 +156,7 @@
                      <div class="control-group-header">Chroma Jitter Controls</div>
                      <div class="control-group-content">
                          <div class="control-grid">
-                            <div class="control-item" data-control-id="chromaShift"></div>
+                            <div class="control-item full-width" data-control-id="chromaShift"></div>
                          </div>
                      </div>
                  </div>
@@ -222,13 +220,15 @@
         const presetList = document.getElementById('presetList');
         const randomBtn = document.getElementById('randomBtn');
 
+        // *** ERROR FIX: Define helper functions here ***
+        function setStatus(text) { status2El.textContent = text; }
+        function setMsg(text, isError = false) { msgEl.textContent = text || ''; msgEl.classList.toggle('status-error', !!isError); }
+
         const ALL_EFFECTS = Array.from(effectBtns).map(btn => btn.dataset.effect);
         let activeEffects = new Set();
         
-        // V3: Wiggle System State
         const controlsState = {};
 
-        // V3: Wiggle System UI Builder
         function createSliderControl(id, def) {
             controlsState[id] = {
                 base: def.value,
@@ -240,9 +240,12 @@
             const container = document.querySelector(`[data-control-id="${id}"]`);
             if (!container) return;
 
+            const isFullWidth = container.classList.contains('full-width');
+            const gridTemplate = isFullWidth ? `1fr` : `auto 1fr`;
+
             container.innerHTML = `
                 <div class="slider-container">
-                    <div class="slider-main-line">
+                    <div class="slider-main-line" style="display: grid; grid-template-columns: ${gridTemplate}; gap: 8px; align-items: center;">
                         <button class="wiggle-btn" data-id="${id}">~</button>
                         <div style="flex-grow: 1;">
                             <label class="slider-label">${def.label}<span id="${id}-val">${def.value}</span></label>
@@ -258,6 +261,11 @@
                     </div>
                 </div>
             `;
+            if (isFullWidth) {
+                container.querySelector('.wiggle-btn').style.gridRow = "1 / 3";
+                container.querySelector('.slider-main-line > div').style.gridColumn = "2 / 3";
+            }
+
 
             const baseSlider = document.getElementById(`${id}-base`);
             const amtSlider = document.getElementById(`${id}-amt`);
@@ -289,7 +297,6 @@
             update();
         }
 
-        // V3: Define all controls with their properties
         const controlDefinitions = {
             smLen: { label: "Length", min: 0, max: 200, step: 1, value: 40 },
             smAng: { label: "Angle", min: 0, max: 360, step: 1, value: 0 },
@@ -311,10 +318,9 @@
 
         Object.keys(controlDefinitions).forEach(id => createSliderControl(id, controlDefinitions[id]));
         
-        // --- WebGL & Face Tracking State ---
         let stream = null, rafId = null, gl = null, program = null;
         let videoTex = null, maskTex = null;
-        let fbos = [], currentFBO = 0; // V3: FBOs for feedback loop
+        let fbos = [], currentFBO = 0;
         let lastFacesMesh = [];
         let effectCenter = { x: 0.5, y: 0.5 };
         const maskCanvas = document.createElement('canvas');
@@ -323,7 +329,6 @@
         const FM_MIN_INTERVAL = 60;
         const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
         
-        // V3: ADVANCED SHADER
         const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
         const fragSrc = `
             precision highp float; 
@@ -332,7 +337,7 @@
             // UNIFORMS
             uniform sampler2D u_videoTex; 
             uniform sampler2D u_maskTex;
-            uniform sampler2D u_feedbackTex; // V3: For feedback effects
+            uniform sampler2D u_feedbackTex;
             uniform vec2 u_resolution; 
             uniform float u_time; 
             
@@ -344,21 +349,16 @@
             uniform bool u_Glitch_active;
             uniform bool u_ChromaJitter_active;
             
-            // Control Uniforms (dynamically updated by JS)
+            // Control Uniforms
             uniform float u_smLen, u_smAng, u_samples;
             uniform float u_turbScale, u_turbStrength;
             uniform float u_moshBlock, u_moshProb;
             uniform float u_pixelSize;
             uniform float u_glitchBlock, u_glitchProb;
             uniform float u_chromaShift;
-            uniform float u_feather, u_mix, u_feedback;
+            uniform float u_feather, u_mix, u_feedback, u_speed;
 
             // HELPERS
-            vec3 hsv2rgb(vec3 c) {
-                vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-                vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-                return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-            }
             float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
             float noise(vec2 p) {
                 vec2 i = floor(p); vec2 f = fract(p);
@@ -375,18 +375,16 @@
             }
 
             // --- ADVANCED EFFECT FUNCTIONS ---
-
             vec4 applySmear(vec2 uv, vec4 base_color) {
                 vec4 acc = vec4(0.0);
                 float w_sum = 0.0;
-                vec2 dir = vec2(cos(u_smAng), sin(u_smAng));
+                vec2 dir = vec2(cos(radians(u_smAng)), sin(radians(u_smAng)));
 
                 for(int i = 0; i < 32; i++) {
                     if (i >= int(u_samples)) break;
                     float t = float(i);
-                    vec2 sample_uv = uv - (dir * t * u_smLen / u_resolution) / u_samples;
+                    vec2 sample_uv = uv - (dir * u_smLen / u_resolution) * (t / u_samples);
                     
-                    // V3: MASK-AWARE SAMPLING
                     float sample_mask = getMaskValue(sample_uv);
                     vec4 sample_color = texture2D(u_videoTex, sample_uv);
                     
@@ -396,27 +394,25 @@
                 
                 if (w_sum > 0.0) acc /= w_sum;
 
-                // Additive blend over the base color
                 return acc + base_color * (1.0 - getMaskValue(uv));
             }
 
             vec2 applyTurbulence(vec2 uv) {
                 float strength = u_turbStrength / u_resolution.x;
-                vec2 p1 = uv * u_turbScale + u_time * 0.1;
-                vec2 p2 = uv * u_turbScale * 2.1 + u_time * -0.15;
+                float time_mult = u_time * u_speed;
+                vec2 p1 = uv * u_turbScale + time_mult * 0.1;
+                vec2 p2 = uv * u_turbScale * 2.1 - time_mult * 0.15;
                 vec2 offset = vec2(noise(p1), noise(p1 + 5.2)) * 2.0 - 1.0;
-                offset += vec2(noise(p2), noise(p2 + 8.3)) * 2.0 - 1.0;
+                offset += (vec2(noise(p2), noise(p2 + 8.3)) * 2.0 - 1.0) * 0.5;
                 return uv + offset * strength;
             }
 
             vec4 applyDataMosh(vec2 uv, vec4 current_color, sampler2D feedback_tex) {
                 vec2 block_uv = floor(uv * u_moshBlock) / u_moshBlock;
-                if (rand(block_uv + floor(u_time * 5.0)) > u_moshProb) {
-                    // P-Frame: Displace based on noise
+                if (rand(block_uv + floor(u_time * 5.0 * u_speed)) > u_moshProb) {
                     vec2 flow = (vec2(rand(block_uv), rand(block_uv + 9.8)) - 0.5) * 0.1;
                     return texture2D(feedback_tex, uv + flow);
                 }
-                // I-Frame: Show current frame
                 return current_color;
             }
 
@@ -427,7 +423,7 @@
             
             vec2 applyGlitch(vec2 uv) {
                 float row = floor(uv.y * u_glitchBlock);
-                if(rand(vec2(row, floor(u_time * 10.0))) > u_glitchProb) return uv;
+                if(rand(vec2(row, floor(u_time * 10.0 * u_speed))) > u_glitchProb) return uv;
                 return uv + vec2((rand(vec2(row, floor(u_time * 15.0))) - 0.5) * 0.3, 0.0);
             }
             
@@ -438,36 +434,29 @@
                  return vec4(r, color.g, b, color.a);
             }
 
-
             void main() {
                 vec4 base_color = texture2D(u_videoTex, v_uv);
                 vec4 feedback_color = texture2D(u_feedbackTex, v_uv);
                 
-                // Mix in feedback first
                 vec4 current_color = mix(base_color, feedback_color, u_feedback);
-
                 vec2 effect_uv = v_uv;
 
-                // --- UV-based effect chain ---
                 if (u_Turbulence_active) { effect_uv = applyTurbulence(effect_uv); }
-                if (u_Pixelate_active)   { effect_uv = applyPixelate(effect_uv); }
-                if (u_Glitch_active)     { effect_uv = applyGlitch(effect_uv); }
+                if (u_Pixelate_active) { effect_uv = applyPixelate(effect_uv); }
+                if (u_Glitch_active) { effect_uv = applyGlitch(effect_uv); }
 
                 vec4 final_color = texture2D(u_videoTex, effect_uv);
 
-                // --- Color-based effect chain ---
                 if (u_ChromaJitter_active) { final_color = applyChromaJitter(final_color, effect_uv); }
-                if (u_DataMosh_active) { final_color = applyDataMosh(v_uv, final_color, u_feedbackTex); }
                 
-                // --- Special additive effects (calculated last) ---
-                if (u_Smear_active) { final_color = applySmear(v_uv, base_color); }
+                // DataMosh uses the mixed feedback color as input
+                if (u_DataMosh_active) { final_color = applyDataMosh(v_uv, current_color, u_feedbackTex); }
                 
-                // --- Final Mixing ---
                 float mask = getMaskValue(v_uv);
-                // Mix based on the INVERTED mask
-                final_color = mix(final_color, base_color, 1.0 - mask);
+                final_color = mix(final_color, current_color, 1.0 - mask);
                 
-                // Apply global mix
+                if (u_Smear_active) { final_color = applySmear(v_uv, final_color); }
+                
                 gl_FragColor = mix(base_color, final_color, u_mix);
             }
         `;
@@ -475,8 +464,9 @@
         const U = {};
         function getU(name) { return U[name] || (U[name] = gl.getUniformLocation(program, name)); }
         
-        // --- Core App Logic (start, stop, loop) ---
         async function start() {
+            if (!navigator.mediaDevices?.getUserMedia) { setMsg('getUserMedia not supported.', true); return; }
+            if (!isSecureContext) { setMsg('Page is not secure (HTTPS).', true); return; }
             try {
                 setStatus('Requesting camera…');
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
@@ -486,12 +476,13 @@
                 fit();
                 window.addEventListener('resize', fit);
                 
-                setMsg('Initializing...');
+                setStatus('Initializing...');
                 await initFaceMesh();
                 createGL();
                 initFBOs();
                 
                 startBtn.disabled = true; stopBtn.disabled = false;
+                setStatus('Running');
                 setMsg('');
                 loop();
             } catch (err) {
@@ -512,13 +503,11 @@
             if (!video.videoWidth || !gl) return;
             const t = animateChk.checked ? time / 1000 : 0;
 
-            // Face tracking
             if (faceMeshReady && !fmBusy && (performance.now() - lastFmTime) > FM_MIN_INTERVAL) {
                 fmBusy = true; lastFmTime = performance.now();
                 faceMesh.send({ image: video }).finally(() => { fmBusy = false; });
             }
 
-            // Update mask if needed
             if (preciseMaskChk.checked) {
                 drawMaskFromMesh();
                 gl.activeTexture(gl.TEXTURE1);
@@ -526,34 +515,29 @@
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
             }
             
-            // Update video texture
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, videoTex);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
-            // --- Render Pass ---
             gl.useProgram(program);
-
-            // Bind the FBO to draw to it
+            
             gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[currentFBO].framebuffer);
             gl.viewport(0, 0, canvas.width, canvas.height);
             
-            // Set Textures
             gl.uniform1i(getU('u_videoTex'), 0);
             gl.uniform1i(getU('u_maskTex'), 1);
-            gl.uniform1i(getU('u_feedbackTex'), 2); // Feedback texture is on unit 2
+            gl.uniform1i(getU('u_feedbackTex'), 2);
             
             gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, fbos[1 - currentFBO].texture); // Read from the OTHER FBO
+            gl.bindTexture(gl.TEXTURE_2D, fbos[1 - currentFBO].texture);
 
-            // Set uniforms (calculating wiggles)
             gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
             gl.uniform1f(getU('u_time'), t);
             
             for (const id in controlsState) {
                 const state = controlsState[id];
                 let value = state.base;
-                if (state.isWiggling) {
+                if (state.isWiggling && animateChk.checked) {
                     value += Math.sin(t * state.wiggleSpd) * state.wiggleAmt;
                 }
                 gl.uniform1f(getU(`u_${id}`), value);
@@ -563,25 +547,20 @@
                 gl.uniform1i(getU(`u_${effect}_active`), activeEffects.has(effect));
             }
             
-            // Draw to FBO
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-            // --- Display Pass ---
-            // Now, draw the FBO content to the screen
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.viewport(0, 0, canvas.width, canvas.height);
             gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, fbos[currentFBO].texture); // Use the FBO we just drew to
+            gl.bindTexture(gl.TEXTURE_2D, fbos[currentFBO].texture);
             
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             
-            // Swap FBOs for next frame
             currentFBO = 1 - currentFBO;
 
             status2El.textContent = `${lastFacesMesh.length > 0 ? 'Face OK' : 'No Face'} @ ${canvas.width}x${canvas.height}`;
         }
         
-        // --- Setup and Util Functions (createGL, fit, FBOs, face mesh) ---
         function fit() {
             if (!video.videoWidth) return;
             const w = video.videoWidth; const h = video.videoHeight;
@@ -589,7 +568,6 @@
             maskCanvas.width = w; maskCanvas.height = h;
             if (gl) {
                 gl.viewport(0, 0, w, h);
-                // V3: Resize FBOs too
                 if (fbos.length > 0) {
                     fbos.forEach(fbo => {
                         gl.bindTexture(gl.TEXTURE_2D, fbo.texture);
@@ -603,7 +581,7 @@
             gl = canvas.getContext('webgl');
             const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vertSrc); gl.compileShader(vs);
             const fs = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs, fragSrc); gl.compileShader(fs);
-            if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(fs)); }
+            if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) { setMsg("Shader Error: " + gl.getShaderInfoLog(fs), true); throw new Error("Shader compile error"); }
             program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
             
             const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
@@ -612,7 +590,6 @@
             gl.enableVertexAttribArray(a_pos);
             gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
 
-            // Create textures
             videoTex = createTexture(); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             maskTex = createTexture();
         }
@@ -630,6 +607,7 @@
         function initFBOs() {
             for (let i = 0; i < 2; i++) {
                 const texture = createTexture();
+                gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
                 
                 const fbo = gl.createFramebuffer();
@@ -641,22 +619,61 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
 
-        // --- All other utility functions (face mesh init, mask drawing, UI event handlers, presets) would go here ---
-        // (They are largely the same as V2 but adapted for the new `controlsState` object)
+        async function initFaceMesh() {
+            if (faceMeshReady) return;
+            if (typeof window.FaceMesh === 'undefined') {
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload = resolve; s.onerror = () => reject(new Error('Failed to load MediaPipe FaceMesh')); document.head.appendChild(s);
+                });
+            }
+            faceMesh = new window.FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            faceMesh.onResults((res) => {
+                lastFacesMesh = res.multiFaceLandmarks || [];
+            });
+            faceMeshReady = true;
+        }
+
+        function drawMaskFromMesh() {
+            const W = maskCanvas.width, H = maskCanvas.height;
+            maskCtx.save();
+            maskCtx.clearRect(0, 0, W, H);
+            
+            if(mirrorChk.checked){ maskCtx.translate(W, 0); maskCtx.scale(-1, 1); }
+            
+            maskCtx.fillStyle = '#fff';
+            maskCtx.beginPath();
+            
+            if(lastFacesMesh.length > 0){
+                const lm = lastFacesMesh[0];
+                if (!lm || lm.length < 468) { maskCtx.restore(); return; }
+                
+                const padding = controlsState.pad ? controlsState.pad.base : 0;
+                const padFactor = 1 + padding / 100;
+
+                let minX = W, minY = H, maxX = 0, maxY = 0;
+                for(const p of lm) { minX = Math.min(minX, p.x * W); minY = Math.min(minY, p.y * H); maxX = Math.max(maxX, p.x * W); maxY = Math.max(maxY, p.y * H); }
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                
+                const p0 = lm[FACE_OVAL[0]];
+                maskCtx.moveTo(centerX + (p0.x*W - centerX) * padFactor, centerY + (p0.y*H - centerY) * padFactor);
+                for(let i = 1; i < FACE_OVAL.length; i++){
+                    const p = lm[FACE_OVAL[i]];
+                    maskCtx.lineTo(centerX + (p.x*W - centerX) * padFactor, centerY + (p.y*H - centerY) * padFactor);
+                }
+                maskCtx.closePath();
+            }
+            maskCtx.fill();
+            maskCtx.restore();
+        }
         
-        async function initFaceMesh() { /* ... same as before ... */ }
-        function drawMaskFromMesh() { /* ... same as before ... */ }
-        
-        // --- Preset management needs to be updated for the new state shape ---
         function getAppState() {
-            // Now saves the entire controlsState object with base, wiggleAmt, etc.
             return {
                 controls: JSON.parse(JSON.stringify(controlsState)),
                 checkboxes: {
-                    mirrorChk: mirrorChk.checked,
-                    animateChk: animateChk.checked,
-                    trackCenterChk: trackCenterChk.checked,
-                    preciseMaskChk: preciseMaskChk.checked
+                    mirrorChk: mirrorChk.checked, animateChk: animateChk.checked,
+                    trackCenterChk: trackCenterChk.checked, preciseMaskChk: preciseMaskChk.checked
                 },
                 effects: Array.from(activeEffects)
             };
@@ -664,12 +681,10 @@
 
         function setAppState(state) {
             if (!state) return;
-            // Restore controls and wiggle state
             if (state.controls) {
                 Object.keys(state.controls).forEach(id => {
-                    if (controlsState[id]) {
+                    if (controlsState[id] && state.controls[id]) {
                         Object.assign(controlsState[id], state.controls[id]);
-                        // Update UI to reflect loaded state
                         document.getElementById(`${id}-base`).value = state.controls[id].base;
                         document.getElementById(`${id}-amt`).value = state.controls[id].wiggleAmt;
                         document.getElementById(`${id}-spd`).value = state.controls[id].wiggleSpd;
@@ -677,28 +692,38 @@
                         const wiggleBtn = document.querySelector(`[data-id="${id}"]`);
                         wigglePanel.classList.toggle('active', state.controls[id].isWiggling);
                         wiggleBtn.classList.toggle('active', state.controls[id].isWiggling);
-                        // Trigger input to update labels
                         document.getElementById(`${id}-base`).dispatchEvent(new Event('input'));
                         document.getElementById(`${id}-amt`).dispatchEvent(new Event('input'));
                         document.getElementById(`${id}-spd`).dispatchEvent(new Event('input'));
                     }
                 });
             }
-            // Restore checkboxes
             if (state.checkboxes) {
-                mirrorChk.checked = state.checkboxes.mirrorChk;
-                animateChk.checked = state.checkboxes.animateChk;
-                trackCenterChk.checked = state.checkboxes.trackCenterChk;
-                preciseMaskChk.checked = state.checkboxes.preciseMaskChk;
+                mirrorChk.checked = state.checkboxes.mirrorChk ?? true;
+                animateChk.checked = state.checkboxes.animateChk ?? true;
+                trackCenterChk.checked = state.checkboxes.trackCenterChk ?? true;
+                preciseMaskChk.checked = state.checkboxes.preciseMaskChk ?? true;
             }
-            // Restore active effects
             if (state.effects) {
                 activeEffects = new Set(state.effects);
                 updateEffectUI();
             }
         }
+
+        function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3Presets') || '{}'); }
+        function savePresets(presets) { localStorage.setItem('faceGlitchV3Presets', JSON.stringify(presets)); }
+
+        function populatePresetList() {
+            const presets = getPresets();
+            presetList.innerHTML = '<option value="">Load a preset...</option>';
+            for(const name in presets) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                presetList.appendChild(opt);
+            }
+        }
         
-        // --- UI event listeners (largely the same) ---
         function updateEffectUI() {
             document.querySelectorAll('.dynamic-controls .control-group').forEach(panel => {
                 panel.classList.toggle('active', activeEffects.has(panel.dataset.effect));
@@ -708,17 +733,63 @@
             });
         }
         
-        effectBtns.forEach(btn => { /* ... same as before ... */ });
-        document.querySelectorAll('.control-group-header').forEach(header => { /* ... same as before ... */ });
-        startBtn.addEventListener('click', start);
-        stopBtn.addEventListener('click', stop);
-        savePresetBtn.addEventListener('click', () => { /* ... same using new getAppState ... */ });
-        deletePresetBtn.addEventListener('click', () => { /* ... same ... */ });
-        presetList.addEventListener('change', () => { /* ... same using new setAppState ... */ });
-        randomBtn.addEventListener('click', () => { /* ... needs update for new state ... */ });
+        effectBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const effectName = btn.dataset.effect;
+                if (activeEffects.has(effectName)) { activeEffects.delete(effectName); } else { activeEffects.add(effectName); }
+                updateEffectUI();
+            });
+        });
+        document.querySelectorAll('.control-group-header').forEach(header => { header.addEventListener('click', () => header.parentElement.classList.toggle('collapsed')); });
+        
+        savePresetBtn.addEventListener('click', () => {
+            const name = presetNameInput.value.trim();
+            if(!name) { setMsg('Please enter a name for the preset.', true); return; }
+            const presets = getPresets(); presets[name] = getAppState();
+            savePresets(presets); populatePresetList();
+            presetList.value = name; setMsg(`Preset '${name}' saved.`);
+        });
+        deletePresetBtn.addEventListener('click', () => {
+             const name = presetList.value; if(!name) { setMsg('Select a preset to delete.', true); return; }
+             const presets = getPresets(); delete presets[name];
+             savePresets(presets); populatePresetList(); setMsg(`Preset '${name}' deleted.`);
+        });
+        presetList.addEventListener('change', () => {
+            const name = presetList.value; if(!name) return;
+            const presets = getPresets();
+            if(presets[name]) { setAppState(presets[name]); presetNameInput.value = name; setMsg(`Preset '${name}' loaded.`); }
+        });
+        randomBtn.addEventListener('click', () => {
+            const rand = (min,max) => min + Math.random() * (max-min);
+            Object.keys(controlDefinitions).forEach(id => {
+                const def = controlDefinitions[id];
+                const baseVal = rand(def.min, def.max);
+                document.getElementById(`${id}-base`).value = baseVal;
+                document.getElementById(`${id}-base`).dispatchEvent(new Event('input'));
+                
+                const isWiggling = Math.random() > 0.7;
+                const wiggleAmt = isWiggling ? rand(0, (def.max-def.min)/4) : 0;
+                const wiggleSpd = isWiggling ? rand(0.1, 5) : 1;
+                document.getElementById(`${id}-amt`).value = wiggleAmt;
+                document.getElementById(`${id}-spd`).value = wiggleSpd;
+                document.getElementById(`${id}-amt`).dispatchEvent(new Event('input'));
+                document.getElementById(`${id}-spd`).dispatchEvent(new Event('input'));
+                
+                const wigglePanel = document.getElementById(`${id}-wiggle-panel`);
+                const wiggleBtn = document.querySelector(`[data-id="${id}"]`);
+                wigglePanel.classList.toggle('active', isWiggling);
+                wiggleBtn.classList.toggle('active', isWiggling);
+                controlsState[id].isWiggling = isWiggling;
+            });
 
-
-        // --- Simplified Init ---
+            activeEffects.clear();
+            ALL_EFFECTS.forEach(effect => { if(Math.random() > 0.5) activeEffects.add(effect); });
+            if (activeEffects.size === 0) activeEffects.add(ALL_EFFECTS[Math.floor(rand(0, ALL_EFFECTS.length))]);
+            updateEffectUI();
+            setMsg('Parameters randomized!');
+        });
+        
+        populatePresetList();
         activeEffects.add('Turbulence');
         updateEffectUI();
         (async () => { try { const p = await navigator.permissions.query({ name: 'camera' }); if (p.state === 'granted') start(); } catch { } })();
