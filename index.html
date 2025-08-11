@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V3</title>
+    <title>Face Glitch V2.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -163,24 +163,40 @@
             color: var(--primary-color);
         }
 
+        .dynamic-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
         .control-group {
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             margin-bottom: 16px;
             overflow: hidden;
             background: var(--primary-bg);
-        }
-
-        .dynamic-controls-group.inactive {
-            max-height: 0;
-            opacity: 0;
-            margin-bottom: 0;
+            max-height: 52px;
+            transition: all 0.3s ease-in-out;
         }
         
-        .dynamic-controls-group {
-            max-height: 1000px;
+        .control-group-content {
+            max-height: 0;
+            opacity: 0;
+            padding: 0 16px;
+            transition: all 0.3s ease-in-out;
+            pointer-events: none;
+        }
+        
+        .control-group.expanded {
+            max-height: 500px;
+        }
+        
+        .control-group.expanded .control-group-content {
+            max-height: 500px;
             opacity: 1;
-            transition: all 0.5s ease-in-out;
+            padding: 12px 16px;
+            pointer-events: auto;
+            border-top: 1px solid var(--border-color);
         }
 
         .control-group-header {
@@ -207,20 +223,8 @@
             content: '-';
             transform: rotate(180deg);
         }
-
-        .control-group-content {
-            overflow: hidden;
-            max-height: 0;
-            transition: max-height 0.3s ease-in-out;
-        }
-        
-        .control-group.expanded .control-group-content {
-            max-height: 500px; /* Needs to be large enough to contain all content */
-        }
         
         .control-grid {
-            padding: 12px 16px;
-            border-top: 1px solid var(--border-color);
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 16px;
@@ -270,8 +274,6 @@
         }
 
         .options-list {
-            padding: 12px 16px;
-            border-top: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -345,183 +347,140 @@
         </div>
         <div class="controls-panel">
             <div class="header">
-                <h1>Face Glitch V3</h1>
+                <h1>Face Glitch V2.1</h1>
                 <div class="header-actions">
                     <button id="startBtn" class="btn btn-primary">Start Camera</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
                 </div>
             </div>
 
-            <div class="section-heading">Effects</div>
-            <div class="effect-selector">
+            <div class="effect-selector" id="effectSelector">
                 <button class="effect-btn active" data-effect="5">Smear</button>
                 <button class="effect-btn" data-effect="6">Radial Blur</button>
                 <button class="effect-btn" data-effect="8">Noise Flow</button>
                 <button class="effect-btn" data-effect="0">Glitch</button>
                 <button class="effect-btn" data-effect="1">Wavy Distort</button>
                 <button class="effect-btn" data-effect="7">Swirl</button>
-                <button class="effect-btn" data-effect="9">Gauss Blur</button>
+                <button class="effect-btn" data-effect="2">Box Blur</button>
                 <button class="effect-btn" data-effect="3">Pixelate</button>
             </div>
 
             <div class="dynamic-controls">
-                <div class="dynamic-controls-group active" data-effect="5">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Smear Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Smear Length (px)<span id="smLenVal">40</span></label>
-                                    <input type="range" id="smLen" min="0" max="120" step="1" value="40" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Smear Angle (°)<span id="smAngVal">0</span></label>
-                                    <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Samples<span id="samplesVal">12</span></label>
-                                    <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
-                                </div>
+                <div id="smearControls" class="control-group expanded" data-effect="5">
+                    <div class="control-group-header">Smear Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Smear Length (px)<span id="smLenVal">40</span></label>
+                                <input type="range" id="smLen" min="0" max="120" step="1" value="40" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Smear Angle (°)<span id="smAngVal">0</span></label>
+                                <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Samples<span id="samplesVal">12</span></label>
+                                <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="6">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Radial Blur Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Blur Radius (px)<span id="radBlurVal">40</span></label>
-                                    <input type="range" id="radBlur" min="0" max="120" step="1" value="40" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Samples<span id="radSamplesVal">12</span></label>
-                                    <input type="range" id="radSamples" min="1" max="32" step="1" value="12" class="slider-input">
-                                </div>
+                <div id="radialBlurControls" class="control-group" data-effect="6">
+                    <div class="control-group-header">Radial Blur Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Blur Radius (px)<span id="smLenVal_b">40</span></label>
+                                <input type="range" id="smLen_b" min="0" max="120" step="1" value="40" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Samples<span id="samplesVal_b">12</span></label>
+                                <input type="range" id="samples_b" min="1" max="32" step="1" value="12" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="dynamic-controls-group" data-effect="8">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Noise Flow Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Noise Scale<span id="nScaleVal">3.0</span></label>
-                                    <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Noise Strength (px)<span id="nStrengthVal">18</span></label>
-                                    <input type="range" id="nStrength" min="0" max="60" step="1" value="18" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Warp Radius<span id="warpRadVal">0.50</span></label>
-                                    <input type="range" id="warpRad" min="0.1" max="1.0" step="0.01" value="0.5" class="slider-input">
-                                </div>
+                <div id="noiseFlowControls" class="control-group" data-effect="8">
+                    <div class="control-group-header">Noise Flow Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Noise Scale<span id="nScaleVal">3.0</span></label>
+                                <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Noise Strength (px)<span id="nStrengthVal">18</span></label>
+                                <input type="range" id="nStrength" min="0" max="60" step="1" value="18" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="0">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Glitch Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Glitch Block (px)<span id="blockVal">22</span></label>
-                                    <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Glitch Probability<span id="probVal">0.45</span></label>
-                                    <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Glitch Height (px)<span id="glitchHVal">1.0</span></label>
-                                    <input type="range" id="glitchH" min="1.0" max="20.0" step="0.1" value="1.0" class="slider-input">
-                                </div>
+                <div id="glitchControls" class="control-group" data-effect="0">
+                    <div class="control-group-header">Glitch Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Glitch Block (px)<span id="blockVal">22</span></label>
+                                <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Glitch Probability<span id="probVal">0.45</span></label>
+                                <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="1">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Wavy Distort Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Wave Freq<span id="freqVal">12.0</span></label>
-                                    <input type="range" id="freq" min="0" max="60" step="0.5" value="12" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Wave Amp (px)<span id="ampVal">16</span></label>
-                                    <input type="range" id="amp" min="0" max="60" step="1" value="16" class="slider-input">
-                                </div>
+                <div id="distortControls" class="control-group" data-effect="1">
+                    <div class="control-group-header">Wavy Distort Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Wave Freq<span id="freqVal">12.0</span></label>
+                                <input type="range" id="freq" min="0" max="60" step="0.5" value="12" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Wave Amp (px)<span id="ampVal">16</span></label>
+                                <input type="range" id="amp" min="0" max="60" step="1" value="16" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="7">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Swirl Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Swirl Amount<span id="swirlVal">2.20</span></label>
-                                    <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="2.2" class="slider-input">
-                                </div>
-                                <div class="control-item">
-                                    <label class="slider-label">Warp Radius<span id="warpRadVal_s">0.50</span></label>
-                                    <input type="range" id="warpRad_s" min="0.1" max="1.0" step="0.01" value="0.5" class="slider-input">
-                                </div>
+                <div id="swirlControls" class="control-group" data-effect="7">
+                    <div class="control-group-header">Swirl Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Swirl Amount<span id="swirlVal">2.20</span></label>
+                                <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="2.2" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="2">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Box Blur Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Blur Radius (px)<span id="blurVal">16</span></label>
-                                    <input type="range" id="blur" min="0" max="48" step="1" value="16" class="slider-input">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="dynamic-controls-group" data-effect="9">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Gaussian Blur Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Blur Radius (px)<span id="gaussBlurVal">12</span></label>
-                                    <input type="range" id="gaussBlur" min="0" max="32" step="1" value="12" class="slider-input">
-                                </div>
+                <div id="boxBlurControls" class="control-group" data-effect="2">
+                    <div class="control-group-header">Box Blur Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Blur Radius (px)<span id="blurVal">16</span></label>
+                                <input type="range" id="blur" min="0" max="48" step="1" value="16" class="slider-input">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="dynamic-controls-group" data-effect="3">
-                    <div class="control-group expanded">
-                        <div class="control-group-header">Pixelate Controls</div>
-                        <div class="control-group-content">
-                            <div class="control-grid">
-                                <div class="control-item">
-                                    <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
-                                    <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
-                                </div>
+                <div id="pixelateControls" class="control-group" data-effect="3">
+                    <div class="control-group-header">Pixelate Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
+                                <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
                             </div>
                         </div>
                     </div>
@@ -529,41 +488,29 @@
             </div>
 
             <div class="section-heading">Global Controls</div>
-            <div class="control-group expanded">
-                <div class="control-group-header">Core & Color</div>
-                <div class="control-group-content">
+            <div class="control-group expanded" data-section="global">
+                <div class="control-group-header">Core & Masking</div>
+                <div class="control-group-content options-list">
                     <div class="control-grid">
                         <div class="control-item">
                             <label class="slider-label">Intensity<span id="intensityVal">0.90</span></label>
                             <input type="range" id="intensity" min="0" max="1" step="0.01" value="0.9" class="slider-input">
                         </div>
                         <div class="control-item">
-                            <label class="slider-label">Mix (Opacity)<span id="mixVal">1.00</span></label>
-                            <input type="range" id="mix" min="0" max="1" step="0.01" value="1" class="slider-input">
-                        </div>
-                        <div class="control-item">
                             <label class="slider-label">Speed<span id="speedVal">1.20</span></label>
                             <input type="range" id="speed" min="0" max="5" step="0.01" value="1.2" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Feather<span id="featherVal">18</span></label>
-                            <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
                         </div>
                         <div class="control-item">
                             <label class="slider-label">Chroma Shift (px)<span id="chromaVal">6</span></label>
                             <input type="range" id="chroma" min="0" max="20" step="1" value="6" class="slider-input">
                         </div>
                         <div class="control-item">
-                            <label class="slider-label">Hue Shift<span id="hueVal">0</span></label>
-                            <input type="range" id="hue" min="0" max="360" step="1" value="0" class="slider-input">
+                            <label class="slider-label">Mix (Opacity)<span id="mixVal">1.00</span></label>
+                            <input type="range" id="mix" min="0" max="1" step="0.01" value="1" class="slider-input">
                         </div>
                         <div class="control-item">
-                            <label class="slider-label">Saturation<span id="satVal">1.00</span></label>
-                            <input type="range" id="sat" min="0" max="2" step="0.01" value="1" class="slider-input">
-                        </div>
-                        <div class="control-item">
-                            <label class="slider-label">Contrast<span id="contrastVal">1.00</span></label>
-                            <input type="range" id="contrast" min="0" max="2" step="0.01" value="1" class="slider-input">
+                            <label class="slider-label">Feather<span id="featherVal">18</span></label>
+                            <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
                         </div>
                         <div class="control-item">
                             <label class="slider-label">Seed<span id="seedVal">7</span></label>
@@ -574,12 +521,6 @@
                             <input type="range" id="pad" min="0" max="120" step="1" value="16" class="slider-input">
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <div class="control-group expanded">
-                <div class="control-group-header">Mask & Tracking</div>
-                <div class="control-group-content options-list">
                     <div class="control-grid">
                         <label>
                             <input type="checkbox" id="mirrorChk" checked> Mirror Camera
@@ -607,8 +548,9 @@
                 </div>
             </div>
             
-            <div class="control-group expanded">
-                <div class="control-group-header">Presets & Tools</div>
+            <div class="section-heading">Presets & Tools</div>
+            <div class="control-group expanded" data-section="presets">
+                <div class="control-group-header">Presets</div>
                 <div class="control-group-content">
                     <div class="control-grid">
                         <button id="presetSoft" class="btn">Soft Blur</button>
@@ -640,7 +582,7 @@
     const invertChk = document.getElementById('invert');
     const shapeSel = document.getElementById('shape');
     const effectSelector = document.getElementById('effectSelector');
-    const dynamicControlGroups = document.querySelectorAll('.dynamic-controls-group');
+    const dynamicControls = document.querySelectorAll('.dynamic-controls .control-group');
     const effectBtns = document.querySelectorAll('.effect-btn');
     const controlsPanel = document.querySelector('.controls-panel');
     let currentEffect = '5';
@@ -665,7 +607,7 @@
             const sel = document.createElement('select');
             sel.id = 'effect-hidden';
             sel.style.display = 'none';
-            const effects = ['Glitch', 'Wavy Distort', 'Box Blur', 'Pixelate', 'Combo: Glitch + Distort + Chroma', 'Smear', 'Radial Blur', 'Swirl', 'Noise Flow', 'Gaussian Blur'];
+            const effects = ['Glitch', 'Wavy Distort', 'Box Blur', 'Pixelate', 'Combo: Glitch + Distort + Chroma', 'Smear', 'Radial Blur', 'Swirl', 'Noise Flow'];
             effects.forEach((name, i) => {
                 const opt = document.createElement('option');
                 opt.value = i;
@@ -688,21 +630,14 @@
         mix: hook('mix', 'mixVal'),
         pad: hook('pad', 'padVal'),
         seed: hook('seed', 'seedVal'),
-        hue: hook('hue', 'hueVal'),
-        sat: hook('sat', 'satVal'),
-        contrast: hook('contrast', 'contrastVal'),
         smLen: hook('smLen', 'smLenVal'),
         smAng: hook('smAng', 'smAngVal'),
         samples: hook('samples', 'samplesVal'),
         swirl: hook('swirl', 'swirlVal'),
         nScale: hook('nScale', 'nScaleVal'),
         nStrength: hook('nStrength', 'nStrengthVal'),
-        glitchH: hook('glitchH', 'glitchHVal'),
-        warpRad: hook('warpRad', 'warpRadVal'),
-        warpRad_s: hook('warpRad_s', 'warpRadVal_s'),
-        radBlur: hook('radBlur', 'radBlurVal'),
-        radSamples: hook('radSamples', 'radSamplesVal'),
-        gaussBlur: hook('gaussBlur', 'gaussBlurVal')
+        smLen_b: hook('smLen_b', 'smLenVal_b'),
+        samples_b: hook('samples_b', 'samplesVal_b')
     };
 
     let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
@@ -729,110 +664,37 @@
     const fragSrc = `
         precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform sampler2D u_maskTex;
         uniform vec2 u_resolution; uniform float u_time; uniform vec2 u_center;
-        uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_mix, u_seed, u_feather;
+        uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_mix, u_seed;
         uniform int u_faceCount, u_shape, u_invert, u_maskMode, u_samples; uniform vec4 u_faces[5];
-        uniform float u_smLen, u_smAng, u_swirl, u_nScale, u_nStrength, u_glitchH, u_warpRad, u_hue, u_sat, u_contrast, u_gaussBlur;
-        
-        // --- Helper functions from original code ---
+        uniform float u_smLen, u_smAng, u_swirl, u_nScale, u_nStrength, u_feather;
         float hash(float n){ return fract(sin(n)*43758.5453123); }
         float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
         vec3 hash3(vec2 p){ vec3 q = vec3(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)), dot(p, vec2(419.2,371.9))); return fract(sin(q)*43758.5453); }
         float noise(vec2 p){ vec2 i = floor(p), f = fract(p); float a = dot(hash3(i).xy, f); float b = dot(hash3(i+vec2(1.0,0.0)).xy, f-vec2(1.0,0.0)); float c = dot(hash3(i+vec2(0.0,1.0)).xy, f-vec2(0.0,1.0)); float d = dot(hash3(i+vec2(1.0,1.0)).xy, f-vec2(1.0,1.0)); vec2 u = f*f*(3.0-2.0*f); return mix(mix(a,b,u.x), mix(c,d,u.x), u.y); }
         vec2 noise2(vec2 p){ return vec2(noise(p), noise(p+vec2(5.2,1.3))); }
         vec4 sampleChroma(vec2 uv){ float c = u_chroma / u_resolution.x; vec3 col; col.r = texture2D(u_tex, uv + vec2(c,0.0)).r; col.g = texture2D(u_tex, uv).g; col.b = texture2D(u_tex, uv - vec2(c,0.0)).b; return vec4(col,1.0); }
-        
-        // --- New/Updated Effect Functions ---
-        vec4 doBoxBlur(vec2 uv){ vec2 off = vec2(u_blur) / u_resolution; vec4 acc = vec4(0.0); for(int dx=-1; dx<=1; ++dx){ for(int dy=-1; dy<=1; ++dy){ acc += texture2D(u_tex, uv + off*vec2(float(dx), float(dy))); } } return acc / 9.0; }
+        vec4 doBlur(vec2 uv){ vec2 off = vec2(u_blur) / u_resolution; vec4 acc = vec4(0.0); for(int dx=-1; dx<=1; ++dx){ for(int dy=-1; dy<=1; ++dy){ acc += texture2D(u_tex, uv + off*vec2(float(dx), float(dy))); } } return acc / 9.0; }
         vec4 dirSmear(vec2 uv, float ang, float len, int taps){ vec2 dir = vec2(cos(ang), sin(ang)); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(taps)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t = float(i); float w = 1.0 - t/float(taps); acc += texture2D(u_tex, uv - stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
         vec4 radialBlur(vec2 uv, vec2 center, float len, int taps){ vec2 dir = normalize(center - uv + 1e-6); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(taps)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t = float(i); float w = 1.0 - t/float(taps); acc += texture2D(u_tex, uv + stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
-        
-        const float PI = 3.14159265359;
-        vec4 gaussianBlur(vec2 uv, float radius){
-            vec4 sum = vec4(0.0);
-            float sigma = radius * 0.5;
-            float Z = 0.0;
-            vec2 off = radius / u_resolution;
-
-            for(int i=-16; i<=16; ++i) {
-                for(int j=-16; j<=16; ++j) {
-                    vec2 offset = vec2(float(i), float(j)) * off;
-                    float weight = exp(-(dot(offset, offset) / (2.0 * sigma * sigma)));
-                    sum += texture2D(u_tex, uv + offset) * weight;
-                    Z += weight;
-                }
-            }
-            return sum / Z;
-        }
-
-        vec2 glitchUV(vec2 uv){
-            float rows = u_resolution.y / max(1.0, u_block);
-            float row = floor(uv.y * rows);
-            float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0);
-            float r = hash(row + t*13.17);
-            float active = step(1.0 - u_prob, r);
-            float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active;
-            float vert_shift = (hash(row*1.23 + t*5.43) - 0.5) * u_glitchH * active;
-            return uv + vec2(shift, vert_shift / u_resolution.y);
-        }
-        vec2 distortUV(vec2 uv){
-            float twopi = 6.2831853; float sx = sin((uv.y * (1.0 + u_freq*0.05) + u_time * (0.2 + u_speed*0.6)) * twopi);
-            float cy = cos((uv.x * (0.6 + u_freq*0.04) + u_time * (0.3 + u_speed*0.5)) * twopi);
-            vec2 d = vec2(sx, cy) * (u_amp / u_resolution);
-            return uv + d * u_intensity;
-        }
-        vec2 swirlUV(vec2 uv, vec2 center, float amount){
-            vec2 d = uv - center; float r = length(d);
-            float radius_eff = u_warpRad;
-            float ang = amount * exp(-r / radius_eff) * u_intensity;
-            float s = sin(ang), c = cos(ang);
-            vec2 rot = vec2(c*d.x - s*d.y, s*d.x + c*d.y); return center + rot;
-        }
-        vec2 displaceNoiseUV(vec2 uv){
-            vec2 p = uv * u_nScale * 2.5 + vec2(u_time * 0.1 * u_speed, 0.0);
-            vec2 n = noise2(p) * 2.0 - 1.0;
-            vec2 off = (u_nStrength / u_resolution) * n;
-            float dist = distance(uv, u_center);
-            float radius_eff = u_warpRad;
-            float falloff = smoothstep(radius_eff, 0.0, dist);
-            return uv + off * u_intensity * falloff;
-        }
-
+        vec2 glitchUV(vec2 uv){ float rows = u_resolution.y / max(1.0, u_block); float row = floor(uv.y * rows); float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0); float r = hash(row + t*13.17); float active = step(1.0 - u_prob, r); float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active; return uv + vec2(shift, 0.0); }
+        vec2 distortUV(vec2 uv){ float twopi = 6.2831853; float sx = sin((uv.y * (1.0 + u_freq*0.05) + u_time * (0.2 + u_speed*0.6)) * twopi); float cy = cos((uv.x * (0.6 + u_freq*0.04) + u_time * (0.3 + u_speed*0.5)) * twopi); vec2 d = vec2(sx, cy) * (u_amp / u_resolution); return uv + d * u_intensity; }
+        vec2 swirlUV(vec2 uv, vec2 center, float amount){ vec2 d = uv - center; float r = length(d); float ang = amount * exp(-r*8.0) * u_intensity; float s = sin(ang), c = cos(ang); vec2 rot = vec2(c*d.x - s*d.y, s*d.x + c*d.y); return center + rot; }
+        vec2 displaceNoiseUV(vec2 uv){ vec2 p = uv * u_nScale * 2.5 + vec2(u_time * 0.1 * u_speed, 0.0); vec2 n = noise2(p) * 2.0 - 1.0; vec2 off = (u_nStrength / u_resolution) * n; return uv + off * u_intensity; }
         float maskRect(vec2 uv, vec4 r){ float inside = step(r.x, uv.x) * step(uv.x, r.x + r.z) * step(r.y, uv.y) * step(uv.y, r.y + r.w); if(inside < 0.5) return 0.0; float fx = u_feather / u_resolution.x; float fy = u_feather / u_resolution.y; float f = max(fx, fy); float dx = min(uv.x - r.x, (r.x + r.z) - uv.x); float dy = min(uv.y - r.y, (r.y + r.w) - uv.y); float d = min(dx, dy); return smoothstep(0.0, f, d); }
         float maskEllipse(vec2 uv, vec4 r){ vec2 c = r.xy + r.zw * 0.5; vec2 rad = r.zw * 0.5; vec2 p = (uv - c) / rad; float rr = dot(p,p); float edge = 1.0 - sqrt(max(rr, 0.0)); float fe = u_feather / min(u_resolution.x, u_resolution.y); return smoothstep(0.0, fe, edge); }
         float faceMaskShape(vec2 uv){ float a = 0.0; for(int i=0;i<5;++i){ if(i>=u_faceCount) break; vec4 r = u_faces[i]; float m = (u_shape==0) ? maskRect(uv,r) : maskEllipse(uv,r); a = max(a, m); } return a; }
         float faceMask(vec2 uv){ float a = (u_maskMode==1) ? texture2D(u_maskTex, uv).r : faceMaskShape(uv); if(u_invert==1) a = 1.0 - a; return clamp(a, 0.0, 1.0); }
-        
-        // New color functions
-        vec3 rgb2hsv(vec3 c){ vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0); vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g)); vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r)); float d = q.x - min(q.w, q.y); float e = 1.0e-10; return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x); }
-        vec3 hsv2rgb(vec3 c){ vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0); vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.w); return c.z * mix(K.xxx, clamp(p - K.x, 0.0, 1.0), c.y); }
-        
-        void main(){
-            vec2 uv = v_uv;
-            vec4 base = texture2D(u_tex, uv);
-            
-            vec4 eff = base;
-            if(u_effect == 0){ vec2 guv = glitchUV(uv); eff = sampleChroma(guv); }
-            else if(u_effect == 1){ vec2 duv = distortUV(uv); eff = sampleChroma(duv); }
-            else if(u_effect == 2){ eff = doBoxBlur(uv); }
-            else if(u_effect == 3){ eff = texture2D(u_tex, (floor(uv * (u_resolution / max(1.0,u_pixel))) + 0.5) / (u_resolution / max(1.0,u_pixel))); }
-            else if(u_effect == 4){ vec2 cuv = glitchUV(distortUV(uv)); vec4 cb = doBoxBlur(cuv); vec4 cc = sampleChroma(cuv); eff = mix(cb, cc, 0.5); }
-            else if(u_effect == 5){ eff = dirSmear(uv, radians(u_smAng), u_smLen, u_samples); }
-            else if(u_effect == 6){ eff = radialBlur(uv, u_center, u_radBlur, u_radSamples); }
-            else if(u_effect == 7){ vec2 suv = swirlUV(uv, u_center, u_swirl); eff = texture2D(u_tex, suv); }
-            else if(u_effect == 8){ vec2 nuv = displaceNoiseUV(uv); eff = sampleChroma(nuv); }
-            else if(u_effect == 9){ eff = gaussianBlur(uv, u_gaussBlur); }
-
-            float m = faceMask(uv);
-            vec4 finalColor = mix(base, eff, m * clamp(u_mix, 0.0, 1.0));
-            
-            // Post-processing color adjustments
-            vec3 hsv = rgb2hsv(finalColor.rgb);
-            hsv.r = fract(hsv.r + u_hue / 360.0);
-            hsv.g = clamp(hsv.g * u_sat, 0.0, 1.0);
-            finalColor.rgb = hsv2rgb(hsv);
-            finalColor.rgb = mix(vec3(0.5), finalColor.rgb, u_contrast);
-            
-            gl_FragColor = finalColor;
+        void main(){ vec2 uv = v_uv; vec4 base = texture2D(u_tex, uv); float m = faceMask(uv); vec4 eff = base;
+        if(u_effect == 0){ vec2 guv = glitchUV(uv); vec4 col = sampleChroma(guv); float line = step(0.98, rand(vec2(floor(uv.y*u_resolution.y), floor(u_time*10.0+u_seed)))); col.rgb *= mix(1.0, 0.7, line * u_intensity); eff = mix(base, col, 0.9); }
+        else if(u_effect == 1){ vec2 duv = distortUV(uv); vec4 col = sampleChroma(duv); eff = col; }
+        else if(u_effect == 2){ vec4 b = doBlur(uv); eff = b; }
+        else if(u_effect == 3){ vec4 p = texture2D(u_tex, (floor(uv * (u_resolution / max(1.0,u_pixel))) + 0.5) / (u_resolution / max(1.0,u_pixel))); vec4 c = sampleChroma(uv); eff = mix(p, c, 0.15*u_intensity); }
+        else if(u_effect == 4){ vec2 cuv = glitchUV(distortUV(uv)); vec4 cb = doBlur(cuv); vec4 cc = sampleChroma(cuv); eff = mix(cb, cc, 0.5); }
+        else if(u_effect == 5){ eff = dirSmear(uv, radians(u_smAng), u_smLen, u_samples); }
+        else if(u_effect == 6){ eff = radialBlur(uv, u_center, u_smLen, u_samples); }
+        else if(u_effect == 7){ vec2 suv = swirlUV(uv, u_center, u_swirl); eff = texture2D(u_tex, suv); }
+        else if(u_effect == 8){ vec2 nuv = displaceNoiseUV(uv); eff = sampleChroma(nuv); }
+        gl_FragColor = mix(base, eff, m * clamp(u_mix, 0.0, 1.0));
         }
     `;
 
@@ -922,17 +784,18 @@
         gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
         gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
         gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
-        gl.uniform1f(getU('u_hue'), parseFloat(ui.hue.value));
-        gl.uniform1f(getU('u_sat'), parseFloat(ui.sat.value));
-        gl.uniform1f(getU('u_contrast'), parseFloat(ui.contrast.value));
+        gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
+        gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
+        gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
+        gl.uniform1f(getU('u_time'), timeSec);
+        gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
 
-        // Set effect-specific uniforms dynamically based on selected effect
+        // Dynamically set effect-specific uniforms
         const effect = parseInt(ui.effect.value, 10);
         switch (effect) {
             case 0: // Glitch
                 gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
                 gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
-                gl.uniform1f(getU('u_glitchH'), parseFloat(ui.glitchH.value));
                 break;
             case 1: // Wavy Distort
                 gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
@@ -950,28 +813,24 @@
                 gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value, 10));
                 break;
             case 6: // Radial Blur
-                gl.uniform1f(getU('u_smLen'), parseFloat(ui.radBlur.value));
-                gl.uniform1i(getU('u_samples'), parseInt(ui.radSamples.value, 10));
+                gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen_b.value));
+                gl.uniform1i(getU('u_samples'), parseInt(ui.samples_b.value, 10));
                 break;
             case 7: // Swirl
                 gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
-                gl.uniform1f(getU('u_warpRad'), parseFloat(ui.warpRad_s.value));
                 break;
             case 8: // Noise Flow
                 gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
                 gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
-                gl.uniform1f(getU('u_warpRad'), parseFloat(ui.warpRad.value));
                 break;
-            case 9: // Gaussian Blur
-                gl.uniform1f(getU('u_gaussBlur'), parseFloat(ui.gaussBlur.value));
+            default: // Other effects or combos
+                gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
+                gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
+                gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
+                gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
+                gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
                 break;
         }
-
-        gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
-        gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
-        gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
-        gl.uniform1f(getU('u_time'), timeSec);
-        gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
     }
 
     async function ensureFaceMesh(){
@@ -1047,15 +906,15 @@
     
     // UI Logic for dynamic panels and effect selection
     function updateEffectUI(effectId) {
-        dynamicControlGroups.forEach(panel => {
+        dynamicControls.forEach(panel => {
             if (panel.dataset.effect === effectId) {
-                panel.classList.add('active');
+                panel.classList.add('expanded');
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             } else {
-                panel.classList.remove('active');
+                panel.classList.remove('expanded');
             }
         });
         ui.effect.value = effectId;
-        controlsPanel.scrollTop = 0;
     }
 
     effectBtns.forEach(btn => {
@@ -1066,41 +925,41 @@
         });
     });
 
-    document.querySelectorAll('.control-group-header').forEach(header => {
-        header.addEventListener('click', () => {
-            header.parentElement.classList.toggle('expanded');
+    document.querySelectorAll('[data-section]').forEach(header => {
+        header.querySelector('.control-group-header').addEventListener('click', () => {
+            header.classList.toggle('expanded');
         });
     });
 
+    // Start/Stop
     startBtn.addEventListener('click', start);
     stopBtn.addEventListener('click', stop);
 
+    // Presets & Randomize
     document.getElementById('presetSoft').addEventListener('click', () => {
         const effectCard = document.querySelector('[data-effect="2"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        updateEffectUI('2'); ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.samples.value=12; ui.smLen.value=20; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
-        ui.hue.value=0; ui.sat.value=1; ui.contrast.value=1; ui.radBlur.value=40; ui.radSamples.value=12; ui.gaussBlur.value=12; ui.warpRad.value=0.5; ui.warpRad_s.value=0.5;
-        [ui.blur, ui.intensity, ui.chroma, ui.feather, ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng, ui.swirl, ui.nScale, ui.nStrength, ui.hue, ui.sat, ui.contrast, ui.radBlur, ui.radSamples, ui.gaussBlur, ui.warpRad, ui.warpRad_s].forEach(el=>el && el.dispatchEvent(new Event('input')));
+        updateEffectUI('2'); ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
+        const els = [ui.blur, ui.intensity, ui.chroma, ui.feather, ui.mix, ui.pad, ui.seed, ui.smAng, ui.swirl, ui.nScale, ui.nStrength];
+        els.forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('presetGlitch').addEventListener('click', () => {
         const effectCard = document.querySelector('[data-effect="0"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        updateEffectUI('0'); ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.samples.value=8; ui.smLen.value=12; ui.smAng.value=0;
-        ui.hue.value=0; ui.sat.value=1; ui.contrast.value=1; ui.radBlur.value=40; ui.radSamples.value=12; ui.gaussBlur.value=12; ui.warpRad.value=0.5; ui.warpRad_s.value=0.5;
-        [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather,ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng, ui.hue, ui.sat, ui.contrast, ui.radBlur, ui.radSamples, ui.gaussBlur, ui.warpRad, ui.warpRad_s].forEach(el=>el && el.dispatchEvent(new Event('input')));
+        updateEffectUI('0'); ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11;
+        const els = [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather,ui.mix, ui.pad, ui.seed];
+        els.forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('presetSmear').addEventListener('click', () => {
         const effectCard = document.querySelector('[data-effect="5"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
         updateEffectUI('5'); ui.smLen.value=80; ui.smAng.value=0; ui.samples.value=24; ui.intensity.value=1; ui.mix.value=1; ui.chroma.value=4; ui.feather.value=16; ui.pad.value=12;
-        ui.hue.value=0; ui.sat.value=1; ui.contrast.value=1; ui.radBlur.value=40; ui.radSamples.value=12; ui.gaussBlur.value=12; ui.warpRad.value=0.5; ui.warpRad_s.value=0.5;
-        [ui.smLen, ui.smAng, ui.samples, ui.intensity, ui.mix, ui.chroma, ui.feather, ui.pad, ui.hue, ui.sat, ui.contrast, ui.radBlur, ui.radSamples, ui.gaussBlur, ui.warpRad, ui.warpRad_s].forEach(el=>el && el.dispatchEvent(new Event('input')));
+        const els = [ui.smLen, ui.smAng, ui.samples, ui.intensity, ui.mix, ui.chroma, ui.feather, ui.pad];
+        els.forEach(el=>el && el.dispatchEvent(new Event('input')));
     });
     document.getElementById('randomBtn').addEventListener('click', () => {
-        const randEffect = String(Math.floor(Math.random()*10));
+        const randEffect = String(Math.floor(Math.random()*9));
         const effectCard = document.querySelector(`[data-effect="${randEffect}"]`); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
         updateEffectUI(randEffect);
         const setRand=(el,min,max,step=1)=>{ if(!el) return; const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
-        setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.hue,0,360,1); setRand(ui.sat,0.5,2,0.01); setRand(ui.contrast,0.5,1.5,0.01);
-        setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1); setRand(ui.glitchH,1,20,0.1); setRand(ui.warpRad,0.1,1.0,0.01); setRand(ui.warpRad_s,0.1,1.0,0.01);
-        setRand(ui.radBlur,0,120,1); setRand(ui.radSamples,4,28,1); setRand(ui.gaussBlur,0,32,1);
+        setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1);
         shapeSel.value = Math.random() < 0.5 ? '0' : '1'; invertChk.checked = Math.random() < 0.2; preciseMaskChk.checked = Math.random() < 0.7; trackCenterChk.checked = Math.random() < 0.8;
     });
 
