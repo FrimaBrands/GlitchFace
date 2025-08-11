@@ -1,12 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="utf-t" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V2</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>Face Glitch V2</title> <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #0b0d11;
@@ -25,57 +24,364 @@
             --radius-sm: 8px;
             --radius-md: 12px;
         }
-        * { box-sizing: border-box; }
-        html, body { height: 100%; margin: 0; font-family: 'Poppins', sans-serif; background: var(--bg); color: var(--text-color); }
-        body { display: flex; justify-content: center; align-items: center; padding: 20px; background: radial-gradient(circle at center, #1a1f26 0%, #0d0f13 100%); }
-        .container { display: flex; width: 100%; max-width: 1600px; height: 90vh; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow); background: var(--primary-bg); border: 1px solid var(--border-color); }
-        .main-stage { flex: 3; position: relative; background: #0d0f13; display: flex; align-items: center; justify-content: center; }
-        #glcanvas, #video { width: 100%; height: 100%; object-fit: contain; display: block; }
-        #video { display: none; }
-        .controls-panel { flex: 1; min-width: 400px; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; background: var(--secondary-bg); }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; }
-        h1 { font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.5px; }
-        .btn { padding: 10px 16px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background-color: transparent; color: var(--text-color); font-size: 14px; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; font-family: 'Poppins', sans-serif; }
-        .btn:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.1); border-color: var(--primary-color); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); color: #1a1f26; font-weight: 600; }
-        .btn-primary:hover:not(:disabled) { background-color: #55d4a6; border-color: #55d4a6; }
-        .section-heading { font-size: 18px; font-weight: 600; margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
-        .effect-stack { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-        .effect-toggle { display: flex; align-items: center; justify-content: space-between; background: var(--primary-bg); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s; }
-        .effect-toggle:hover { border-color: var(--primary-color); }
-        .effect-toggle.active { background: rgba(110, 231, 183, 0.1); border-color: var(--primary-color); }
-        .effect-toggle span { font-weight: 600; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-color); transition: .4s; border-radius: 24px; }
-        .switch-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .switch-slider { background-color: var(--primary-color); }
-        input:checked + .switch-slider:before { transform: translateX(20px); }
-        .control-group { border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 10px; background: var(--primary-bg); display: none; }
-        .control-group.active { display: block; }
-        .control-group-header { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; transition: background-color 0.2s; }
-        .control-group-header:hover { background-color: rgba(255, 255, 255, 0.05); }
-        .control-group-content { padding: 12px 16px; border-top: 1px solid var(--border-color); }
-        .control-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-        @media (min-width: 600px) { .control-grid { grid-template-columns: 1fr 1fr; } }
-        .control-item { display: flex; flex-direction: column; gap: 6px; }
-        .slider-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-        .slider-input { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color); -webkit-appearance: none; appearance: none; outline: none; }
-        .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
-        .slider-input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
-        .options-list { display: flex; flex-direction: column; gap: 10px; }
-        .options-list label { display: flex; align-items: center; gap: 10px; font-size: 14px; cursor: pointer; }
-        .preset-manager { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
-        .preset-controls { display: flex; gap: 8px; }
-        .preset-controls input { flex-grow: 1; background: var(--primary-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 8px; border-radius: var(--radius-sm); }
-        #presetList { display: flex; flex-direction: column; gap: 8px; max-height: 150px; overflow-y: auto; padding: 8px; background: var(--primary-bg); border-radius: var(--radius-sm); }
-        .preset-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
-        .preset-item:hover { background: rgba(255, 255, 255, 0.1); }
-        .preset-delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 16px; }
-        .status-bar { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
-        .status-badge { background: var(--primary-bg); padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 10px; }
-        .status-error { color: var(--danger); }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg);
+            color: var(--text-color);
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: radial-gradient(circle at center, #1a1f26 0%, #0d0f13 100%);
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1600px; /* V2 Change: Increased max-width for wider layout */
+            height: 90vh;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .main-stage {
+            flex: 3; /* V2 Change: More space for the canvas */
+            position: relative;
+            background: #0d0f13;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #glcanvas,
+        #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #video {
+            display: none;
+        }
+
+        .controls-panel {
+            flex: 1;
+            min-width: 400px; /* V2 Change: Ensure controls have enough space */
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: var(--secondary-bg);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background-color: transparent;
+            color: var(--text-color);
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .btn:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-small { /* V2 Change: Smaller button style */
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #1a1f26;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: #55d4a6;
+            border-color: #55d4a6;
+        }
+
+        .section-heading {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 16px 0 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .effect-selector {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .effect-btn {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .effect-btn:hover {
+            border-color: var(--primary-color);
+            background: rgba(110, 231, 183, 0.1);
+        }
+
+        /* V2 Change: Active state now supports multiple selections */
+        .effect-btn.active {
+            border-color: var(--primary-color);
+            background: var(--primary-color);
+            color: #1a1f26;
+            font-weight: 600;
+        }
+
+        .dynamic-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .control-group {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+            background: var(--primary-bg);
+            /* V2 Change: Simpler show/hide logic */
+            display: none; 
+        }
+
+        .control-group.global,
+        .control-group.active {
+            display: block;
+        }
+        
+        .control-group-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .control-group-header:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .control-group-header::after {
+            content: '▼';
+            font-size: 0.8rem;
+            transition: transform 0.2s;
+        }
+
+        .control-group.collapsed .control-group-header::after {
+            transform: rotate(-90deg);
+        }
+
+        .control-group-content {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+            transition: all 0.3s ease-in-out;
+        }
+        
+        .control-group.collapsed .control-group-content {
+            display: none;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        /* V2 Change: Grid for preset management */
+        .preset-grid {
+             display: grid;
+             grid-template-columns: 1fr auto auto;
+             gap: 8px;
+             align-items: center;
+             margin-bottom: 12px;
+        }
+        
+        #presetName {
+            width: 100%;
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+        }
+        
+        #presetList {
+            width: 100%;
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        /* V2 Change: Full-width items for single-column layouts */
+        .control-item.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .slider-input {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-color);
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+        }
+
+        .slider-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: 2px solid #0d0f13;
+        }
+
+        .slider-input::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: 2px solid #0d0f13;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .options-list label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .options-list input[type="checkbox"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--primary-bg);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .options-list input[type="checkbox"]:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .options-list input[type="checkbox"]:checked:after {
+            content: '✓';
+            color: #1a1f26;
+            font-size: 14px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .status-bar {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .status-badge {
+            background: var(--primary-bg);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            font-size: 10px;
+        }
+
+        .status-error {
+            color: var(--danger);
+        }
     </style>
 </head>
 <body>
@@ -93,49 +399,160 @@
                 </div>
             </div>
 
-            <div id="globalControls">
-                 <div class="section-heading">Global Controls</div>
-                 <div class="control-grid">
-                     <div class="control-item">
-                         <label class="slider-label">Master Mix<span id="mixVal">1.00</span></label>
-                         <input type="range" id="mix" min="0" max="1" step="0.01" value="1.0" class="slider-input">
-                     </div>
-                     <div class="control-item">
-                         <label class="slider-label">Animation Speed<span id="speedVal">1.00</span></label>
-                         <input type="range" id="speed" min="0" max="5" step="0.01" value="1.0" class="slider-input">
-                     </div>
-                      <div class="control-item">
-                         <label class="slider-label">Mask Feather<span id="featherVal">20</span></label>
-                         <input type="range" id="feather" min="0" max="100" step="1" value="20" class="slider-input">
-                     </div>
-                     <div class="control-item">
-                         <label class="slider-label">Mask Padding (px)<span id="padVal">15</span></label>
-                         <input type="range" id="pad" min="-50" max="150" step="1" value="15" class="slider-input">
+            <div class="section-heading">Active Effects</div>
+            <div class="effect-selector">
+                <button class="effect-btn" data-effect="Smear">Smear</button>
+                <button class="effect-btn" data-effect="Displacement">Displacement</button>
+                <button class="effect-btn" data-effect="Pixelate">Pixelate</button>
+                <button class="effect-btn" data-effect="Glitch">Glitch</button>
+                <button class="effect-btn" data-effect="SlitScan">Slit Scan</button>
+                <button class="effect-btn" data-effect="Chroma">Chroma</button>
+            </div>
+
+            <div class="dynamic-controls">
+                <div id="smearControls" class="control-group" data-effect="Smear">
+                    <div class="control-group-header">Smear Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Length<span id="smLenVal">40</span></label>
+                                <input type="range" id="smLen" min="0" max="200" step="1" value="40" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Angle<span id="smAngVal">0</span></label>
+                                <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                 <label class="slider-label">Wobble Speed<span id="smWobbleVal">0.5</span></label>
+                                 <input type="range" id="smWobble" min="0" max="10" step="0.1" value="0.5" class="slider-input">
+                             </div>
+                             <div class="control-item">
+                                 <label class="slider-label">Samples<span id="samplesVal">12</span></label>
+                                 <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="displacementControls" class="control-group" data-effect="Displacement">
+                    <div class="control-group-header">Displacement Controls</div>
+                    <div class="control-group-content">
+                        <div class="control-grid">
+                            <div class="control-item">
+                                <label class="slider-label">Scale<span id="nScaleVal">3.0</span></label>
+                                <input type="range" id="nScale" min="0.5" max="20" step="0.1" value="3" class="slider-input">
+                            </div>
+                            <div class="control-item">
+                                <label class="slider-label">Strength (px)<span id="nStrengthVal">18</span></label>
+                                <input type="range" id="nStrength" min="0" max="100" step="1" value="18" class="slider-input">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pixelateControls" class="control-group" data-effect="Pixelate">
+                     <div class="control-group-header">Pixelate Controls</div>
+                     <div class="control-group-content">
+                         <div class="control-grid">
+                             <div class="control-item">
+                                 <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
+                                 <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
+                             </div>
+                             <div class="control-item">
+                                 <label class="slider-label">Noise Threshold<span id="pixelThresholdVal">0.00</span></label>
+                                 <input type="range" id="pixelThreshold" min="0" max="0.99" step="0.01" value="0.0" class="slider-input">
+                             </div>
+                         </div>
                      </div>
                  </div>
-                 <div class="options-list" style="margin-top: 16px;">
-                     <label><input type="checkbox" id="mirrorChk" checked> Mirror Camera</label>
-                     <label><input type="checkbox" id="animateChk" checked> Animate Effects</label>
-                     <label><input type="checkbox" id="trackCenterChk" checked> Track Center of Face</label>
-                     <label><input type="checkbox" id="preciseMaskChk" checked> Use Precise Face Mesh</label>
-                     <label><input type="checkbox" id="invertMaskChk"> Invert Mask</label>
+                 
+                 <div id="glitchControls" class="control-group" data-effect="Glitch">
+                     <div class="control-group-header">Glitch Controls</div>
+                     <div class="control-group-content">
+                         <div class="control-grid">
+                             <div class="control-item">
+                                 <label class="slider-label">Block Size (px)<span id="blockVal">22</span></label>
+                                 <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
+                             </div>
+                             <div class="control-item">
+                                 <label class="slider-label">Probability<span id="probVal">0.45</span></label>
+                                 <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 
+                 <div id="slitScanControls" class="control-group" data-effect="SlitScan">
+                     <div class="control-group-header">Slit Scan Controls</div>
+                     <div class="control-group-content">
+                         <div class="control-grid">
+                             <div class="control-item">
+                                 <label class="slider-label">Slit Size (px)<span id="slitSizeVal">10</span></label>
+                                 <input type="range" id="slitSize" min="1" max="50" step="1" value="10" class="slider-input">
+                             </div>
+                              <div class="control-item">
+                                 <label class="slider-label">Speed<span id="slitSpeedVal">5.0</span></label>
+                                 <input type="range" id="slitSpeed" min="0" max="20" step="0.1" value="5" class="slider-input">
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+
+                 <div id="chromaControls" class="control-group" data-effect="Chroma">
+                     <div class="control-group-header">Chromatic Aberration</div>
+                     <div class="control-group-content">
+                         <div class="control-grid">
+                             <div class="control-item full-width">
+                                 <label class="slider-label">Shift Amount (px)<span id="chromaVal">6</span></label>
+                                 <input type="range" id="chroma" min="0" max="40" step="1" value="6" class="slider-input">
+                             </div>
+                         </div>
+                     </div>
                  </div>
             </div>
 
-            <div class="section-heading">Effect Stack</div>
-            <div class="effect-stack" id="effectStack">
+            <div id="globalControls" class="control-group global">
+                <div class="control-group-header">Global & Mask Controls</div>
+                <div class="control-group-content">
+                    <div class="control-grid">
+                         <div class="control-item">
+                             <label class="slider-label">Global Speed<span id="speedVal">1.20</span></label>
+                             <input type="range" id="speed" min="0" max="5" step="0.01" value="1.2" class="slider-input">
+                         </div>
+                         <div class="control-item">
+                             <label class="slider-label">Effect Mix<span id="mixVal">1.00</span></label>
+                             <input type="range" id="mix" min="0" max="1" step="0.01" value="1" class="slider-input">
+                         </div>
+                         <div class="control-item">
+                             <label class="slider-label">Feather<span id="featherVal">18</span></label>
+                             <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
+                         </div>
+                         <div class="control-item">
+                             <label class="slider-label">Mask Padding<span id="padVal">16</span></label>
+                             <input type="range" id="pad" min="-50" max="120" step="1" value="16" class="slider-input">
+                         </div>
+                    </div>
+                    <div class="options-list">
+                        <label><input type="checkbox" id="mirrorChk" checked> Mirror Camera</label>
+                        <label><input type="checkbox" id="animateChk" checked> Animate Effects</label>
+                        <label><input type="checkbox" id="trackCenterChk" checked> Track Center of Face</label>
+                        <label><input type="checkbox" id="preciseMaskChk" checked> Precise Face Mesh Mask</label>
+                        <label><input type="checkbox" id="invert"> Invert Mask</label>
+                    </div>
                 </div>
-            <div id="effectControlsContainer">
-                </div>
-
-            <div class="section-heading">Presets</div>
-             <div class="preset-manager">
-                 <div class="preset-controls">
-                     <input type="text" id="presetName" placeholder="Preset Name">
-                     <button id="savePresetBtn" class="btn btn-primary">Save</button>
+            </div>
+            
+            <div id="presetsTools" class="control-group global">
+                 <div class="control-group-header">Presets</div>
+                 <div class="control-group-content">
+                     <div class="preset-grid">
+                         <input type="text" id="presetName" placeholder="Preset Name...">
+                         <button id="savePresetBtn" class="btn btn-small">Save</button>
+                         <button id="deletePresetBtn" class="btn btn-small" style="color: var(--danger);">Delete</button>
+                     </div>
+                     <select id="presetList" class="btn"></select>
+                     <button id="randomBtn" class="btn" style="width: 100%; margin-top: 8px;">Randomize All</button>
                  </div>
-                 <div id="presetList"></div>
-                 <button id="randomBtn" class="btn">Randomize All</button>
              </div>
 
             <div class="status-bar">
@@ -146,517 +563,351 @@
     </div>
     <script>
     (() => {
-        // --- V2 Feature Flags ---
-        const V2_FEATURES = {
-            EFFECT_STACKING: true,
-            PRESET_SAVING: true,
-            ADVANCED_EFFECTS: true,
-            TRACKING_FIX: true,
-            MASK_FIX: true,
-        };
-
-        // --- DOM Elements ---
+        // --- DOM Elements & UI Hooks ---
         const video = document.getElementById('video');
         const canvas = document.getElementById('glcanvas');
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const msgEl = document.getElementById('msg');
+        const mirrorChk = document.getElementById('mirrorChk');
+        const animateChk = document.getElementById('animateChk');
+        const trackCenterChk = document.getElementById('trackCenterChk');
+        const preciseMaskChk = document.getElementById('preciseMaskChk');
         const status2El = document.getElementById('status2');
-        
-        // --- State Variables ---
-        let stream = null, rafId = null, gl = null, program = null, tex = null, buf = null;
-        let lastFacesMesh = [];
-        let effectCenter = { x: 0.5, y: 0.5 };
-        const maskCanvas = document.createElement('canvas');
-        const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
-        let maskTex = null;
-        let faceMesh = null;
-        let faceMeshReady = false;
-        let fmBusy = false;
-        let lastFmTime = 0;
-        const FM_MIN_INTERVAL = 50; // ms
-        const FACE_OVAL_INDICES = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
-        
-        // --- WebGL Source ---
-        const vertSrc = `
-            attribute vec2 a_pos;
-            varying vec2 v_uv;
-            void main() {
-                v_uv = a_pos;
-                gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
-            }`;
+        const msgEl = document.getElementById('msg');
+        const invertChk = document.getElementById('invert');
+        const effectSelector = document.querySelector('.effect-selector');
+        const dynamicControls = document.querySelectorAll('.dynamic-controls .control-group');
+        const effectBtns = document.querySelectorAll('.effect-btn');
+        const controlsPanel = document.querySelector('.controls-panel');
+        // V2 Change: Preset UI
+        const savePresetBtn = document.getElementById('savePresetBtn');
+        const deletePresetBtn = document.getElementById('deletePresetBtn');
+        const presetNameInput = document.getElementById('presetName');
+        const presetList = document.getElementById('presetList');
+        const randomBtn = document.getElementById('randomBtn');
 
-        const fragSrc = `
-            precision highp float;
-            varying vec2 v_uv;
+        // V2 Change: List of all available effects
+        const ALL_EFFECTS = Array.from(effectBtns).map(btn => btn.dataset.effect);
+        let activeEffects = new Set();
 
-            // Textures
-            uniform sampler2D u_tex;
-            uniform sampler2D u_maskTex;
-
-            // Global settings
-            uniform vec2 u_resolution;
-            uniform float u_time;
-            uniform float u_speed;
-            uniform float u_masterMix;
-            uniform bool u_mirror;
-
-            // Mask settings
-            uniform vec2 u_center;
-            uniform bool u_usePreciseMask;
-            uniform bool u_invertMask;
-            uniform float u_feather;
-
-            // Effect-specific uniforms
-            uniform bool u_smear_enabled;
-            uniform float u_smear_len;
-            uniform float u_smear_ang;
-            uniform int u_smear_samples;
-            uniform float u_smear_pingpong;
-
-            uniform bool u_pixelate_enabled;
-            uniform float u_pixelate_size;
-            uniform float u_pixelate_pattern_scale;
-            
-            uniform bool u_noiseflow_enabled;
-            uniform float u_noiseflow_scale;
-            uniform float u_noiseflow_strength;
-
-            uniform bool u_jitter_enabled;
-            uniform float u_jitter_amount;
-            uniform float u_jitter_speed;
-
-            uniform bool u_chroma_enabled;
-            uniform float u_chroma_amount;
-
-            uniform bool u_distort_enabled;
-            uniform float u_distort_freq;
-            uniform float u_distort_amp;
-
-            // --- Utility Functions ---
-            float rand(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-            vec3 hash3(vec2 p) {
-                vec3 q = vec3(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)), dot(p, vec2(419.2, 371.9)));
-                return fract(sin(q) * 43758.5453);
-            }
-
-            // --- Masking ---
-            float getMaskValue(vec2 uv) {
-                float mask = 1.0;
-                if (u_usePreciseMask) {
-                    // MASK_FIX: Feathering is now done via blurring the mask texture lookup, not a canvas filter.
-                    // This provides a proper feather instead of a "glow".
-                    float feather_uv = u_feather / u_resolution.x;
-                    if (feather_uv > 0.001) {
-                        float total = 0.0;
-                        for (float x = -2.0; x <= 2.0; x += 1.0) {
-                            for (float y = -2.0; y <= 2.0; y += 1.0) {
-                                total += texture2D(u_maskTex, uv + vec2(x, y) * feather_uv / 2.0).r;
-                            }
-                        }
-                        mask = total / 25.0;
-                    } else {
-                        mask = texture2D(u_maskTex, uv).r;
-                    }
-                }
-                
-                if (u_invertMask) {
-                    mask = 1.0 - mask;
-                }
-                return clamp(mask, 0.0, 1.0);
-            }
-
-            // --- Effect Functions ---
-            
-            // DISPLACEMENT: Noise Flow
-            vec2 applyNoiseFlow(vec2 uv, float mask) {
-                if (!u_noiseflow_enabled || mask == 0.0) return uv;
-                vec2 p = uv * u_noiseflow_scale + u_time * u_speed * 0.1;
-                vec3 n = hash3(p) * 2.0 - 1.0;
-                vec2 offset = n.xy * (u_noiseflow_strength / u_resolution) * mask;
-                return uv + offset;
-            }
-
-            // DISPLACEMENT: Wavy Distort
-            vec2 applyDistort(vec2 uv, float mask) {
-                if (!u_distort_enabled || mask == 0.0) return uv;
-                float angle = u_time * u_speed;
-                float sx = sin(uv.y * u_distort_freq + angle);
-                float sy = cos(uv.x * u_distort_freq + angle);
-                vec2 offset = vec2(sx, sy) * (u_distort_amp / u_resolution) * mask;
-                return uv + offset;
-            }
-
-            // DISPLACEMENT: Jitter
-            vec2 applyJitter(vec2 uv, float mask) {
-                if (!u_jitter_enabled || mask == 0.0) return uv;
-                float t = floor(u_time * u_jitter_speed);
-                vec2 block_uv = floor(uv * 50.0);
-                float r = rand(block_uv + t);
-                if (r < 0.95) return uv;
-                vec2 offset = (hash3(block_uv + t + 10.0).xy - 0.5) * (u_jitter_amount / u_resolution) * mask;
-                return uv + offset;
-            }
-
-            // COLOR: Smear
-            vec4 applySmear(vec4 originalColor, vec2 uv, float mask) {
-                if (!u_smear_enabled || mask == 0.0) return originalColor;
-                
-                // ADVANCED_EFFECTS: Smear animates back and forth (ping-pong)
-                float angle = radians(u_smear_ang + sin(u_time * u_speed * 2.0) * u_smear_pingpong);
-                vec2 dir = vec2(cos(angle), sin(angle));
-                vec2 stepUV = dir * (u_smear_len / u_resolution) / float(u_smear_samples);
-                
-                vec4 acc = vec4(0.0);
-                float totalWeight = 0.0;
-                
-                for(int i = 0; i < 32; i++) {
-                    if (i >= u_smear_samples) break;
-                    float t = float(i);
-                    // MASK_FIX: The effect "seeps" because it samples outside pixels.
-                    // The strength of the effect (smear length) is modulated by the mask.
-                    vec2 sampleUV = uv - stepUV * t * mask;
-                    float weight = 1.0 - (t / float(u_smear_samples));
-                    acc += texture2D(u_tex, sampleUV) * weight;
-                    totalWeight += weight;
-                }
-                
-                return acc / max(totalWeight, 1.0);
-            }
-
-            // COLOR: Pixelate
-            vec4 applyPixelate(vec4 originalColor, vec2 uv, float mask) {
-                if (!u_pixelate_enabled || mask == 0.0) return originalColor;
-                
-                // ADVANCED_EFFECTS: Pixelation strength is modulated by a noise pattern.
-                float noise_mask = rand(uv * u_pixelate_pattern_scale + floor(u_time * u_speed * 5.0));
-                float currentPixelSize = u_pixelate_size * noise_mask * mask;
-                
-                if (currentPixelSize < 1.5) return originalColor;
-                
-                vec2 pixelatedUV = (floor(uv * u_resolution / currentPixelSize) + 0.5) * currentPixelSize / u_resolution;
-                return texture2D(u_tex, pixelatedUV);
-            }
-
-            // COLOR: Chromatic Aberration
-            vec4 applyChroma(vec4 originalColor, vec2 uv, float mask) {
-                if (!u_chroma_enabled || mask == 0.0) return originalColor;
-                float offset = u_chroma_amount / u_resolution.x * mask;
-                float r = texture2D(u_tex, uv + vec2(offset, 0.0)).r;
-                float b = texture2D(u_tex, uv - vec2(offset, 0.0)).b;
-                return vec4(r, originalColor.g, b, originalColor.a);
-            }
-
-
-            void main() {
-                // Base UV coordinate, handling mirroring
-                vec2 uv = v_uv;
-                if (u_mirror) {
-                    uv.x = 1.0 - uv.x;
-                }
-
-                // Get the mask value at the current pixel
-                float mask = getMaskValue(uv);
-                
-                // --- EFFECT STACKING: UV / Displacement Effects ---
-                // Effects that change *where* we look up the texture
-                vec2 effectedUV = uv;
-                effectedUV = applyNoiseFlow(effectedUV, mask);
-                effectedUV = applyDistort(effectedUV, mask);
-                effectedUV = applyJitter(effectedUV, mask);
-                
-                // Sample the texture using the final distorted UV
-                vec4 effectedColor = texture2D(u_tex, effectedUV);
-
-                // --- EFFECT STACKING: Color / Post-Processing Effects ---
-                // Effects that change the color of the sampled pixel
-                effectedColor = applySmear(effectedColor, effectedUV, mask);
-                effectedColor = applyPixelate(effectedColor, effectedUV, mask);
-                effectedColor = applyChroma(effectedColor, effectedUV, mask);
-                
-                // Get the original, unaffected color
-                vec4 baseColor = texture2D(u_tex, uv);
-
-                // Final mix between base color and effected color, controlled by master mix
-                gl_FragColor = mix(baseColor, effectedColor, u_masterMix);
-            }
-        `;
-        
-        // --- Effect Definitions ---
-        const effects = {
-            smear: {
-                name: 'Directional Smear',
-                enabled: true,
-                controls: [
-                    { id: 'smear_len', label: 'Length', min: 0, max: 200, step: 1, value: 40 },
-                    { id: 'smear_ang', label: 'Angle', min: 0, max: 360, step: 1, value: 0 },
-                    { id: 'smear_samples', label: 'Samples', min: 1, max: 32, step: 1, value: 12 },
-                    { id: 'smear_pingpong', label: 'Ping-Pong', min: 0, max: 90, step: 1, value: 20 },
-                ]
-            },
-            pixelate: {
-                name: 'Patterned Pixelate',
-                enabled: false,
-                controls: [
-                    { id: 'pixelate_size', label: 'Max Size', min: 1, max: 80, step: 1, value: 16 },
-                    { id: 'pixelate_pattern_scale', label: 'Pattern Scale', min: 1, max: 200, step: 1, value: 50 },
-                ]
-            },
-            noiseflow: {
-                name: 'Noise Flow',
-                enabled: true,
-                controls: [
-                    { id: 'noiseflow_scale', label: 'Scale', min: 0.5, max: 20, step: 0.1, value: 4 },
-                    { id: 'noiseflow_strength', label: 'Strength', min: 0, max: 100, step: 1, value: 20 },
-                ]
-            },
-            jitter: {
-                name: 'Block Jitter',
-                enabled: false,
-                controls: [
-                    { id: 'jitter_amount', label: 'Amount', min: 0, max: 200, step: 1, value: 50 },
-                    { id: 'jitter_speed', label: 'Speed', min: 1, max: 30, step: 1, value: 10 },
-                ]
-            },
-            chroma: {
-                name: 'Chroma Shift',
-                enabled: true,
-                controls: [
-                    { id: 'chroma_amount', label: 'Amount', min: 0, max: 50, step: 1, value: 8 },
-                ]
-            },
-            distort: {
-                name: 'Wavy Distort',
-                enabled: false,
-                controls: [
-                    { id: 'distort_freq', label: 'Frequency', min: 0, max: 100, step: 0.5, value: 15 },
-                    { id: 'distort_amp', label: 'Amplitude', min: 0, max: 100, step: 1, value: 10 },
-                ]
-            }
-        };
-
-        // UI hooks
-        const ui = {};
-
-        function hookSlider(id, valueId, config) {
+        function hook(id, outId) {
             const el = document.getElementById(id);
-            const out = document.getElementById(valueId);
+            const out = document.getElementById(outId);
             if (!el || !out) return null;
-            
-            const set = () => {
-                const val = parseFloat(el.value);
-                out.textContent = val.toFixed(config.step < 1 ? 2 : 0);
-            };
+            const set = () => out.textContent = parseFloat(el.value).toFixed(el.step < 1 ? 2 : 0);
             el.addEventListener('input', set);
             set();
             return el;
         }
 
-        function createEffectUI() {
-            const stackContainer = document.getElementById('effectStack');
-            const controlsContainer = document.getElementById('effectControlsContainer');
-            stackContainer.innerHTML = '';
-            controlsContainer.innerHTML = '';
+        const ui = {
+            speed: hook('speed', 'speedVal'),
+            mix: hook('mix', 'mixVal'),
+            feather: hook('feather', 'featherVal'),
+            pad: hook('pad', 'padVal'),
+            // Effect-specific
+            smLen: hook('smLen', 'smLenVal'),
+            smAng: hook('smAng', 'smAngVal'),
+            smWobble: hook('smWobble', 'smWobbleVal'), // V2 New
+            samples: hook('samples', 'samplesVal'),
+            nScale: hook('nScale', 'nScaleVal'),
+            nStrength: hook('nStrength', 'nStrengthVal'),
+            pixel: hook('pixel', 'pixelVal'),
+            pixelThreshold: hook('pixelThreshold', 'pixelThresholdVal'), // V2 New
+            block: hook('block', 'blockVal'),
+            prob: hook('prob', 'probVal'),
+            slitSize: hook('slitSize', 'slitSizeVal'), // V2 New
+            slitSpeed: hook('slitSpeed', 'slitSpeedVal'), // V2 New
+            chroma: hook('chroma', 'chromaVal'),
+        };
 
-            for (const key in effects) {
-                const config = effects[key];
-                
-                // Create Toggles
-                const toggle = document.createElement('div');
-                toggle.className = 'effect-toggle';
-                toggle.id = `toggle_${key}`;
-                toggle.innerHTML = `
-                    <span>${config.name}</span>
-                    <label class="switch">
-                        <input type="checkbox" id="chk_${key}" ${config.enabled ? 'checked' : ''}>
-                        <span class="switch-slider"></span>
-                    </label>
-                `;
-                stackContainer.appendChild(toggle);
+        let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
+        let lastFacesMesh = [];
+        let effectCenter = { x: 0.5, y: 0.5 };
+        const maskCanvas = document.createElement('canvas');
+        const maskCtx = maskCanvas.getContext('2d');
+        let maskTex = null;
+        let faceMesh = null;
+        let faceMeshReady = false;
+        let fmBusy = false;
+        let lastFmTime = 0;
+        const FM_MIN_INTERVAL = 60;
+        const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+        
+        // V2 Change: Refactored and new GLSL shader for effect stacking
+        const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
+        const fragSrc = `
+            precision highp float; 
+            varying vec2 v_uv; 
+            
+            // --- UNIFORMS ---
+            uniform sampler2D u_tex; 
+            uniform sampler2D u_maskTex;
+            uniform vec2 u_resolution; 
+            uniform float u_time; 
+            uniform vec2 u_center; 
+            uniform float u_mix, u_speed;
+            
+            // Masking
+            uniform int u_maskMode, u_invert;
+            uniform float u_feather;
+            
+            // Effect Flags (used for stacking)
+            uniform bool u_Smear_active;
+            uniform bool u_Displacement_active;
+            uniform bool u_Pixelate_active;
+            uniform bool u_Glitch_active;
+            uniform bool u_SlitScan_active;
+            uniform bool u_Chroma_active;
+            
+            // Effect Parameters
+            uniform float u_smLen, u_smAng, u_smWobble;
+            uniform int u_samples;
+            uniform float u_nScale, u_nStrength;
+            uniform float u_pixel, u_pixelThreshold;
+            uniform float u_block, u_prob;
+            uniform float u_slitSize, u_slitSpeed;
+            uniform float u_chroma;
 
-                // Create Control Panels
-                const panel = document.createElement('div');
-                panel.className = `control-group ${config.enabled ? 'active' : ''}`;
-                panel.id = `controls_${key}`;
-                panel.innerHTML = `
-                    <div class="control-group-header">${config.name} Controls</div>
-                    <div class="control-group-content">
-                        <div class="control-grid">
-                            ${config.controls.map(c => `
-                                <div class="control-item">
-                                    <label class="slider-label">${c.label}<span id="val_${c.id}">${c.value}</span></label>
-                                    <input type="range" id="${c.id}" min="${c.min}" max="${c.max}" step="${c.step}" value="${c.value}" class="slider-input">
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-                controlsContainer.appendChild(panel);
-                
-                // Hook up controls
-                ui[`chk_${key}`] = document.getElementById(`chk_${key}`);
-                ui[`chk_${key}`].addEventListener('change', (e) => {
-                    document.getElementById(`controls_${key}`).classList.toggle('active', e.target.checked);
-                    document.getElementById(`toggle_${key}`).classList.toggle('active', e.target.checked);
-                });
-                 document.getElementById(`toggle_${key}`).classList.toggle('active', config.enabled);
-
-
-                config.controls.forEach(c => {
-                    ui[c.id] = hookSlider(c.id, `val_${c.id}`, c);
-                });
+            // --- HELPERS ---
+            float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                vec2 u = f*f*(3.0-2.0*f);
+                return mix(mix(rand(i + vec2(0.0,0.0)), rand(i + vec2(1.0,0.0)), u.x),
+                           mix(rand(i + vec2(0.0,1.0)), rand(i + vec2(1.0,1.0)), u.x), u.y);
             }
-             // Hook global controls
-            ui.mix = hookSlider('mix', 'mixVal', { step: 0.01 });
-            ui.speed = hookSlider('speed', 'speedVal', { step: 0.01 });
-            ui.feather = hookSlider('feather', 'featherVal', { step: 1 });
-            ui.pad = hookSlider('pad', 'padVal', { step: 1 });
-            ui.mirrorChk = document.getElementById('mirrorChk');
-            ui.animateChk = document.getElementById('animateChk');
-            ui.trackCenterChk = document.getElementById('trackCenterChk');
-            ui.preciseMaskChk = document.getElementById('preciseMaskChk');
-            ui.invertMaskChk = document.getElementById('invertMaskChk');
-        }
 
+            // --- MASKING LOGIC ---
+            float getMask(vec2 uv) {
+                // V2 Change: Feathering is now done via smoothstep for a clean soft edge
+                float m = texture2D(u_maskTex, uv).r;
+                float feather_amount = u_feather / u_resolution.y;
+                m = smoothstep(0.5 - feather_amount, 0.5 + feather_amount, m);
+
+                if (u_invert == 1) m = 1.0 - m;
+                return clamp(m, 0.0, 1.0);
+            }
+
+            // --- EFFECT FUNCTIONS ---
+            vec4 applySmear(vec4 current_color, vec2 uv) {
+                float angle = radians(u_smAng + sin(u_time * u_smWobble * u_speed) * 20.0);
+                vec2 dir = vec2(cos(angle), sin(angle));
+                vec2 step_uv = (u_smLen / u_resolution) * dir / max(1.0, float(u_samples));
+                vec4 acc = vec4(0.0);
+                float w_sum = 0.0;
+                for(int i = 0; i < 32; i++) {
+                    if (i >= u_samples) break;
+                    float t = float(i);
+                    float w = 1.0 - t / float(u_samples);
+                    // The smear "seeps" because it samples from the original texture regardless of mask
+                    acc += texture2D(u_tex, uv - step_uv * t) * w; 
+                    w_sum += w;
+                }
+                return acc / max(w_sum, 1e-4);
+            }
+
+            vec2 applyDisplacement(vec2 uv) {
+                vec2 p = uv * u_nScale + vec2(u_time * 0.1 * u_speed, 0.0);
+                vec2 n_offset = vec2(noise(p), noise(p + vec2(5.2, 1.3))) * 2.0 - 1.0;
+                return uv + (n_offset * u_nStrength / u_resolution);
+            }
+            
+            vec2 applyPixelate(vec2 uv) {
+                if (rand(uv + u_time) > u_pixelThreshold) {
+                    float pixel_size = u_pixel;
+                    if(u_pixelThreshold > 0.0) { // Make pixels smaller when thresholding
+                       pixel_size = max(1.0, u_pixel * (1.0 - u_pixelThreshold));
+                    }
+                    vec2 res_factor = u_resolution / pixel_size;
+                    return (floor(uv * res_factor) + 0.5) / res_factor;
+                }
+                return uv;
+            }
+
+            vec2 applyGlitch(vec2 uv) {
+                float rows = floor(u_resolution.y / u_block);
+                float row_idx = floor(uv.y * rows);
+                float t = floor(u_time * (2.0 + u_speed * 10.0));
+                if (rand(vec2(row_idx, t)) > u_prob) return uv;
+                float shift = (rand(vec2(row_idx, t * 1.3)) - 0.5) * 0.3;
+                return uv + vec2(shift, 0.0);
+            }
+
+            vec2 applySlitScan(vec2 uv) {
+                float slit_y = fract(u_time * 0.1 * u_slitSpeed);
+                float slit_h = u_slitSize / u_resolution.y;
+                if(abs(uv.y - slit_y) < slit_h) {
+                    return uv;
+                }
+                // Sample from the slit position
+                return vec2(uv.x, slit_y);
+            }
+
+            vec4 applyChroma(vec2 uv) {
+                float c = u_chroma / u_resolution.x;
+                float r = texture2D(u_tex, uv + vec2(c, 0.0)).r;
+                float g = texture2D(u_tex, uv).g;
+                float b = texture2D(u_tex, uv - vec2(c, 0.0)).b;
+                return vec4(r, g, b, 1.0);
+            }
+
+            void main() {
+                vec4 base_color = texture2D(u_tex, v_uv);
+                vec4 effect_color = base_color;
+                vec2 effect_uv = v_uv;
+
+                // --- V2: EFFECT STACKING PIPELINE ---
+                
+                // 1. UV Displacement Effects
+                if (u_Displacement_active) { effect_uv = applyDisplacement(effect_uv); }
+                if (u_Pixelate_active)     { effect_uv = applyPixelate(effect_uv); }
+                if (u_Glitch_active)      { effect_uv = applyGlitch(effect_uv); }
+                if (u_SlitScan_active)    { effect_uv = applySlitScan(effect_uv); }
+                
+                // 2. Sample texture with final UVs
+                effect_color = texture2D(u_tex, effect_uv);
+
+                // 3. Color-based Effects (that read multiple pixels)
+                if (u_Smear_active) { effect_color = applySmear(effect_color, v_uv); }
+                
+                // 4. Final color channel shifts
+                if (u_Chroma_active) { effect_color = applyChroma(effect_uv); }
+
+                // --- MASKING & MIXING ---
+                float m = getMask(v_uv);
+                vec4 final_color = mix(base_color, effect_color, m * u_mix);
+
+                gl_FragColor = final_color;
+            }
+        `;
+        
+        // --- Core Functions (Setup, Start, Stop, Loop) ---
         function setStatus(text) { status2El.textContent = text; }
         function setMsg(text, isError = false) { msgEl.textContent = text || ''; msgEl.classList.toggle('status-error', !!isError); }
 
         async function initFaceMesh() {
-            if (faceMeshReady) return;
+            if (faceMeshReady) return true;
             if (typeof window.FaceMesh === 'undefined') {
-                setMsg('Loading FaceMesh model...');
                 await new Promise((resolve, reject) => {
-                    const s = document.createElement('script');
-                    s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';
-                    s.crossOrigin = 'anonymous';
-                    s.onload = resolve;
-                    s.onerror = () => reject(new Error('Failed to load MediaPipe FaceMesh'));
-                    document.head.appendChild(s);
+                    const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload = resolve; s.onerror = () => reject(new Error('Failed to load MediaPipe FaceMesh')); document.head.appendChild(s);
                 });
             }
-            faceMesh = new window.FaceMesh({
-                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-            });
+            faceMesh = new window.FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
             faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-            faceMesh.onResults((results) => {
-                fmBusy = false;
-                if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                    const landmarks = results.multiFaceLandmarks[0];
-                    lastFacesMesh = landmarks.map(p => ({ x: p.x, y: p.y }));
+            faceMesh.onResults((res) => {
+                lastFacesMesh = res.multiFaceLandmarks ? res.multiFaceLandmarks.map(lm => lm.map(p => ({ x: p.x, y: p.y }))) : [];
+                if (trackCenterChk.checked && lastFacesMesh.length > 0) {
+                    const lm = lastFacesMesh[0];
+                    let sx = 0, sy = 0;
+                    for (const p of lm) { sx += p.x; sy += p.y; }
+                    let cx = sx / lm.length;
+                    let cy = sy / lm.length;
                     
-                    if (ui.trackCenterChk.checked) {
-                        const noseTip = landmarks[1]; // Use a stable central point like the nose tip
-                        if (noseTip) {
-                           // TRACKING_FIX: Y-axis is inverted because WebGL's V coordinate (0=bottom) is opposite to image/DOM Y (0=top).
-                           // We use 1.0 - y to correct this. X-axis is handled by the `u_mirror` uniform in the shader.
-                           effectCenter = { x: noseTip.x, y: 1.0 - noseTip.y };
-                        }
-                    }
-                } else {
-                    lastFacesMesh = [];
+                    // V2 Fix: Correct coordinates for mirror and WebGL space
+                    if(mirrorChk.checked) cx = 1.0 - cx;
+                    cy = 1.0 - cy;
+
+                    effectCenter = { x: cx, y: cy };
                 }
             });
-            await faceMesh.initialize();
-            faceMeshReady = true;
-            setMsg('');
+            faceMeshReady = true; return true;
         }
         
         function fit() {
             if (!video.videoWidth) return;
-            const videoRatio = video.videoWidth / video.videoHeight;
-            const container = canvas.parentElement;
-            const containerRatio = container.clientWidth / container.clientHeight;
-            
-            let w, h;
-            if (containerRatio > videoRatio) {
-                h = container.clientHeight;
-                w = h * videoRatio;
-            } else {
-                w = container.clientWidth;
-                h = w / videoRatio;
-            }
-
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.style.width = `${w}px`;
-            canvas.style.height = `${h}px`;
-
-            maskCanvas.width = video.videoWidth;
-            maskCanvas.height = video.videoHeight;
-            if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+            canvas.width = w; canvas.height = h;
+            maskCanvas.width = w; maskCanvas.height = h;
+            if (gl) gl.viewport(0, 0, w, h);
         }
 
         function createGL() {
-            gl = canvas.getContext('webgl');
-            if (!gl) throw new Error('WebGL not available');
-
-            const compile = (type, src) => {
-                const s = gl.createShader(type);
-                gl.shaderSource(s, src);
-                gl.compileShader(s);
-                if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-                return s;
-            };
-            program = gl.createProgram();
-            gl.attachShader(program, compile(gl.VERTEX_SHADER, vertSrc));
-            gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragSrc));
-            gl.linkProgram(program);
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-
+            gl = canvas.getContext('webgl'); if (!gl) throw new Error('WebGL not available');
+            function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { throw new Error(gl.getShaderInfoLog(s) || 'shader compile fail'); } return s; }
+            const vs = compile(gl.VERTEX_SHADER, vertSrc);
+            const fs = compile(gl.FRAGMENT_SHADER, fragSrc);
+            program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program); if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { throw new Error(gl.getProgramInfoLog(program) || 'link fail'); }
+            
             const a_pos = gl.getAttribLocation(program, 'a_pos');
-            buf = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+            gl.useProgram(program);
             gl.enableVertexAttribArray(a_pos);
             gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
 
-            tex = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, tex);
+            tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // This is important for coordinate systems
-
-            maskTex = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, maskTex);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            
+            maskTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, maskTex);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         }
         
-        const U_CACHE = {};
-        function getU(name) { return U_CACHE[name] || (U_CACHE[name] = gl.getUniformLocation(program, name)); }
+        async function start() {
+            if (!navigator.mediaDevices?.getUserMedia) { setMsg('getUserMedia not supported.', true); return; }
+            if (!isSecureContext) { setMsg('Page is not secure (HTTPS). Camera access will be blocked.', true); return; }
+            try {
+                setStatus('Requesting camera…');
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                video.srcObject = stream; await video.play();
+                await new Promise(res => { video.addEventListener('loadedmetadata', res, { once: true }); });
+                
+                fit(); window.addEventListener('resize', fit);
+                setMsg('Initializing Face Mesh...');
+                await initFaceMesh();
+                setMsg('');
 
-        function uploadVideoTexture() {
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch (e) { /* stale video frame */ }
-            gl.uniform1i(getU('u_tex'), 0);
+                createGL();
+                startBtn.disabled = true; stopBtn.disabled = false;
+                loop();
+            } catch (err) {
+                console.error(err);
+                let hint = (err.name === 'NotAllowedError') ? ' • Permission blocked.' : '';
+                setMsg('Could not start camera: ' + err.message + hint, true); setStatus('Error');
+            }
         }
 
-        function uploadMaskTexture() {
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, maskTex);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
-            gl.uniform1i(getU('u_maskTex'), 1);
+        function stop() {
+            if (rafId) cancelAnimationFrame(rafId), rafId = null;
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            startBtn.disabled = false; stopBtn.disabled = true;
+            setStatus('Stopped');
         }
+
+        const U = {};
+        function getU(name) { return U[name] || (U[name] = gl.getUniformLocation(program, name)); }
         
         function drawMaskFromMesh() {
             const W = maskCanvas.width, H = maskCanvas.height;
+            maskCtx.save();
             maskCtx.clearRect(0, 0, W, H);
             
-            if (lastFacesMesh.length > 0) {
-                maskCtx.fillStyle = '#fff';
-                maskCtx.beginPath();
-                
-                const padding = parseFloat(ui.pad.value || 0);
-                const landmarks = lastFacesMesh;
-                
-                // Find bounding box to calculate center for padding
+            // V2 Fix: Handle mirroring by translating the canvas context
+            if(mirrorChk.checked){
+                maskCtx.translate(W, 0);
+                maskCtx.scale(-1, 1);
+            }
+            
+            maskCtx.fillStyle = '#fff';
+            maskCtx.beginPath();
+            
+            const padding = parseFloat(ui.pad.value);
+            if(lastFacesMesh.length > 0){
+                const lm = lastFacesMesh[0];
+                if (!lm || lm.length < 468) { maskCtx.restore(); return; }
+
+                // Calculate bounding box for padding
                 let minX = W, minY = H, maxX = 0, maxY = 0;
-                for (const p of landmarks) {
+                for(const p of lm) {
                     minX = Math.min(minX, p.x * W);
                     minY = Math.min(minY, p.y * H);
                     maxX = Math.max(maxX, p.x * W);
@@ -665,271 +916,254 @@
                 const centerX = (minX + maxX) / 2;
                 const centerY = (minY + maxY) / 2;
 
-                const p0 = landmarks[FACE_OVAL_INDICES[0]];
-                let startX = p0.x * W;
-                let startY = p0.y * H;
-                if (padding !== 0) {
-                    let dx = startX - centerX;
-                    let dy = startY - centerY;
-                    let len = Math.sqrt(dx*dx + dy*dy);
-                    startX += (dx/len) * padding;
-                    startY += (dy/len) * padding;
-                }
-                maskCtx.moveTo(startX, startY);
-
-                for (let i = 1; i < FACE_OVAL_INDICES.length; i++) {
-                    const p = landmarks[FACE_OVAL_INDICES[i]];
-                    let px = p.x * W;
-                    let py = p.y * H;
-
-                    if (padding !== 0) {
-                       let dx = px - centerX;
-                       let dy = py - centerY;
-                       let len = Math.sqrt(dx*dx + dy*dy);
-                       px += (dx/len) * padding;
-                       py += (dy/len) * padding;
-                    }
-                    maskCtx.lineTo(px, py);
+                // Draw padded oval
+                const p0 = lm[FACE_OVAL[0]];
+                maskCtx.moveTo(centerX + (p0.x*W - centerX) * (1 + padding/100), centerY + (p0.y*H - centerY) * (1 + padding/100));
+                for(let i = 1; i < FACE_OVAL.length; i++){
+                    const p = lm[FACE_OVAL[i]];
+                    maskCtx.lineTo(centerX + (p.x*W - centerX) * (1 + padding/100), centerY + (p.y*H - centerY) * (1 + padding/100));
                 }
                 maskCtx.closePath();
-                maskCtx.fill();
+            } else {
+                // Fallback: draw nothing if no face
             }
-        }
 
-        function setUniforms(timeSec) {
-            gl.useProgram(program);
-            
-            // Globals
-            gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
-            gl.uniform1f(getU('u_time'), timeSec);
-            gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
-            gl.uniform1f(getU('u_masterMix'), parseFloat(ui.mix.value));
-            gl.uniform1i(getU('u_mirror'), ui.mirrorChk.checked);
-
-            // Mask
-            gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
-            gl.uniform1i(getU('u_usePreciseMask'), ui.preciseMaskChk.checked);
-            gl.uniform1i(getU('u_invertMask'), ui.invertMaskChk.checked);
-            gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
-            
-            // Per-effect uniforms
-            for (const key in effects) {
-                const enabled = ui[`chk_${key}`] && ui[`chk_${key}`].checked;
-                gl.uniform1i(getU(`u_${key}_enabled`), enabled);
-                if (enabled) {
-                    effects[key].controls.forEach(c => {
-                        const uniformType = (c.step === 1 && c.max > 1) ? '1i' : '1f';
-                        gl[`uniform${uniformType}`](getU(`u_${c.id}`), parseFloat(ui[c.id].value));
-                    });
-                }
-            }
-        }
-        
-        async function start() {
-            if (!navigator.mediaDevices?.getUserMedia) { setMsg('Camera access (getUserMedia) not supported.', true); return; }
-            if (!window.isSecureContext) { setMsg('Page not secure (HTTPS). Camera access will be blocked.', true); return; }
-            
-            try {
-                setStatus('Requesting camera…');
-                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-                video.srcObject = stream;
-                await video.play();
-                fit();
-                window.addEventListener('resize', fit, false);
-
-                await initFaceMesh();
-                createGL();
-                
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                setMsg('');
-                loop();
-            } catch (err) {
-                let hint = '';
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    hint = ' • Permission blocked. Check browser settings.';
-                } else if (err.name === 'NotFoundError') {
-                    hint = ' • No camera found.';
-                }
-                setMsg(`Could not start camera: ${err.message}${hint}`, true);
-                setStatus('Error');
-            }
-        }
-
-        function stop() {
-            if (rafId) cancelAnimationFrame(rafId);
-            rafId = null;
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            stream = null;
-            video.srcObject = null;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            setStatus('Stopped');
+            maskCtx.fill();
+            maskCtx.restore();
         }
 
         function loop() {
             rafId = requestAnimationFrame(loop);
-            
-            if (!video.videoWidth || video.paused || video.ended) return;
+            if (!video.videoWidth) return;
 
-            const now = performance.now();
-            if (ui.preciseMaskChk.checked && faceMeshReady && !fmBusy && (now - lastFmTime > FM_MIN_INTERVAL)) {
-                fmBusy = true;
-                lastFmTime = now;
-                faceMesh.send({ image: video });
+            // Face tracking
+            if (faceMeshReady && !fmBusy && (performance.now() - lastFmTime) > FM_MIN_INTERVAL) {
+                fmBusy = true; lastFmTime = performance.now();
+                faceMesh.send({ image: video }).finally(() => { fmBusy = false; });
             }
-            
-            if (canvas.width === 0) fit();
 
-            if (ui.preciseMaskChk.checked && lastFacesMesh.length) {
+            if(canvas.width === 0) fit();
+            
+            let maskMode = 0;
+            if (preciseMaskChk.checked) {
                 drawMaskFromMesh();
-                uploadMaskTexture();
+                gl.activeTexture(gl.TEXTURE1);
+                gl.bindTexture(gl.TEXTURE_2D, maskTex);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+                maskMode = 1;
+            }
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch (e) { /* on some browsers this can throw an error if the video isn't ready */ }
+            
+            gl.useProgram(program);
+            
+            // Set uniforms
+            gl.uniform1i(getU('u_tex'), 0);
+            gl.uniform1i(getU('u_maskTex'), 1);
+            gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
+            const t = animateChk.checked ? performance.now() / 1000 : 0;
+            gl.uniform1f(getU('u_time'), t);
+            gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
+            gl.uniform1i(getU('u_maskMode'), maskMode);
+            gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
+            
+            // Global controls
+            gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
+            gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
+            gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
+            
+            // V2 Change: Set uniforms for each active effect
+            for (const effect of ALL_EFFECTS) {
+                gl.uniform1i(getU(`u_${effect}_active`), activeEffects.has(effect));
             }
             
-            uploadVideoTexture();
-            
-            const timeSec = ui.animateChk.checked ? now / 1000 : 0;
-            setUniforms(timeSec);
-            
+            // Effect-specific uniforms (always set them)
+            gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
+            gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value));
+            gl.uniform1f(getU('u_smWobble'), parseFloat(ui.smWobble.value));
+            gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value, 10));
+            gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
+            gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
+            gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
+            gl.uniform1f(getU('u_pixelThreshold'), parseFloat(ui.pixelThreshold.value));
+            gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
+            gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
+            gl.uniform1f(getU('u_slitSize'), parseFloat(ui.slitSize.value));
+            gl.uniform1f(getU('u_slitSpeed'), parseFloat(ui.slitSpeed.value));
+            gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
+
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-            const activeEffects = Object.keys(effects).filter(k => ui[`chk_${k}`].checked).length;
-            setStatus(`${canvas.width}×${canvas.height} | ${activeEffects} effects active`);
-        }
-
-        // --- Preset Management ---
-        function collectSettings() {
-            const settings = {};
-            // Collect global settings
-            document.querySelectorAll('#globalControls input').forEach(input => {
-                settings[input.id] = input.type === 'checkbox' ? input.checked : input.value;
-            });
-            // Collect effect settings
-            for (const key in effects) {
-                settings[`chk_${key}`] = ui[`chk_${key}`].checked;
-                effects[key].controls.forEach(c => {
-                    settings[c.id] = ui[c.id].value;
-                });
-            }
-            return settings;
-        }
-
-        function applySettings(settings) {
-            // Apply global settings
-            document.querySelectorAll('#globalControls input').forEach(input => {
-                if (settings[input.id] !== undefined) {
-                    if (input.type === 'checkbox') {
-                        input.checked = settings[input.id];
-                    } else {
-                        input.value = settings[input.id];
-                    }
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-            });
-             // Apply effect settings
-            for (const key in effects) {
-                if (settings[`chk_${key}`] !== undefined) {
-                     ui[`chk_${key}`].checked = settings[`chk_${key}`];
-                     ui[`chk_${key}`].dispatchEvent(new Event('change'));
-                }
-                effects[key].controls.forEach(c => {
-                    if (settings[c.id] !== undefined) {
-                        ui[c.id].value = settings[c.id];
-                        ui[c.id].dispatchEvent(new Event('input'));
-                    }
-                });
-            }
+            status2El.textContent = `${lastFacesMesh.length > 0 ? 'Face OK' : 'No Face'} @ ${canvas.width}x${canvas.height}`;
         }
         
-        function renderPresetList() {
-            const listEl = document.getElementById('presetList');
-            listEl.innerHTML = '';
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key.startsWith('faceglitch_preset_')) {
-                    const name = key.replace('faceglitch_preset_', '');
-                    const item = document.createElement('div');
-                    item.className = 'preset-item';
-                    item.textContent = name;
-                    item.onclick = () => {
-                        const settings = JSON.parse(localStorage.getItem(key));
-                        applySettings(settings);
-                        setMsg(`Loaded preset: ${name}`);
-                    };
-                    
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'preset-delete-btn';
-                    deleteBtn.innerHTML = '&times;';
-                    deleteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        if (confirm(`Delete preset "${name}"?`)) {
-                            localStorage.removeItem(key);
-                            renderPresetList();
-                        }
-                    };
-                    item.appendChild(deleteBtn);
-                    listEl.appendChild(item);
+        // --- V2: Event Handlers & UI Logic ---
+        function updateEffectUI() {
+            dynamicControls.forEach(panel => {
+                if (activeEffects.has(panel.dataset.effect)) {
+                    panel.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
                 }
+            });
+            effectBtns.forEach(btn => {
+                 if (activeEffects.has(btn.dataset.effect)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        effectBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const effectName = btn.dataset.effect;
+                if (activeEffects.has(effectName)) {
+                    activeEffects.delete(effectName);
+                } else {
+                    activeEffects.add(effectName);
+                }
+                updateEffectUI();
+            });
+        });
+
+        document.querySelectorAll('.control-group-header').forEach(header => {
+            header.addEventListener('click', () => {
+                header.parentElement.classList.toggle('collapsed');
+            });
+        });
+
+        startBtn.addEventListener('click', start);
+        stopBtn.addEventListener('click', stop);
+        
+        // --- V2: Preset Management Logic ---
+        function getAppState() {
+            const state = { controls: {}, checkboxes: {}, effects: Array.from(activeEffects) };
+            for(const key in ui) {
+                if(ui[key]) state.controls[key] = ui[key].value;
+            }
+            document.querySelectorAll('.options-list input[type="checkbox"]').forEach(chk => {
+                state.checkboxes[chk.id] = chk.checked;
+            });
+            return state;
+        }
+
+        function setAppState(state) {
+            if(!state) return;
+            // Set controls
+            if(state.controls){
+                for(const key in state.controls) {
+                    const el = ui[key];
+                    if(el) {
+                        el.value = state.controls[key];
+                        el.dispatchEvent(new Event('input')); // Update slider label
+                    }
+                }
+            }
+            // Set checkboxes
+            if(state.checkboxes){
+                 document.querySelectorAll('.options-list input[type="checkbox"]').forEach(chk => {
+                    if(typeof state.checkboxes[chk.id] !== 'undefined') {
+                        chk.checked = state.checkboxes[chk.id];
+                    }
+                });
+            }
+            // Set active effects
+            if(state.effects){
+                activeEffects = new Set(state.effects);
+                updateEffectUI();
             }
         }
 
-        function savePreset() {
-            const nameEl = document.getElementById('presetName');
-            const name = nameEl.value.trim();
-            if (!name) {
+        function getPresets() {
+            return JSON.parse(localStorage.getItem('faceGlitchV2Presets') || '{}');
+        }
+        
+        function savePresets(presets) {
+            localStorage.setItem('faceGlitchV2Presets', JSON.stringify(presets));
+        }
+
+        function populatePresetList() {
+            const presets = getPresets();
+            presetList.innerHTML = '<option value="">Load a preset...</option>';
+            for(const name in presets) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                presetList.appendChild(opt);
+            }
+        }
+
+        savePresetBtn.addEventListener('click', () => {
+            const name = presetNameInput.value.trim();
+            if(!name) {
                 setMsg('Please enter a name for the preset.', true);
                 return;
             }
-            const settings = collectSettings();
-            localStorage.setItem(`faceglitch_preset_${name}`, JSON.stringify(settings));
-            nameEl.value = '';
-            renderPresetList();
-            setMsg(`Preset "${name}" saved.`);
-        }
-
-        // --- Event Listeners ---
-        startBtn.addEventListener('click', start);
-        stopBtn.addEventListener('click', stop);
-        document.getElementById('savePresetBtn').addEventListener('click', savePreset);
-        document.getElementById('randomBtn').addEventListener('click', () => {
-             const randomSettings = {};
-             // Randomize globals
-             randomSettings.mix = (0.5 + Math.random() * 0.5).toFixed(2);
-             randomSettings.speed = (Math.random() * 4).toFixed(2);
-             randomSettings.feather = Math.floor(Math.random() * 100);
-             randomSettings.pad = Math.floor(Math.random() * 100 - 20);
-             randomSettings.invertMaskChk = Math.random() > 0.8;
-             
-             // Randomize effects
-             for(const key in effects) {
-                 randomSettings[`chk_${key}`] = Math.random() > 0.4;
-                 effects[key].controls.forEach(c => {
-                    const min = parseFloat(c.min);
-                    const max = parseFloat(c.max);
-                    const val = min + Math.random() * (max - min);
-                    randomSettings[c.id] = val;
-                 });
-             }
-             applySettings(randomSettings);
-             setMsg('Settings randomized!');
+            const presets = getPresets();
+            presets[name] = getAppState();
+            savePresets(presets);
+            populatePresetList();
+            presetList.value = name;
+            setMsg(`Preset '${name}' saved.`);
         });
 
-        // --- Initialization ---
-        createEffectUI();
-        renderPresetList();
-        
-        // Auto-start if camera permission was already granted
-        (async () => {
-            if (navigator.permissions) {
-                try {
-                    const permission = await navigator.permissions.query({ name: 'camera' });
-                    if (permission.state === 'granted') {
-                        start();
-                    }
-                } catch(e) { /* ignore */ }
+        deletePresetBtn.addEventListener('click', () => {
+             const name = presetList.value;
+             if(!name) {
+                setMsg('Select a preset to delete.', true);
+                return;
             }
-        })();
+             const presets = getPresets();
+             delete presets[name];
+             savePresets(presets);
+             populatePresetList();
+             setMsg(`Preset '${name}' deleted.`);
+        });
 
+        presetList.addEventListener('change', () => {
+            const name = presetList.value;
+            if(!name) return;
+            const presets = getPresets();
+            if(presets[name]) {
+                setAppState(presets[name]);
+                presetNameInput.value = name;
+                setMsg(`Preset '${name}' loaded.`);
+            }
+        });
+
+        randomBtn.addEventListener('click', () => {
+            const rand = (min,max) => min + Math.random() * (max-min);
+            const setRand=(el,min,max,step=1)=>{ if(!el) return; const v = (Math.round(rand(min,max)/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
+            
+            // Randomize controls
+            Object.values(ui).forEach(el => {
+                if(el) setRand(el, parseFloat(el.min), parseFloat(el.max), parseFloat(el.step) || 1);
+            });
+            // Randomize checkboxes
+            document.querySelectorAll('.options-list input[type="checkbox"]').forEach(chk => chk.checked = Math.random() > 0.5);
+
+            // Randomize active effects
+            activeEffects.clear();
+            ALL_EFFECTS.forEach(effect => {
+                if(Math.random() > 0.6) activeEffects.add(effect);
+            });
+            if(activeEffects.size === 0) activeEffects.add(ALL_EFFECTS[Math.floor(rand(0, ALL_EFFECTS.length))]); // Ensure at least one
+            updateEffectUI();
+            setMsg('Parameters randomized!');
+        });
+
+        // Initial population
+        populatePresetList();
+        
+        // Set initial state (e.g., a default effect)
+        activeEffects.add('Displacement');
+        activeEffects.add('Chroma');
+        updateEffectUI();
+
+        // Auto-start if camera permission is already granted
+        (async () => { try { const p = await navigator.permissions.query({ name: 'camera' }); if (p.state === 'granted') start(); } catch { } })();
     })();
     </script>
 </body>
