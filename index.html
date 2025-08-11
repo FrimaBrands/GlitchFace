@@ -1,19 +1,17 @@
 <!doctype html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>U N K N O W N // Signal Processor</title>
-    
-    <!-- Tailwind CSS -->
+
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts -->
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- MediaPipe Face Mesh -->
+
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <style>
@@ -78,11 +76,11 @@
         }
     </style>
 </head>
+
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
 
     <div class="container w-full max-w-7xl h-[90vh] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
         
-        <!-- Main Stage: Video and Canvas -->
         <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
             <video id="video" playsinline muted class="hidden"></video>
             <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
@@ -91,12 +89,11 @@
             </div>
         </div>
 
-        <!-- Controls Panel -->
         <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-800/50 border-l border-gray-700 flex flex-col custom-scrollbar overflow-y-auto">
             
             <div class="p-4 border-b border-gray-700">
                 <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-                <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.3</p>
+                <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.4</p>
                 <div class="flex space-x-2 mt-4">
                     <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
                     <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -104,7 +101,6 @@
                  <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
             </div>
 
-            <!-- Presets Section -->
             <div class="p-4 border-b border-gray-700">
                 <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
                 <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
@@ -116,12 +112,9 @@
                 </div>
             </div>
 
-            <!-- Effects Controls -->
             <div id="effects-controls" class="flex-1 p-4 space-y-4">
-                <!-- This will be populated by JavaScript -->
-            </div>
+                </div>
 
-            <!-- Global Settings -->
             <div class="p-4 border-t border-gray-700 bg-gray-900/50">
                  <h2 class="font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h2>
                  <div class="space-y-3">
@@ -247,6 +240,7 @@
                 gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
             }`;
 
+        // --- IMPROVEMENT #2 --- The fragment shader is updated to allow effects to "seep".
         const fragSrc = `
             precision highp float;
             varying vec2 v_uv;
@@ -259,7 +253,7 @@
             uniform float u_time;
             uniform bool u_mirror;
             uniform float u_maskFeather;
-            uniform bool u_isFeedbackPass; // New uniform to control pass
+            uniform bool u_isFeedbackPass;
             
             // Effect uniforms
             uniform float u_feedbackAmount;
@@ -296,7 +290,11 @@
 
             // --- Main ---
             void main() {
-                vec2 uv = v_uv;
+                // This is the screen coordinate, which we use for positioning.
+                vec2 screen_uv = v_uv;
+                
+                // This is the texture sampling coordinate. We flip this one if mirrored.
+                vec2 uv = screen_uv;
                 if (u_mirror) {
                     uv.x = 1.0 - uv.x;
                 }
@@ -317,12 +315,12 @@
                     float blockSize = u_glitchBlockSize / u_resolution.y;
                     vec2 block_uv = floor(uv / blockSize) * blockSize;
                     float displacement = (rand(block_uv) - 0.5) * 0.1;
-                    effectedColor = texture2D(u_tex, uv + vec2(displacement, 0.0));
+                    effectedColor = texture2D(u_feedbackTex, uv + vec2(displacement, 0.0));
                 }
 
                 // 4. Color Distortion
-                float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
-                float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+                float r = texture2D(u_feedbackTex, uv + vec2(u_rgbShift, 0.0)).r;
+                float b = texture2D(u_feedbackTex, uv - vec2(u_rgbShift, 0.0)).b;
                 effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
 
                 // 5. Lens Distortion
@@ -344,6 +342,9 @@
                 }
 
                 // Face smear
+                // u_faceCenter is now always in the original video's coordinate space.
+                // We compare it to `uv`, which is also in that space (after mirroring).
+                // This keeps the effect correctly positioned.
                 if (u_faceCenter.z > 0.5) {
                     float dist_to_face = distance(uv, u_faceCenter.xy);
                     float face_smear_mix = 1.0 - smoothstep(0.0, 0.3, dist_to_face);
@@ -363,14 +364,22 @@
                     // This is what allows the effects to "seep" on the next frame.
                     gl_FragColor = effectedGrayscale;
                 } else {
-                    // For the screen pass, mix between the original and the effected color using the mask.
-                    float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
-                    vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
+                    // --- IMPROVEMENT #2 ---
+                    // For the screen pass, we now mix between the previous frame's feedback (the "seeped" state)
+                    // and the new fully-effected color, using the face mask. This makes new effects generate
+                    // on the face, while old effects can persist and drift into the background.
 
-                    float mask = texture2D(u_maskTex, v_uv).r; // Mask is drawn on non-mirrored UVs
+                    // Get the previous frame's output (already has zoom applied).
+                    float feedbackGray = dot(feedbackColor.rgb, vec3(0.299, 0.587, 0.114));
+                    vec4 feedbackGrayscale = vec4(vec3(feedbackGray), 1.0);
+                    
+                    // --- IMPROVEMENT #1 ---
+                    // The mask is sampled with the same `uv` as the effects to ensure alignment.
+                    float mask = texture2D(u_maskTex, uv).r;
                     mask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, mask);
 
-                    gl_FragColor = mix(originalGrayscale, effectedGrayscale, mask);
+                    // Mix between the background (feedback) and the new face effects.
+                    gl_FragColor = mix(feedbackGrayscale, effectedGrayscale, mask);
                 }
             }`;
 
@@ -528,7 +537,11 @@
                         landmarks.forEach(p => { sx += p.x; sy += p.y; });
                         let cx = sx / landmarks.length;
                         let cy = sy / landmarks.length;
-                        if (mirrorChk.checked) cx = 1.0 - cx;
+                        
+                        // --- IMPROVEMENT #1 ---
+                        // REMOVED: if (mirrorChk.checked) cx = 1.0 - cx;
+                        // The face center coordinates are now ALWAYS sent to the shader un-mirrored.
+                        // The shader will handle all mirroring logic consistently.
                         faceCenter = { x: cx, y: 1.0 - cy, detected: 1.0 };
                     } else {
                         faceCenter.detected = 0.0;
@@ -674,8 +687,8 @@
             
             if (lastFacesMesh.length > 0) {
                 maskCtx.save();
-                // We draw the mask based on the non-mirrored video feed
-                // The mirroring is handled in the shader for the final output
+                // The mask is always drawn based on the non-mirrored video feed coordinates.
+                // The shader handles sampling it correctly for the final mirrored output.
                 
                 maskCtx.fillStyle = 'white';
                 maskCtx.beginPath();
@@ -701,7 +714,7 @@
                 maskCtx.fill();
                 maskCtx.restore();
             }
-             
+            
             gl.activeTexture(gl.TEXTURE2);
             gl.bindTexture(gl.TEXTURE_2D, textures.mask);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
@@ -768,7 +781,7 @@
                         if (controlKey.toLowerCase().includes('zoom')) val = 1.0;
                     }
                     gl.uniform1f(gl.getUniformLocation(programs.main, `u_${controlKey}`), val);
-                }
+                 }
             }
             
             // Texture bindings
@@ -852,8 +865,8 @@
             }
         }
 
-        function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3.3Presets') || '{}'); }
-        function savePresets(p) { localStorage.setItem('faceGlitchV3.3Presets', JSON.stringify(p)); }
+        function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3.4Presets') || '{}'); }
+        function savePresets(p) { localStorage.setItem('faceGlitchV3.4Presets', JSON.stringify(p)); }
 
         function populatePresetList() {
             const presets = getPresets();
