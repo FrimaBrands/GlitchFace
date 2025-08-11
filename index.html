@@ -1,427 +1,894 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Webcam Face FX — Modular</title>
-  <style>
-    :root { --bg:#0f1115; --panel:#11141a; --stroke:#1f2430; --fg:#e5e7eb; --muted:#9aa0aa; --accent:#6ee7b7; --danger:#f87171; }
-    html, body { height:100%; }
-    body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; display:grid; place-items:center; }
-    .wrap { width:min(980px,96vw); }
-    .panel { background:var(--panel); border:1px solid var(--stroke); border-radius:14px; padding:12px; box-shadow:0 8px 30px rgba(0,0,0,.35); }
-    header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
-    h1 { font-size:16px; margin:0; letter-spacing:.2px; opacity:.9; }
-    .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-    .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border:1px solid var(--stroke); border-radius:999px; background:#0b0e13; cursor:pointer; }
-    .chip input { accent-color: var(--accent); }
-    .chip span { font-size:12px; }
-    .btn { padding:6px 10px; border:1px solid var(--stroke); border-radius:10px; background:#0b0e13; color:var(--fg); cursor:pointer; }
-    .btn:disabled{ opacity:.6; cursor:not-allowed; }
-    .btn:hover{ border-color:#2e3748; }
-    .inline { display:flex; gap:8px; align-items:center; }
-    #stage { position:relative; aspect-ratio:16/9; background:#0c1016; border-radius:14px; overflow:hidden; margin-top:8px; }
-    #glcanvas { display:block; width:100%; height:100%; }
-    #video { display:none; }
-    details { border:1px solid var(--stroke); border-radius:10px; padding:6px 8px; background:#0b0e13; }
-    details > summary { list-style:none; cursor:pointer; font-size:12px; color:var(--muted); outline:none; }
-    details[open] { background:#0c1118; }
-    .grid { display:grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap:8px; }
-    label { font-size:11px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
-    input[type="range"], select { background:#0b0e13; color:var(--fg); border:1px solid var(--stroke); border-radius:8px; padding:4px 6px; height:28px; }
-    .badge { font-size:11px; color:var(--muted); padding:2px 6px; border:1px solid var(--stroke); border-radius:999px; }
-    footer { margin-top:8px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:11px; }
-  </style>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>REDO: Face Glitch AR</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0f13;
+            --panel: #11141a;
+            --stroke: #1f2430;
+            --fg: #e5e7eb;
+            --muted: #9aa0aa;
+            --accent: #6ee7b7;
+            --danger: #f87171;
+            --primary-bg: #1a202c;
+            --secondary-bg: #2d3748;
+            --text-color: #f7fafc;
+            --primary-color: #6ee7b7;
+            --border-color: #4a5568;
+            --shadow: 0 10px 30px rgba(0,0,0,0.4);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+        }
+        
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; font-family: 'Montserrat', sans-serif; background: var(--bg); color: var(--text-color); }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: radial-gradient(circle at center, #1a1f26 0%, #0d0f13 100%);
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            height: 90vh;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+        }
+
+        .main-stage {
+            flex: 2;
+            position: relative;
+            background: #0d0f13;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #glcanvas, #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #video {
+            display: none;
+        }
+
+        .controls-panel {
+            flex: 1;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: var(--secondary-bg);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 16px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: -0.5px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background-color: transparent;
+            color: var(--text-color);
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        
+        .btn:hover:not(:disabled) {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #1a1f26;
+            font-weight: 600;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background-color: #55d4a6;
+            border-color: #55d4a6;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .effect-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .effect-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .effect-card.active {
+            border-color: var(--primary-color);
+            background: rgba(110, 231, 183, 0.1);
+        }
+
+        .effect-card .icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 8px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        
+        .effect-card .label {
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            color: var(--fg);
+        }
+        
+        .icon-glitch { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 17a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l4 4v1.5'/%3E%3Cpath d='M12 11h4l-4 4h4'/%3E%3C/svg%3E"); }
+        .icon-distort { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 18v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2'/%3E%3Cpath d='M4 6v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6'/%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3C/svg%3E"); }
+        .icon-blur { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a10 10 0 0 0 0 20'/%3E%3Cpath d='M12 2a10 10 0 0 1 0 20'/%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M4 12c0-2.2 4-4 8-4s8 1.8 8 4'/%3E%3Cpath d='M4 12c0 2.2 4 4 8 4s8-1.8 8-4'/%3E%3C/svg%3E"); }
+        .icon-pixelate { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='3' y1='9' x2='21' y2='9'/%3E%3Cline x1='3' y1='15' x2='21' y2='15'/%3E%3Cline x1='9' y1='3' x2='9' y2='21'/%3E%3Cline x1='15' y1='3' x2='15' y2='21'/%3E%3C/svg%3E"); }
+        .icon-combo { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='12' y1='3' x2='12' y2='21'/%3E%3Cline x1='3' y1='12' x2='21' y2='12'/%3E%3Cpath d='M18 18c-2.8-2.8-2.8-7.2 0-10'/%3E%3Cpath d='M6 6c2.8 2.8 2.8 7.2 0 10'/%3E%3C/svg%3E"); }
+        .icon-smear { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M18 6a6 6 0 0 0-12 0'/%3E%3Cpath d='M18 18a6 6 0 0 1-12 0'/%3E%3C/svg%3E"); }
+        .icon-radial-blur { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='M4.9 4.9l1.4 1.4'/%3E%3Cpath d='M17.7 17.7l1.4 1.4'/%3E%3Cpath d='M4.9 19.1l1.4-1.4'/%3E%3Cpath d='M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E"); }
+        .icon-swirl { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2a10 10 0 0 1 0 20'/%3E%3Cpath d='M12 2a10 10 0 0 0 0 20'/%3E%3Cpath d='M12 2c-2.2 0-4 1.8-4 4s1.8 4 4 4s4-1.8 4-4s-1.8-4-4-4z'/%3E%3C/svg%3E"); }
+        .icon-noise { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236ee7b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2v20'/%3E%3Cpath d='M4 12h16'/%3E%3Cpath d='M18 6a6 6 0 0 0-12 0'/%3E%3Cpath d='M18 18a6 6 0 0 1-12 0'/%3E%3C/svg%3E"); }
+
+        .control-group {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+            overflow: hidden;
+            background: var(--primary-bg);
+        }
+
+        .control-group-header {
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        .control-group-header:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .control-group-header::after {
+            content: '+';
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+
+        .control-group.expanded .control-group-header::after {
+            content: '-';
+            transform: rotate(180deg);
+        }
+
+        .control-group-content {
+            display: none;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .control-group.expanded .control-group-content {
+            display: block;
+        }
+        
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        
+        .slider-input {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-color);
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+        }
+
+        .slider-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: 2px solid #0d0f13;
+        }
+
+        .slider-input::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: 2px solid #0d0f13;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .options-list label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .options-list input[type="checkbox"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--primary-bg);
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .options-list input[type="checkbox"]:checked {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .options-list input[type="checkbox"]:checked:after {
+            content: '✓';
+            color: #1a1f26;
+            font-size: 14px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .status-bar {
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        
+        .status-badge {
+            background: var(--primary-bg);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            font-size: 10px;
+        }
+        
+        .status-error {
+            color: var(--danger);
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="panel">
-      <header>
-        <h1>Webcam Face FX — Modular</h1>
-        <div class="inline">
-          <button id="startBtn" class="btn">Start</button>
-          <button id="stopBtn" class="btn" disabled>Stop</button>
-          <span id="status" class="badge">Idle</span>
+    <div class="container">
+        <div class="main-stage">
+            <video id="video" playsinline muted></video>
+            <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
         </div>
-      </header>
+        <div class="controls-panel">
+            <div class="header">
+                <h1>Face Glitch AR</h1>
+                <div class="header-actions">
+                    <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                    <button id="stopBtn" class="btn" disabled>Stop</button>
+                </div>
+            </div>
 
-      <!-- Slim global toggles -->
-      <div class="row" aria-label="global toggles">
-        <label class="chip"><input type="checkbox" id="applyMaskChk" checked><span>Apply mask</span></label>
-        <label class="chip"><input type="checkbox" id="preciseMaskChk"><span>Mesh mask</span></label>
-        <label class="chip"><input type="checkbox" id="invertChk"><span>Invert</span></label>
-        <label class="chip"><input type="checkbox" id="mirrorChk" checked><span>Mirror</span></label>
-        <label class="chip"><input type="checkbox" id="animateChk" checked><span>Animate</span></label>
-        <label class="chip"><input type="checkbox" id="trackCenterChk" checked><span>Track center</span></label>
-        <span id="status2" class="badge">—</span>
-      </div>
+            <div class="controls-section">
+                <h3>Effects</h3>
+                <div class="controls-grid" id="effectSelector">
+                    <div class="effect-card active" data-effect="0">
+                        <div class="icon icon-glitch"></div>
+                        <span class="label">Glitch</span>
+                    </div>
+                    <div class="effect-card" data-effect="1">
+                        <div class="icon icon-distort"></div>
+                        <span class="label">Distort</span>
+                    </div>
+                    <div class="effect-card" data-effect="2">
+                        <div class="icon icon-blur"></div>
+                        <span class="label">Blur</span>
+                    </div>
+                    <div class="effect-card" data-effect="3">
+                        <div class="icon icon-pixelate"></div>
+                        <span class="label">Pixelate</span>
+                    </div>
+                    <div class="effect-card" data-effect="4">
+                        <div class="icon icon-combo"></div>
+                        <span class="label">Combo</span>
+                    </div>
+                    <div class="effect-card" data-effect="5">
+                        <div class="icon icon-smear"></div>
+                        <span class="label">Smear</span>
+                    </div>
+                    <div class="effect-card" data-effect="6">
+                        <div class="icon icon-radial-blur"></div>
+                        <span class="label">Radial Blur</span>
+                    </div>
+                    <div class="effect-card" data-effect="7">
+                        <div class="icon icon-swirl"></div>
+                        <span class="label">Swirl</span>
+                    </div>
+                    <div class="effect-card" data-effect="8">
+                        <div class="icon icon-noise"></div>
+                        <span class="label">Noise Flow</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="control-group expanded" data-group="core">
+                <div class="control-group-header">Core Controls</div>
+                <div class="control-group-content">
+                    <div class="control-grid">
+                        <div class="control-item">
+                            <label class="slider-label">Intensity<span id="intensityVal">0.90</span></label>
+                            <input type="range" id="intensity" min="0" max="1" step="0.01" value="0.9" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Speed<span id="speedVal">1.20</span></label>
+                            <input type="range" id="speed" min="0" max="5" step="0.01" value="1.2" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Feather<span id="featherVal">18</span></label>
+                            <input type="range" id="feather" min="0" max="64" step="1" value="18" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Mix (Opacity)<span id="mixVal">1.00</span></label>
+                            <input type="range" id="mix" min="0" max="1" step="0.01" value="1" class="slider-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Slim effect chips -->
-      <div class="row" style="margin-top:6px" aria-label="effects">
-        <label class="chip"><input type="checkbox" id="glitchOn"><span>Glitch</span></label>
-        <label class="chip"><input type="checkbox" id="waveOn" checked><span>Wave</span></label>
-        <label class="chip"><input type="checkbox" id="smearOn" checked><span>Smear</span></label>
-        <label class="chip"><input type="checkbox" id="displaceOn"><span>Displace</span></label>
-        <label class="chip"><input type="checkbox" id="swirlOn"><span>Swirl</span></label>
-        <label class="chip"><input type="checkbox" id="blurOn"><span>Blur</span></label>
-        <label class="chip"><input type="checkbox" id="radialOn"><span>Radial</span></label>
-        <label class="chip"><input type="checkbox" id="pixelOn"><span>Pixel</span></label>
-        <label class="chip"><input type="checkbox" id="chromaOn" checked><span>Chroma</span></label>
-        <button id="randomBtn" class="btn">Random</button>
-        <button id="resetBtn" class="btn">Reset</button>
-      </div>
+            <div class="control-group" data-group="glitch">
+                <div class="control-group-header">Glitch & Distortion</div>
+                <div class="control-group-content">
+                    <div class="control-grid">
+                        <div class="control-item">
+                            <label class="slider-label">Glitch Block (px)<span id="blockVal">22</span></label>
+                            <input type="range" id="block" min="2" max="160" step="2" value="22" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Glitch Probability<span id="probVal">0.45</span></label>
+                            <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Chroma Shift (px)<span id="chromaVal">6</span></label>
+                            <input type="range" id="chroma" min="0" max="20" step="1" value="6" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Wave Freq<span id="freqVal">12.0</span></label>
+                            <input type="range" id="freq" min="0" max="60" step="0.5" value="12" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Wave Amp (px)<span id="ampVal">16</span></label>
+                            <input type="range" id="amp" min="0" max="60" step="1" value="16" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Pixel Size (px)<span id="pixelVal">12</span></label>
+                            <input type="range" id="pixel" min="1" max="64" step="1" value="12" class="slider-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-      <!-- Minimal settings drawer -->
-      <details id="settings" style="margin-top:6px">
-        <summary>Settings</summary>
-        <div class="grid" style="margin-top:6px">
-          <!-- Mask -->
-          <label class="col" style="grid-column: span 3">Feather (px)
-            <input type="range" id="feather" min="0" max="64" step="1" value="16"><span id="featherVal" class="badge">16</span>
-          </label>
-          <label class="col" style="grid-column: span 3">Padding (px)
-            <input type="range" id="pad" min="0" max="100" step="1" value="14"><span id="padVal" class="badge">14</span>
-          </label>
-          <label class="col" style="grid-column: span 3">Mix (opacity)
-            <input type="range" id="mix" min="0" max="1" step="0.01" value="1"><span id="mixVal" class="badge">1.00</span>
-          </label>
-          <label class="col" style="grid-column: span 3">Seed
-            <input type="range" id="seed" min="0" max="100" step="1" value="7"><span id="seedVal" class="badge">7</span>
-          </label>
+            <div class="control-group" data-group="smear-blur">
+                <div class="control-group-header">Smear & Blur</div>
+                <div class="control-group-content">
+                    <div class="control-grid">
+                        <div class="control-item">
+                            <label class="slider-label">Smear Length (px)<span id="smLenVal">40</span></label>
+                            <input type="range" id="smLen" min="0" max="120" step="1" value="40" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Smear Angle (°)<span id="smAngVal">0</span></label>
+                            <input type="range" id="smAng" min="0" max="360" step="1" value="0" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Blur Radius (px)<span id="blurVal">16</span></label>
+                            <input type="range" id="blur" min="0" max="48" step="1" value="16" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Samples<span id="samplesVal">12</span></label>
+                            <input type="range" id="samples" min="1" max="32" step="1" value="12" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Swirl Amount<span id="swirlVal">2.20</span></label>
+                            <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="2.2" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Noise Scale<span id="nScaleVal">3.0</span></label>
+                            <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3" class="slider-input">
+                        </div>
+                        <div class="control-item">
+                            <label class="slider-label">Noise Strength<span id="nStrengthVal">18</span></label>
+                            <input type="range" id="nStrength" min="0" max="60" step="1" value="18" class="slider-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-          <!-- Wave Distort -->
-          <label class="col" style="grid-column: span 3" data-panel="wave">Wave freq
-            <input type="range" id="freq" min="0" max="60" step="0.5" value="12"><span id="freqVal" class="badge">12.0</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="wave">Wave amp (px)
-            <input type="range" id="amp" min="0" max="60" step="1" value="14"><span id="ampVal" class="badge">14</span>
-          </label>
+            <div class="control-group" data-group="mask-options">
+                <div class="control-group-header">Mask & Tracking</div>
+                <div class="control-group-content options-list">
+                    <label>
+                        <input type="checkbox" id="mirrorChk" checked> Mirror Camera
+                    </label>
+                    <label>
+                        <input type="checkbox" id="animateChk" checked> Animate Effects
+                    </label>
+                    <label>
+                        <input type="checkbox" id="trackCenterChk" checked> Track Center of Face
+                    </label>
+                    <label>
+                        <input type="checkbox" id="preciseMaskChk"> Precise Face Mesh Mask
+                    </label>
+                    <label>
+                        <input type="checkbox" id="invert"> Invert Mask
+                    </label>
+                    <label>
+                        Mask Shape (Fallback):
+                        <select id="shape" class="btn">
+                            <option value="0">Rounded Rect</option>
+                            <option value="1">Ellipse</option>
+                        </select>
+                    </label>
+                    <div class="control-item">
+                        <label class="slider-label">Mask Padding (px)<span id="padVal">16</span></label>
+                        <input type="range" id="pad" min="0" max="120" step="1" value="16" class="slider-input">
+                    </div>
+                </div>
+            </div>
 
-          <!-- Smear -->
-          <label class="col" style="grid-column: span 3" data-panel="smear">Smear length (px)
-            <input type="range" id="smLen" min="0" max="120" step="1" value="50"><span id="smLenVal" class="badge">50</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="smear">Smear angle (°)
-            <input type="range" id="smAng" min="0" max="360" step="1" value="0"><span id="smAngVal" class="badge">0</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="smear">Samples
-            <input type="range" id="samples" min="4" max="32" step="1" value="16"><span id="samplesVal" class="badge">16</span>
-          </label>
-          <label class="col inline" style="grid-column: span 3" data-panel="smear"><input type="checkbox" id="smearAnim" checked> <span>Animate smear</span></label>
-          <label class="col" style="grid-column: span 3" data-panel="smear">Smear wobble (°)
-            <input type="range" id="smWobble" min="0" max="180" step="1" value="50"><span id="smWobbleVal" class="badge">50</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="smear">Smear speed
-            <input type="range" id="smSpeed" min="0" max="5" step="0.01" value="1.5"><span id="smSpeedVal" class="badge">1.50</span>
-          </label>
+            <div class="control-group" data-group="presets">
+                <div class="control-group-header">Presets & Tools</div>
+                <div class="control-group-content">
+                    <div class="control-grid">
+                        <button id="presetSoft" class="btn">Soft Blur</button>
+                        <button id="presetGlitch" class="btn">Heavy Glitch</button>
+                        <button id="presetSmear" class="btn">Smear Sweep</button>
+                        <button id="randomBtn" class="btn">Randomize</button>
+                    </div>
+                </div>
+            </div>
 
-          <!-- Displace (noise) -->
-          <label class="col" style="grid-column: span 3" data-panel="displace">Noise scale
-            <input type="range" id="nScale" min="0.5" max="10" step="0.1" value="3"><span id="nScaleVal" class="badge">3.0</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="displace">Noise strength (px)
-            <input type="range" id="nStrength" min="0" max="60" step="1" value="18"><span id="nStrengthVal" class="badge">18</span>
-          </label>
-
-          <!-- Swirl / Liquify -->
-          <label class="col" style="grid-column: span 3" data-panel="swirl">Swirl amount
-            <input type="range" id="swirl" min="-6.28" max="6.28" step="0.01" value="1.8"><span id="swirlVal" class="badge">1.80</span>
-          </label>
-
-          <!-- Blur / Pixel / Chroma / Glitch / Radial  -->
-          <label class="col" style="grid-column: span 3" data-panel="blur">Blur radius (px)
-            <input type="range" id="blur" min="0" max="48" step="1" value="16"><span id="blurVal" class="badge">16</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="pixel">Pixel size (px)
-            <input type="range" id="pixel" min="1" max="64" step="1" value="12"><span id="pixelVal" class="badge">12</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="chroma">Chroma shift (px)
-            <input type="range" id="chroma" min="0" max="20" step="1" value="6"><span id="chromaVal" class="badge">6</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="radial">Radial length (px)
-            <input type="range" id="radLen" min="0" max="120" step="1" value="30"><span id="radLenVal" class="badge">30</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="radial">Radial samples
-            <input type="range" id="radSamples" min="4" max="32" step="1" value="16"><span id="radSamplesVal" class="badge">16</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="glitch">Block (px)
-            <input type="range" id="block" min="2" max="160" step="2" value="24"><span id="blockVal" class="badge">24</span>
-          </label>
-          <label class="col" style="grid-column: span 3" data-panel="glitch">Probability
-            <input type="range" id="prob" min="0" max="1" step="0.01" value="0.45"><span id="probVal" class="badge">0.45</span>
-          </label>
-          <label class="col" style="grid-column: span 3">Speed
-            <input type="range" id="speed" min="0" max="5" step="0.01" value="1.2"><span id="speedVal" class="badge">1.20</span>
-          </label>
+            <div class="status-bar">
+                <span id="msg" class="status-error"></span>
+                <span id="status2" class="status-badge">Idle</span>
+            </div>
         </div>
-      </details>
-
-      <div id="stage">
-        <video id="video" playsinline muted></video>
-        <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
-      </div>
-
-      <footer>
-        <span id="msg">Runs in-browser (HTTPS). Uses FaceDetector or MediaPipe FaceMesh + WebGL.</span>
-        <span id="res" class="badge">—</span>
-      </footer>
     </div>
-  </div>
-
 <script>
 (() => {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('glcanvas');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const msgEl = document.getElementById('msg');
-  const statusEl = document.getElementById('status');
-  const status2El = document.getElementById('status2');
-  const resEl = document.getElementById('res');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('glcanvas');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const mirrorChk = document.getElementById('mirrorChk');
+    const animateChk = document.getElementById('animateChk');
+    const trackCenterChk = document.getElementById('trackCenterChk');
+    const preciseMaskChk = document.getElementById('preciseMaskChk');
+    const status2El = document.getElementById('status2');
+    const msgEl = document.getElementById('msg');
+    const invertChk = document.getElementById('invert');
+    const shapeSel = document.getElementById('shape');
+    const effectSelector = document.getElementById('effectSelector');
 
-  // toggles
-  const t = {
-    applyMask: document.getElementById('applyMaskChk'),
-    precise: document.getElementById('preciseMaskChk'),
-    invert: document.getElementById('invertChk'),
-    mirror: document.getElementById('mirrorChk'),
-    animate: document.getElementById('animateChk'),
-    trackCenter: document.getElementById('trackCenterChk'),
-    glitch: document.getElementById('glitchOn'),
-    wave: document.getElementById('waveOn'),
-    smear: document.getElementById('smearOn'),
-    displace: document.getElementById('displaceOn'),
-    swirl: document.getElementById('swirlOn'),
-    blur: document.getElementById('blurOn'),
-    radial: document.getElementById('radialOn'),
-    pixel: document.getElementById('pixelOn'),
-    chroma: document.getElementById('chromaOn'),
-    smearAnim: document.getElementById('smearAnim'),
-  };
+    document.querySelectorAll('.control-group-header').forEach(header => {
+        header.addEventListener('click', () => {
+            header.parentElement.classList.toggle('expanded');
+        });
+    });
 
-  // sliders
-  const ui = mapRanges([
-    ['feather','featherVal'], ['pad','padVal'], ['mix','mixVal'], ['seed','seedVal'],
-    ['freq','freqVal'], ['amp','ampVal'], ['smLen','smLenVal'], ['smAng','smAngVal'], ['samples','samplesVal'], ['smWobble','smWobbleVal'], ['smSpeed','smSpeedVal'],
-    ['nScale','nScaleVal'], ['nStrength','nStrengthVal'], ['swirl','swirlVal'], ['blur','blurVal'], ['pixel','pixelVal'], ['chroma','chromaVal'], ['radLen','radLenVal'], ['radSamples','radSamplesVal'], ['block','blockVal'], ['prob','probVal'], ['speed','speedVal']
-  ]);
+    // Helper function with a defensive check for elements
+    function hook(id, outId) {
+        const el = document.getElementById(id);
+        const out = document.getElementById(outId);
 
-  function mapRanges(pairs){
-    const m = {}; for(const [id,badge] of pairs){ const el = document.getElementById(id); const out = document.getElementById(badge); const set = () => { out.textContent = el.value; }; el.addEventListener('input', set); set(); m[id]=el; } return m;
-  }
+        // This check prevents the TypeError and provides a helpful console message
+        if (!el || !out) {
+            console.error(`Error: Missing element with ID '${id}' or '${outId}'. Please ensure all slider and value display elements are present in the HTML.`);
+            return null;
+        }
 
-  function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.style.color = isError ? 'var(--danger)' : 'var(--muted)'; }
-  function setStatus(text){ statusEl.textContent = text; }
+        const set = () => {
+            out.textContent = parseFloat(el.value).toFixed(el.step < 1 ? 2 : 0);
+        };
+        el.addEventListener('input', set);
+        set();
+        return el;
+    }
 
-  // state
-  let stream=null, rafId=null, detector=null, gl=null, program=null, tex=null, maskTex=null, buf=null;
-  let lastDetections=[], lastFacesMesh=[]; let lastDetTime=0; const DETECT_EVERY_MS=110; const MAX_FACES=5; const faceRects=new Float32Array(MAX_FACES*4);
-  let effectCenter={x:0.5,y:0.5};
+    // Dynamic UI object creation
+    const ui = {
+        effect: (() => {
+            const sel = document.createElement('select');
+            sel.id = 'effect-hidden';
+            sel.style.display = 'none';
+            const effects = ['Glitch (blocks + chroma)', 'Distort (wave)', 'Blur (box)', 'Pixelate', 'Combo: Glitch + Distort + Chroma', 'Smear — Directional', 'Blur — Radial', 'Warp — Swirl', 'Displace — Noise Flow'];
+            effects.forEach((name, i) => {
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = name;
+                sel.appendChild(opt);
+            });
+            document.body.appendChild(sel);
+            return sel;
+        })(),
+        intensity: hook('intensity', 'intensityVal'),
+        speed: hook('speed', 'speedVal'),
+        blur: hook('blur', 'blurVal'),
+        chroma: hook('chroma', 'chromaVal'),
+        pixel: hook('pixel', 'pixelVal'),
+        freq: hook('freq', 'freqVal'),
+        amp: hook('amp', 'ampVal'),
+        block: hook('block', 'blockVal'),
+        prob: hook('prob', 'probVal'),
+        feather: hook('feather', 'featherVal'),
+        mix: hook('mix', 'mixVal'),
+        pad: hook('pad', 'padVal'),
+        seed: hook('seed', 'seedVal'),
+        smLen: hook('smLen', 'smLenVal'),
+        smAng: hook('smAng', 'smAngVal'),
+        samples: hook('samples', 'samplesVal'),
+        swirl: hook('swirl', 'swirlVal'),
+        nScale: hook('nScale', 'nScaleVal'),
+        nStrength: hook('nStrength', 'nStrengthVal'),
+    };
 
-  // precise mask canvases
-  const maskCanvas=document.createElement('canvas'); const maskCtx=maskCanvas.getContext('2d');
-  const tmpCanvas=document.createElement('canvas'); const tmpCtx=tmpCanvas.getContext('2d');
+    let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
+    let lastDetections = [];
+    let lastFacesMesh = [];
+    let lastDetTime = 0;
+    const DETECT_EVERY_MS = 110;
+    const MAX_FACES = 5;
+    const faceRects = new Float32Array(MAX_FACES * 4);
+    let effectCenter = { x: 0.5, y: 0.5 };
+    const maskCanvas = document.createElement('canvas');
+    const maskCtx = maskCanvas.getContext('2d');
+    const tmpCanvas = document.createElement('canvas');
+    const tmpCtx = tmpCanvas.getContext('2d');
+    let maskTex = null;
+    let faceMesh = null;
+    let faceMeshReady = false;
+    let fmBusy = false;
+    let lastFmTime = 0;
+    const FM_MIN_INTERVAL = 60;
+    const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
+    
+    const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
+    const fragSrc = `
+        precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform sampler2D u_maskTex;
+        uniform vec2 u_resolution; uniform float u_time; uniform vec2 u_center;
+        uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_mix, u_seed;
+        uniform int u_faceCount, u_shape, u_invert, u_maskMode, u_samples; uniform vec4 u_faces[5];
+        uniform float u_smLen, u_smAng, u_swirl, u_nScale, u_nStrength, u_feather;
+        float hash(float n){ return fract(sin(n)*43758.5453123); }
+        float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+        vec3 hash3(vec2 p){ vec3 q = vec3(dot(p, vec2(127.1,311.7)), dot(p, vec2(269.5,183.3)), dot(p, vec2(419.2,371.9))); return fract(sin(q)*43758.5453); }
+        float noise(vec2 p){ vec2 i = floor(p), f = fract(p); float a = dot(hash3(i).xy, f); float b = dot(hash3(i+vec2(1.0,0.0)).xy, f-vec2(1.0,0.0)); float c = dot(hash3(i+vec2(0.0,1.0)).xy, f-vec2(0.0,1.0)); float d = dot(hash3(i+vec2(1.0,1.0)).xy, f-vec2(1.0,1.0)); vec2 u = f*f*(3.0-2.0*f); return mix(mix(a,b,u.x), mix(c,d,u.x), u.y); }
+        vec2 noise2(vec2 p){ return vec2(noise(p), noise(p+vec2(5.2,1.3))); }
+        vec4 sampleChroma(vec2 uv){ float c = u_chroma / u_resolution.x; vec3 col; col.r = texture2D(u_tex, uv + vec2(c,0.0)).r; col.g = texture2D(u_tex, uv).g; col.b = texture2D(u_tex, uv - vec2(c,0.0)).b; return vec4(col,1.0); }
+        vec4 doBlur(vec2 uv){ vec2 off = vec2(u_blur) / u_resolution; vec4 acc = vec4(0.0); for(int dx=-1; dx<=1; ++dx){ for(int dy=-1; dy<=1; ++dy){ acc += texture2D(u_tex, uv + off*vec2(float(dx), float(dy))); } } return acc / 9.0; }
+        vec4 dirSmear(vec2 uv, float ang, float len, int taps){ vec2 dir = vec2(cos(ang), sin(ang)); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(taps)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t = float(i); float w = 1.0 - t/float(taps); acc += texture2D(u_tex, uv - stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
+        vec4 radialBlur(vec2 uv, vec2 center, float len, int taps){ vec2 dir = normalize(center - uv + 1e-6); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(taps)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t = float(i); float w = 1.0 - t/float(taps); acc += texture2D(u_tex, uv + stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
+        vec2 glitchUV(vec2 uv){ float rows = u_resolution.y / max(1.0, u_block); float row = floor(uv.y * rows); float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0); float r = hash(row + t*13.17); float active = step(1.0 - u_prob, r); float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active; return uv + vec2(shift, 0.0); }
+        vec2 distortUV(vec2 uv){ float twopi = 6.2831853; float sx = sin((uv.y * (1.0 + u_freq*0.05) + u_time * (0.2 + u_speed*0.6)) * twopi); float cy = cos((uv.x * (0.6 + u_freq*0.04) + u_time * (0.3 + u_speed*0.5)) * twopi); vec2 d = vec2(sx, cy) * (u_amp / u_resolution); return uv + d * u_intensity; }
+        vec2 swirlUV(vec2 uv, vec2 center, float amount){ vec2 d = uv - center; float r = length(d); float ang = amount * exp(-r*8.0) * u_intensity; float s = sin(ang), c = cos(ang); vec2 rot = vec2(c*d.x - s*d.y, s*d.x + c*d.y); return center + rot; }
+        vec2 displaceNoiseUV(vec2 uv){ vec2 p = uv * u_nScale * 2.5 + vec2(u_time * 0.1 * u_speed, 0.0); vec2 n = noise2(p) * 2.0 - 1.0; vec2 off = (u_nStrength / u_resolution) * n; return uv + off * u_intensity; }
+        float maskRect(vec2 uv, vec4 r){ float inside = step(r.x, uv.x) * step(uv.x, r.x + r.z) * step(r.y, uv.y) * step(uv.y, r.y + r.w); if(inside < 0.5) return 0.0; float fx = u_feather / u_resolution.x; float fy = u_feather / u_resolution.y; float f = max(fx, fy); float dx = min(uv.x - r.x, (r.x + r.z) - uv.x); float dy = min(uv.y - r.y, (r.y + r.w) - uv.y); float d = min(dx, dy); return smoothstep(0.0, f, d); }
+        float maskEllipse(vec2 uv, vec4 r){ vec2 c = r.xy + r.zw * 0.5; vec2 rad = r.zw * 0.5; vec2 p = (uv - c) / rad; float rr = dot(p,p); float edge = 1.0 - sqrt(max(rr, 0.0)); float fe = u_feather / min(u_resolution.x, u_resolution.y); return smoothstep(0.0, fe, edge); }
+        float faceMaskShape(vec2 uv){ float a = 0.0; for(int i=0;i<5;++i){ if(i>=u_faceCount) break; vec4 r = u_faces[i]; float m = (u_shape==0) ? maskRect(uv,r) : maskEllipse(uv,r); a = max(a, m); } return a; }
+        float faceMask(vec2 uv){ float a = (u_maskMode==1) ? texture2D(u_maskTex, uv).r : faceMaskShape(uv); if(u_invert==1) a = 1.0 - a; return clamp(a, 0.0, 1.0); }
+        void main(){ vec2 uv = v_uv; vec4 base = texture2D(u_tex, uv); float m = faceMask(uv); vec4 eff = base;
+        if(u_effect == 0){ vec2 guv = glitchUV(uv); vec4 col = sampleChroma(guv); float line = step(0.98, rand(vec2(floor(uv.y*u_resolution.y), floor(u_time*10.0+u_seed)))); col.rgb *= mix(1.0, 0.7, line * u_intensity); eff = mix(base, col, 0.9); }
+        else if(u_effect == 1){ vec2 duv = distortUV(uv); vec4 col = sampleChroma(duv); eff = col; }
+        else if(u_effect == 2){ vec4 b = doBlur(uv); eff = b; }
+        else if(u_effect == 3){ vec4 p = texture2D(u_tex, (floor(uv * (u_resolution / max(1.0,u_pixel))) + 0.5) / (u_resolution / max(1.0,u_pixel))); vec4 c = sampleChroma(uv); eff = mix(p, c, 0.15*u_intensity); }
+        else if(u_effect == 4){ vec2 cuv = glitchUV(distortUV(uv)); vec4 cb = doBlur(cuv); vec4 cc = sampleChroma(cuv); eff = mix(cb, cc, 0.5); }
+        else if(u_effect == 5){ eff = dirSmear(uv, radians(u_smAng), u_smLen, u_samples); }
+        else if(u_effect == 6){ eff = radialBlur(uv, u_center, u_smLen, u_samples); }
+        else if(u_effect == 7){ vec2 suv = swirlUV(uv, u_center, u_swirl); eff = texture2D(u_tex, suv); }
+        else if(u_effect == 8){ vec2 nuv = displaceNoiseUV(uv); eff = sampleChroma(nuv); }
+        gl_FragColor = mix(base, eff, m * clamp(u_mix, 0.0, 1.0));
+        }
+    `;
 
-  // FaceMesh lazy load
-  let faceMesh=null, faceMeshReady=false, fmBusy=false, lastFmTime=0; const FM_MIN_INTERVAL=60;
-  const FACE_OVAL=[10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10];
+    function setStatus(text){ status2El.textContent = text; }
+    function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.classList.toggle('status-error', !!isError); }
+    const faceApiAvailable = 'FaceDetector' in window;
+    if(!isSecureContext){ setMsg('Page is not secure (HTTPS). Camera access will be blocked by the browser.', true); }
 
-  function fit(){ if(!video.videoWidth) return; const w=video.videoWidth,h=video.videoHeight; canvas.width=w; canvas.height=h; maskCanvas.width=w; maskCanvas.height=h; tmpCanvas.width=w; tmpCanvas.height=h; if(gl) gl.viewport(0,0,w,h); resEl.textContent = w+'×'+h; }
+    async function initDetector(){ if(!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.'); detector = new FaceDetector({ fastMode:true, maxDetectedFaces: 5 }); }
 
-  // WebGL
-  const vertSrc=`attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv=a_pos; gl_Position=vec4(a_pos*2.0-1.0,0.0,1.0);} `;
-  const fragSrc=`
-  precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform sampler2D u_maskTex; 
-  uniform vec2 u_resolution; uniform float u_time; uniform vec2 u_center; 
-  uniform int u_useMask,u_invert,u_maskMode; uniform float u_mix, u_feather; 
-  uniform int u_useGlitch,u_useWave,u_useSmear,u_useDisplace,u_useSwirl,u_useBlur,u_useRadial,u_usePixel,u_useChroma; 
-  uniform float u_speed,u_seed; 
-  // wave
-  uniform float u_freq,u_amp;
-  // smear
-  uniform float u_smLen,u_smAng; uniform int u_smSamples; uniform int u_smAnim; uniform float u_smWobble,u_smSpeed;
-  // displace
-  uniform float u_nScale,u_nStrength;
-  // swirl
-  uniform float u_swirl;
-  // blur/pixel/chroma/glitch/radial
-  uniform float u_blur,u_pixel,u_chroma,u_block,u_prob,u_radLen; uniform int u_radSamples;
-  // rect fallback
-  uniform int u_faceCount; uniform vec4 u_faces[5];
+    function fit(){ if(!video.videoWidth) return; const w = video.videoWidth, h = video.videoHeight; canvas.width = w; canvas.height = h; maskCanvas.width = w; maskCanvas.height = h; tmpCanvas.width = w; tmpCanvas.height = h; if(gl) gl.viewport(0,0,w,h); }
 
-  float hash(float n){ return fract(sin(n)*43758.5453123); }
-  float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
+    function createGL(){
+        gl = canvas.getContext('webgl'); if(!gl) throw new Error('WebGL not available');
+        function compile(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ throw new Error(gl.getShaderInfoLog(s)||'shader compile fail'); } return s; }
+        const vs = compile(gl.VERTEX_SHADER, vertSrc); const fs = compile(gl.FRAGMENT_SHADER, fragSrc);
+        program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program); if(!gl.getProgramParameter(program, gl.LINK_STATUS)){ throw new Error(gl.getProgramInfoLog(program)||'link fail'); }
 
-  // noise
-  vec3 hash3(vec2 p){ vec3 q=vec3(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)),dot(p,vec2(419.2,371.9))); return fract(sin(q)*43758.5453); }
-  float noise(vec2 p){ vec2 i=floor(p), f=fract(p); float a=dot(hash3(i).xy,f); float b=dot(hash3(i+vec2(1.,0.)).xy, f-vec2(1.,0.)); float c=dot(hash3(i+vec2(0.,1.)).xy, f-vec2(0.,1.)); float d=dot(hash3(i+vec2(1.,1.)).xy, f-vec2(1.,1.)); vec2 u=f*f*(3.-2.*f); return mix(mix(a,b,u.x), mix(c,d,u.x), u.y); }
-  vec2 noise2(vec2 p){ return vec2(noise(p), noise(p+vec2(5.2,1.3))); }
+        const a_pos = gl.getAttribLocation(program, 'a_pos');
+        buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        const verts = new Float32Array([ 0,0, 1,0, 0,1, 1,1 ]);
+        gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
 
-  // helpers
-  vec4 sampleChroma(vec2 uv){ float c=u_chroma/u_resolution.x; vec3 col; col.r=texture2D(u_tex,uv+vec2(c,0.)).r; col.g=texture2D(u_tex,uv).g; col.b=texture2D(u_tex,uv-vec2(c,0.)).b; return vec4(col,1.); }
-  vec4 boxBlur(vec2 uv){ vec2 off=vec2(u_blur)/u_resolution; vec4 acc=vec4(0.); for(int dx=-1;dx<=1;++dx){ for(int dy=-1;dy<=1;++dy){ acc+=texture2D(u_tex, uv+off*vec2(float(dx),float(dy))); } } return acc/9.; }
-  vec4 pixel(vec2 uv){ vec2 grid = u_resolution/max(1.,u_pixel); vec2 uvp = (floor(uv*grid)+.5)/grid; return texture2D(u_tex,uvp); }
+        gl.useProgram(program);
+        gl.enableVertexAttribArray(a_pos);
+        gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
 
-  // effects
-  vec2 wave(vec2 uv){ float t=u_time*(.3+.7*u_speed); float sx=sin((uv.y*(1.+.05*u_freq)+t)*6.2831853); float cy=cos((uv.x*(.6+.04*u_freq)+t*.8)*6.2831853); return uv + vec2(sx,cy)*(u_amp/u_resolution); }
-  vec2 displace(vec2 uv){ vec2 p=uv*u_nScale*2.5 + vec2(u_time*.1*u_speed,0.0); vec2 n=noise2(p)*2.-1.; return uv + (u_nStrength/u_resolution)*n; }
-  vec2 swirl(vec2 uv){ vec2 d=uv-u_center; float r=length(d); float ang=u_swirl*exp(-r*8.); float s=sin(ang), c=cos(ang); vec2 rot=vec2(c*d.x - s*d.y, s*d.x + c*d.y); return u_center+rot; }
-  vec2 glitchUV(vec2 uv){ float rows=u_resolution.y/max(1.,u_block); float row=floor(uv.y*rows); float t=floor(u_time*(2.+u_speed*20.)+u_seed*10.); float r=hash(row+t*13.17); float active=step(1.-u_prob,r); float shift=(hash(row*7.31+t*3.17)-.5)*.25*active; return uv+vec2(shift,0.); }
+        tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-  vec4 smear(vec2 uv){ int taps=u_smSamples; float ang=u_smAng; if(u_smAnim==1){ ang += radians(u_smWobble) * sin(u_time*u_smSpeed*6.2831853); }
-    vec2 dir=vec2(cos(ang),sin(ang)); vec2 stepUV=(u_smLen/u_resolution)*dir/max(1.,float(taps)); vec4 acc=vec4(0.); float wsum=0.;
-    for(int i=0;i<64;i++){ if(i>=taps) break; float k=float(i); float w=1.-k/float(taps); acc+=texture2D(u_tex, uv - stepUV*k)*w; wsum+=w; }
-    return acc/max(wsum,1e-4);
-  }
-  vec4 radial(vec2 uv){ int taps=u_radSamples; vec2 dir=normalize(u_center-uv+1e-6); vec2 stepUV=(u_radLen/u_resolution)*dir/max(1.,float(taps)); vec4 acc=vec4(0.); float wsum=0.; for(int i=0;i<64;i++){ if(i>=taps) break; float k=float(i); float w=1.-k/float(taps); acc+=texture2D(u_tex, uv + stepUV*k)*w; wsum+=w; } return acc/max(wsum,1e-4); }
+        maskTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, maskTex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
 
-  float maskRect(vec2 uv, vec4 r){ float inside=step(r.x,uv.x)*step(uv.x,r.x+r.z)*step(r.y,uv.y)*step(uv.y,r.y+r.w); if(inside<.5) return 0.; float f=max(u_feather/u_resolution.x,u_feather/u_resolution.y); float dx=min(uv.x-r.x,(r.x+r.z)-uv.x); float dy=min(uv.y-r.y,(r.y+r.w)-uv.y); float d=min(dx,dy); return smoothstep(0.,f,d); }
-  float faceMaskShape(vec2 uv){ float a=0.; for(int i=0;i<5;++i){ if(i>=u_faceCount) break; vec4 r=u_faces[i]; a=max(a, maskRect(uv,r)); } return a; }
-  float faceMask(vec2 uv){ if(u_useMask==0) return 1.; float a = (u_maskMode==1) ? texture2D(u_maskTex,uv).r : faceMaskShape(uv); if(u_invert==1) a=1.-a; return clamp(a,0.,1.); }
+    const U = {};
+    function getU(name){ return U[name] || (U[name] = gl.getUniformLocation(program, name)); }
 
-  void main(){
-    vec2 uv=v_uv; vec4 base=texture2D(u_tex,uv); float m=faceMask(uv);
-    // UV chain
-    if(u_useWave==1) uv=wave(uv);
-    if(u_useDisplace==1) uv=displace(uv);
-    if(u_useSwirl==1) uv=swirl(uv);
-    if(u_useGlitch==1) uv=glitchUV(uv);
+    function uploadVideoTexture(){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch(e) { } gl.uniform1i(getU('u_tex'), 0); }
 
-    // Color stack
-    vec4 col = texture2D(u_tex,uv);
-    if(u_usePixel==1) col = pixel(uv);
-    if(u_useBlur==1) col = mix(col, boxBlur(uv), 1.0);
-    if(u_useRadial==1) col = radial(uv);
-    if(u_useSmear==1) col = smear(uv);
-    if(u_useChroma==1) col = sampleChroma(uv);
+    function uploadMaskTexture(){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, maskTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas); gl.uniform1i(getU('u_maskTex'), 1); }
 
-    gl_FragColor = mix(base, col, m * u_mix);
-  }
-  `;
+    function setFacesUniform(){
+        const W = canvas.width, H = canvas.height; const mirror = mirrorChk.checked; const grow = parseFloat(ui.pad.value);
+        let count = 0; let cx = 0.5, cy = 0.5;
+        for(let i=0;i<Math.min(lastDetections.length, MAX_FACES); i++){
+            const bb = lastDetections[i].boundingBox || lastDetections[i];
+            let x = bb.x, y = bb.y, w = bb.width, h = bb.height;
+            let nx = Math.floor(x - grow), ny = Math.floor(y - grow), nw = Math.ceil(w + 2*grow), nh = Math.ceil(h + 2*grow);
+            if (nx < 0) { nw += nx; nx = 0; }
+            if (ny < 0) { nh += ny; ny = 0; }
+            if (nx + nw > W) nw = W - nx;
+            if (ny + nh > H) nh = H - ny;
+            if (nw <= 2 || nh <= 2) continue;
+            if(mirror){ nx = W - (nx + nw); }
+            faceRects[count*4+0] = nx / W; faceRects[count*4+1] = ny / H; faceRects[count*4+2] = nw / W; faceRects[count*4+3] = nh / H; count++;
+            if(i===0){ cx = (nx + nw*0.5)/W; cy = (ny + nh*0.5)/H; }
+            if(count>=MAX_FACES) break;
+        }
+        for(let j=count;j<MAX_FACES;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; }
+        gl.uniform1i(getU('u_faceCount'), count);
+        for(let k=0;k<MAX_FACES;k++){ gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]); }
+        if(trackCenterChk.checked) effectCenter = { x: cx, y: cy };
+    }
 
-  function createGL(){
-    gl = canvas.getContext('webgl'); if(!gl) throw new Error('WebGL not available');
-    function comp(type,src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-    const vs=comp(gl.VERTEX_SHADER, vertSrc), fs=comp(gl.FRAGMENT_SHADER, fragSrc);
-    program=gl.createProgram(); gl.attachShader(program,vs); gl.attachShader(program,fs); gl.linkProgram(program); if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
-    const a_pos=gl.getAttribLocation(program,'a_pos'); buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,1,1]),gl.STATIC_DRAW); gl.useProgram(program); gl.enableVertexAttribArray(a_pos); gl.vertexAttribPointer(a_pos,2,gl.FLOAT,false,0,0);
-    tex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,tex); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-    maskTex=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,maskTex); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  }
+    function drawMaskFromMesh(){
+        const W = maskCanvas.width, H = maskCanvas.height; maskCtx.clearRect(0,0,W,H); tmpCtx.clearRect(0,0,W,H);
+        tmpCtx.fillStyle = '#fff'; tmpCtx.beginPath();
+        for(const lm of lastFacesMesh){ if(!lm || lm.length < 468) continue; const p0 = lm[FACE_OVAL[0]]; tmpCtx.moveTo(p0.x*W, p0.y*H); for(let i=1;i<FACE_OVAL.length;i++){ const p = lm[FACE_OVAL[i]]; tmpCtx.lineTo(p.x*W, p.y*H); } tmpCtx.closePath(); }
+        tmpCtx.fill();
+        maskCtx.filter = `blur(${parseInt(ui.feather.value||0)}px)`;
+        maskCtx.drawImage(tmpCanvas, 0, 0);
+        maskCtx.filter = 'none';
+    }
 
-  const U={}; function getU(name){ return U[name] || (U[name]=gl.getUniformLocation(program,name)); }
-  function uploadVideo(){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,tex); try{ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,video);}catch(e){} gl.uniform1i(getU('u_tex'),0); }
-  function uploadMask(){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,maskTex); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,maskCanvas); gl.uniform1i(getU('u_maskTex'),1); }
+    function setCommonUniforms(timeSec){
+        gl.uniform1i(getU('u_effect'), parseInt(ui.effect.value,10));
+        gl.uniform1f(getU('u_intensity'), parseFloat(ui.intensity.value));
+        gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
+        gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
+        gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
+        gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
+        gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
+        gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
+        gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
+        gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
+        gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
+        gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
+        gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
+        gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
+        gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value) * 3.14159265 / 180.0);
+        gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value,10));
+        gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
+        gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
+        gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
+        gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
+        gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
+        gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
+        gl.uniform1f(getU('u_time'), timeSec);
+        gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
+    }
 
-  const faceApiAvailable = 'FaceDetector' in window; let detector=null;
-  async function initDetector(){ if(!faceApiAvailable) throw new Error('FaceDetector not available'); detector=new FaceDetector({fastMode:true,maxDetectedFaces:5}); }
+    async function ensureFaceMesh(){
+        if(faceMeshReady) return true;
+        if(typeof window.FaceMesh === 'undefined'){
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload = resolve; s.onerror = () => reject(new Error('Failed to load MediaPipe FaceMesh')); document.head.appendChild(s);
+            });
+        }
+        faceMesh = new window.FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
+        faceMesh.setOptions({ maxNumFaces: MAX_FACES, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        faceMesh.onResults((res) => {
+            lastFacesMesh = res.multiFaceLandmarks ? res.multiFaceLandmarks.map(lm => lm.map(p => ({x:p.x, y:p.y}))) : [];
+            if(trackCenterChk.checked && lastFacesMesh.length){ const lm = lastFacesMesh[0]; let sx=0, sy=0; for(const p of lm){ sx+=p.x; sy+=p.y; } effectCenter = { x: sx/lm.length, y: sy/lm.length }; }
+        });
+        faceMeshReady = true; return true;
+    }
 
-  function setFacesUniform(){ const W=canvas.width,H=canvas.height; const grow=parseFloat(ui.pad.value); let count=0,cx=.5,cy=.5; for(let i=0;i<Math.min(lastDetections.length,5);i++){ const bb=lastDetections[i].boundingBox||lastDetections[i]; let x=bb.x,y=bb.y,w=bb.width,h=bb.height; let nx=Math.floor(x-grow), ny=Math.floor(y-grow), nw=Math.ceil(w+2*grow), nh=Math.ceil(h+2*grow); if(nx<0){nw+=nx;nx=0;} if(ny<0){nh+=ny;ny=0;} if(nx+nw>W) nw=W-nx; if(ny+nh>H) nh=H-ny; if(nw<=2||nh<=2) continue; if(t.mirror.checked){ nx = W - (nx+nw); } faceRects[count*4+0]=nx/W; faceRects[count*4+1]=ny/H; faceRects[count*4+2]=nw/W; faceRects[count*4+3]=nh/H; if(i===0){ cx=(nx+nw*.5)/W; cy=(ny+nh*.5)/H; } if(++count>=5) break; }
-    for(let j=count;j<5;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; }
-    gl.uniform1i(getU('u_faceCount'),count); for(let k=0;k<5;k++){ gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]); }
-    if(t.trackCenter.checked) effectCenter={x:cx,y:cy};
-  }
+    async function start(){
+        if(!navigator.mediaDevices?.getUserMedia){ setMsg('getUserMedia not supported. Try Chrome/Edge/Firefox.', true); return; }
+        if(!isSecureContext){ setMsg('This page is not in a secure context (HTTPS). Camera will be blocked. Use GitHub Pages HTTPS or localhost with HTTPS.', true); return; }
+        try {
+            setStatus('Requesting camera…');
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+            video.srcObject = stream; await video.play();
+            await new Promise((res) => { if (video.videoWidth && video.videoHeight) return res(); const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); }; video.addEventListener('loadedmetadata', onMeta, { once: true }); });
+            fit(); window.addEventListener('resize', fit);
+            try { await initDetector(); setMsg(''); } catch(e){ console.warn(e); setMsg('FaceDetector API not available. Using MediaPipe for tracking.', true); }
+            createGL();
+            startBtn.disabled = true; stopBtn.disabled = false;
+            loop();
+        } catch(err){
+            console.error(err);
+            let hint = '';
+            if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) { hint = ' • Permission blocked. Click the camera icon in the address bar and allow access.'; }
+            if (err && err.name === 'NotFoundError') { hint = ' • No camera found. If you have multiple, pick one in site settings.'; }
+            setMsg('Could not start camera: ' + err.message + hint, true); setStatus('Error');
+        }
+    }
 
-  function drawMaskFromMesh(){ const W=maskCanvas.width,H=maskCanvas.height; maskCtx.clearRect(0,0,W,H); tmpCtx.clearRect(0,0,W,H); tmpCtx.fillStyle='#fff'; tmpCtx.beginPath(); for(const lm of lastFacesMesh){ if(!lm||lm.length<468) continue; const p0=lm[FACE_OVAL[0]]; tmpCtx.moveTo(p0.x*W,p0.y*H); for(let i=1;i<FACE_OVAL.length;i++){ const p=lm[FACE_OVAL[i]]; tmpCtx.lineTo(p.x*W,p.y*H);} tmpCtx.closePath(); } tmpCtx.fill(); maskCtx.filter=`blur(${parseInt(ui.feather.value||0)}px)`; maskCtx.drawImage(tmpCanvas,0,0); maskCtx.filter='none'; }
+    function stop(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
 
-  async function ensureFaceMesh(){ if(faceMeshReady) return true; if(typeof window.FaceMesh==='undefined'){ await new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload=res; s.onerror=()=>rej(new Error('Failed to load FaceMesh')); document.head.appendChild(s); }); } faceMesh=new window.FaceMesh({ locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` }); faceMesh.setOptions({ maxNumFaces:5, refineLandmarks:true, minDetectionConfidence:.5, minTrackingConfidence:.5 }); faceMesh.onResults((r)=>{ lastFacesMesh=r.multiFaceLandmarks? r.multiFaceLandmarks.map(l=>l.map(p=>({x:p.x,y:p.y}))) : []; if(t.trackCenter.checked && lastFacesMesh.length){ const lm=lastFacesMesh[0]; let sx=0,sy=0; for(const p of lm){ sx+=p.x; sy+=p.y;} effectCenter={x:sx/lm.length,y:sy/lm.length}; } }); faceMeshReady=true; return true; }
+    async function detectFaces(){ if(!detector) return []; try { return (await detector.detect(video)) || []; } catch(e){ return []; } }
 
-  async function start(){ if(!navigator.mediaDevices?.getUserMedia){ setMsg('getUserMedia not supported',true); return; } if(!isSecureContext){ setMsg('HTTPS required for camera',true); return; } try{ setStatus('Requesting…'); stream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'user' }, audio:false }); video.srcObject=stream; await video.play(); await new Promise(r=>{ if(video.videoWidth) return r(); const on=()=>{ video.removeEventListener('loadedmetadata',on); r(); }; video.addEventListener('loadedmetadata',on,{once:true}); }); fit(); window.addEventListener('resize',fit); try{ await initDetector(); setMsg(''); }catch(e){ setMsg('FaceDetector missing; enable flag or use Mesh mask', true); }
-      createGL(); startBtn.disabled=true; stopBtn.disabled=false; loop(); } catch(err){ setMsg('Start failed: '+err.message,true); setStatus('Error'); } }
-  function stop(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
+    function loop(){
+        rafId = requestAnimationFrame(loop);
+        if(preciseMaskChk.checked){
+            ensureFaceMesh().catch(e => setMsg(e.message, true));
+            if(faceMesh && !fmBusy && (performance.now() - lastFmTime) > FM_MIN_INTERVAL){
+                fmBusy = true; lastFmTime = performance.now();
+                faceMesh.send({ image: video }).then(() => { fmBusy = false; }).catch(()=>{ fmBusy=false; });
+            }
+        } else if(!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS){
+            lastDetTime = performance.now(); if(detector){ detectFaces().then(faces => { lastDetections = faces; status2El.textContent = faces.length ? `Faces: ${faces.length}` : 'No face'; }); } else { status2El.textContent = 'Camera on'; }
+        }
+        if(!video.videoWidth){ return; }
+        if(canvas.width === 0 || canvas.height === 0){ fit(); }
+        if(!preciseMaskChk.checked){ setFacesUniform(); }
+        let maskMode = 0;
+        if(preciseMaskChk.checked && lastFacesMesh.length){ drawMaskFromMesh(); uploadMaskTexture(); maskMode = 1; }
+        uploadVideoTexture();
+        gl.useProgram(program);
+        gl.uniform1i(getU('u_maskMode'), maskMode);
+        if(!preciseMaskChk.checked){
+        } else {
+            gl.uniform1i(getU('u_faceCount'), 0);
+        }
+        const t = animateChk.checked ? performance.now()/1000 : 0;
+        setCommonUniforms(t);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        status2El.textContent = `${canvas.width}×${canvas.height} • Effect: ${ui.effect.options[ui.effect.selectedIndex].textContent}${preciseMaskChk.checked ? ' • Mesh mask' : ''}`;
+    }
 
-  async function detectFaces(){ if(!detector) return []; try{ return (await detector.detect(video))||[]; }catch(e){ return []; } }
+    effectSelector.addEventListener('click', (e) => {
+        const card = e.target.closest('.effect-card');
+        if (card) {
+            document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            const newEffectValue = card.dataset.effect;
+            ui.effect.value = newEffectValue;
+            ui.effect.dispatchEvent(new Event('input'));
+        }
+    });
 
-  function loop(){ rafId=requestAnimationFrame(loop);
-    // detection
-    if(t.precise.checked){ ensureFaceMesh().catch(e=>setMsg(e.message,true)); if(faceMesh && !fmBusy && (performance.now()-lastFmTime)>60){ fmBusy=true; lastFmTime=performance.now(); faceMesh.send({image:video}).then(()=>fmBusy=false).catch(()=>fmBusy=false); }
-    } else if(!lastDetTime || (performance.now()-lastDetTime)>DETECT_EVERY_MS){ lastDetTime=performance.now(); if(detector){ detectFaces().then(f=>{ lastDetections=f; statusEl.textContent=f.length?`Faces: ${f.length}`:'No face'; }); } else { statusEl.textContent='Camera on'; } }
+    startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
 
-    if(!video.videoWidth) return; if(canvas.width===0) fit();
-    // uniforms
-    gl.useProgram(program);
-    uploadVideo();
+    document.getElementById('presetSoft').addEventListener('click', () => {
+        const effectCard = document.querySelector('[data-effect="2"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        ui.effect.value='2'; ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.samples.value=12; ui.smLen.value=20; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
+        [ui.blur, ui.intensity, ui.chroma, ui.feather, ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng, ui.swirl, ui.nScale, ui.nStrength].forEach(el=>el && el.dispatchEvent(new Event('input')));
+    });
+    document.getElementById('presetGlitch').addEventListener('click', () => {
+        const effectCard = document.querySelector('[data-effect="0"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        ui.effect.value='0'; ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.samples.value=8; ui.smLen.value=12; ui.smAng.value=0;
+        [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather,ui.mix, ui.pad, ui.seed, ui.samples, ui.smLen, ui.smAng].forEach(el=>el && el.dispatchEvent(new Event('input')));
+    });
+    document.getElementById('presetSmear').addEventListener('click', () => {
+        const effectCard = document.querySelector('[data-effect="5"]'); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        ui.effect.value='5'; ui.smLen.value=80; ui.smAng.value=0; ui.samples.value=24; ui.intensity.value=1; ui.mix.value=1; ui.chroma.value=4; ui.feather.value=16; ui.pad.value=12;
+        [ui.smLen, ui.smAng, ui.samples, ui.intensity, ui.mix, ui.chroma, ui.feather, ui.pad].forEach(el=>el && el.dispatchEvent(new Event('input')));
+    });
+    document.getElementById('randomBtn').addEventListener('click', () => {
+        const randEffect = String(Math.floor(Math.random()*9));
+        const effectCard = document.querySelector(`[data-effect="${randEffect}"]`); if(effectCard) { document.querySelectorAll('.effect-card').forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
+        ui.effect.value = randEffect;
+        const setRand=(el,min,max,step=1)=>{ const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
+        setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1);
+        shapeSel.value = Math.random() < 0.5 ? '0' : '1'; invertChk.checked = Math.random() < 0.2; preciseMaskChk.checked = Math.random() < 0.7; trackCenterChk.checked = Math.random() < 0.8;
+    });
 
-    // Mask prep
-    let maskMode=0; if(t.applyMask.checked){ if(t.precise.checked && lastFacesMesh.length){ drawMaskFromMesh(); uploadMask(); maskMode=1; } else { setFacesUniform(); maskMode=0; } } else { gl.uniform1i(getU('u_faceCount'),0); }
-
-    // globals
-    const time = t.animate.checked? performance.now()/1000 : 0;
-    gl.uniform1f(getU('u_time'), time);
-    gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
-    gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
-
-    // toggles
-    gl.uniform1i(getU('u_useMask'), t.applyMask.checked?1:0);
-    gl.uniform1i(getU('u_maskMode'), maskMode);
-    gl.uniform1i(getU('u_invert'), t.invert.checked?1:0);
-    gl.uniform1i(getU('u_useGlitch'), t.glitch.checked?1:0);
-    gl.uniform1i(getU('u_useWave'), t.wave.checked?1:0);
-    gl.uniform1i(getU('u_useSmear'), t.smear.checked?1:0);
-    gl.uniform1i(getU('u_useDisplace'), t.displace.checked?1:0);
-    gl.uniform1i(getU('u_useSwirl'), t.swirl.checked?1:0);
-    gl.uniform1i(getU('u_useBlur'), t.blur.checked?1:0);
-    gl.uniform1i(getU('u_useRadial'), t.radial.checked?1:0);
-    gl.uniform1i(getU('u_usePixel'), t.pixel.checked?1:0);
-    gl.uniform1i(getU('u_useChroma'), t.chroma.checked?1:0);
-
-    // values
-    gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
-    gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
-    gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
-    gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
-
-    gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
-    gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
-
-    gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
-    gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value) * Math.PI/180);
-    gl.uniform1i(getU('u_smSamples'), parseInt(ui.samples.value,10));
-    gl.uniform1i(getU('u_smAnim'), t.smearAnim.checked?1:0);
-    gl.uniform1f(getU('u_smWobble'), parseFloat(ui.smWobble.value));
-    gl.uniform1f(getU('u_smSpeed'), parseFloat(ui.smSpeed.value));
-
-    gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
-    gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
-
-    gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
-
-    gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
-    gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
-    gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
-
-    gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
-    gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
-
-    gl.uniform1f(getU('u_radLen'), parseFloat(ui.radLen.value));
-    gl.uniform1i(getU('u_radSamples'), parseInt(ui.radSamples.value,10));
-
-    // draw
-    gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-    status2El.textContent = `${canvas.width}×${canvas.height}` + (t.precise.checked? ' • Mesh' : '');
-  }
-
-  // createGL on start
-  startBtn.addEventListener('click', start);
-  stopBtn.addEventListener('click', stop);
-
-  // Random / Reset
-  document.getElementById('randomBtn').addEventListener('click', () => {
-    const r=(a,b,s=1)=>{ const v=(Math.round((a+Math.random()*(b-a))/s)*s).toFixed(s<1?2:0); return v; };
-    t.glitch.checked = Math.random()<.5; t.wave.checked=Math.random()<.9; t.smear.checked=Math.random()<.9; t.displace.checked=Math.random()<.4; t.swirl.checked=Math.random()<.5; t.blur.checked=Math.random()<.6; t.radial.checked=Math.random()<.3; t.pixel.checked=Math.random()<.2; t.chroma.checked=Math.random()<.8;
-    ui.freq.value=r(4,20,.5); ui.amp.value=r(4,30,1); ui.smLen.value=r(10,90,1); ui.smAng.value=r(0,360,1); ui.samples.value=r(8,24,1); ui.smWobble.value=r(0,120,1); ui.smSpeed.value=r(.5,3,.01); ui.nScale.value=r(.8,6,.1); ui.nStrength.value=r(4,40,1); ui.swirl.value=r(-2.5,2.5,.01); ui.blur.value=r(4,28,1); ui.pixel.value=r(4,22,1); ui.chroma.value=r(0,12,1); ui.block.value=r(6,48,2); ui.prob.value=r(.2,.8,.01); ui.radLen.value=r(8,60,1); ui.radSamples.value=r(8,24,1); ui.mix.value=r(.6,1,.01); ui.feather.value=r(6,28,1); ui.pad.value=r(8,28,1); ui.seed.value=r(0,100,1);
-    for(const k in ui){ ui[k].dispatchEvent(new Event('input')); }
-  });
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    ['glitch','displace','swirl','blur','radial','pixel'].forEach(k=>t[k].checked=false); ['wave','smear','chroma'].forEach(k=>t[k].checked=true);
-    const set=(id,val)=>{ ui[id].value=val; ui[id].dispatchEvent(new Event('input')); };
-    set('freq',12); set('amp',14); set('smLen',50); set('smAng',0); set('samples',16); set('smWobble',50); set('smSpeed',1.5); set('nScale',3); set('nStrength',18); set('swirl',1.8); set('blur',16); set('pixel',12); set('chroma',6); set('radLen',30); set('radSamples',16); set('block',24); set('prob',0.45); set('mix',1); set('feather',16); set('pad',14); set('seed',7); set('speed',1.2);
-  });
-
-  // Auto-start if permission granted
-  (async()=>{ try{ const p=await navigator.permissions.query({name:'camera'}); if(p.state==='granted') start(); }catch{} })();
+    (async () => { try { const p = await navigator.permissions.query({ name:'camera' }); if(p.state==='granted') start(); } catch{} })();
 })();
 </script>
 </body>
