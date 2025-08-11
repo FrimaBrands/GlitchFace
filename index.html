@@ -202,13 +202,14 @@
             display: none !important;
         }
 
-        .face-indicator {
-            color: #0f0;
-            font-weight: bold;
+        .loading-models {
+            color: #ff0;
+            animation: pulse 1s infinite;
         }
 
-        .no-face {
-            color: #f00;
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
@@ -219,7 +220,8 @@
         
         <div id="startScreen">
             <h1 class="glitch-text">FACE GLITCH</h1>
-            <p>Apply real-time glitch effects to detected faces</p>
+            <p>Apply real-time glitch effects with face tracking</p>
+            <p id="loadStatus" class="loading-models hidden">Loading face detection models...</p>
             <button id="initBtn">START CAMERA</button>
         </div>
         
@@ -259,184 +261,154 @@
                 <input type="range" id="padding" min="0" max="100" value="30">
             </div>
 
-            <div class="checkbox-group">
-                <input type="checkbox" id="faceOnly" checked>
-                <label for="faceOnly">Apply to Face Only</label>
+            <div class="control-group">
+                <label>Detection Mode</label>
+                <select id="detectionMode">
+                    <option value="auto">Auto (Face Tracked)</option>
+                    <option value="center">Center Region</option>
+                    <option value="full">Full Frame</option>
+                    <option value="mouse">Mouse Position</option>
+                </select>
             </div>
 
             <div class="checkbox-group">
                 <input type="checkbox" id="showBounds">
-                <label for="showBounds">Show Face Bounds</label>
+                <label for="showBounds">Show Effect Region</label>
             </div>
         </div>
 
         <div class="status hidden" id="status">
             FPS: <span id="fps">0</span> | 
-            Face: <span id="faceStatus" class="no-face">NOT DETECTED</span> |
+            Mode: <span id="currentMode">Auto</span> |
             Effect: <span id="currentEffect">RGB</span>
         </div>
     </div>
 
+    <!-- Load face-api.js from CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
     <script>
         let video, canvas, ctx;
         let frameCount = 0;
         let isRunning = false;
         let lastTime = performance.now();
         let fps = 0;
-        let currentFace = null;
-        let faceHistory = [];
+        let currentRegion = null;
+        let mouseX = 0, mouseY = 0;
+        let faceApiReady = false;
+        let lastDetection = null;
+        let detectionCounter = 0;
+        
         let settings = {
             effectType: 'rgb',
             intensity: 50,
             blur: 0,
             speed: 50,
             padding: 30,
-            faceOnly: true,
+            detectionMode: 'auto',
             showBounds: false
         };
 
-        // Simple but more robust face detection
-        function detectFace(imageData) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            
-            // Divide image into grid for better detection
-            const gridSize = 10;
-            const cellWidth = Math.floor(width / gridSize);
-            const cellHeight = Math.floor(height / gridSize);
-            const skinGrid = [];
-            
-            // Analyze each grid cell
-            for (let gy = 0; gy < gridSize; gy++) {
-                skinGrid[gy] = [];
-                for (let gx = 0; gx < gridSize; gx++) {
-                    let skinPixels = 0;
-                    let totalPixels = 0;
-                    
-                    const startX = gx * cellWidth;
-                    const startY = gy * cellHeight;
-                    const endX = Math.min(startX + cellWidth, width);
-                    const endY = Math.min(startY + cellHeight, height);
-                    
-                    for (let y = startY; y < endY; y += 2) {
-                        for (let x = startX; x < endX; x += 2) {
-                            const idx = (y * width + x) * 4;
-                            const r = data[idx];
-                            const g = data[idx + 1];
-                            const b = data[idx + 2];
-                            
-                            // Enhanced skin detection with multiple color ranges
-                            const isSkin = (
-                                // Light skin tones
-                                (r > 220 && g > 190 && b > 170 && r > b && g > b) ||
-                                // Medium skin tones
-                                (r > 95 && g > 40 && b > 20 && 
-                                 Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
-                                 Math.abs(r - g) > 15 && r > g && r > b) ||
-                                // Darker skin tones
-                                (r > 60 && g > 35 && b > 15 && 
-                                 r > b + 15 && r > g)
-                            );
-                            
-                            if (isSkin) skinPixels++;
-                            totalPixels++;
-                        }
-                    }
-                    
-                    skinGrid[gy][gx] = skinPixels / totalPixels;
-                }
+        // Track mouse position
+        document.addEventListener('mousemove', (e) => {
+            const rect = canvas ? canvas.getBoundingClientRect() : null;
+            if (rect) {
+                mouseX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+                mouseY = ((e.clientY - rect.top) / rect.height) * canvas.height;
             }
-            
-            // Find the region with highest concentration of skin pixels
-            let maxScore = 0;
-            let bestRegion = null;
-            
-            // Look for face-sized regions (typically 3-5 grid cells)
-            for (let gy = 0; gy < gridSize - 3; gy++) {
-                for (let gx = 0; gx < gridSize - 3; gx++) {
-                    let score = 0;
-                    
-                    // Calculate score for a 4x4 region
-                    for (let dy = 0; dy < 4; dy++) {
-                        for (let dx = 0; dx < 4; dx++) {
-                            score += skinGrid[gy + dy][gx + dx];
-                        }
-                    }
-                    
-                    // Bonus for central location (faces usually centered)
-                    const centerDistance = Math.abs(gx + 2 - gridSize/2) + Math.abs(gy + 2 - gridSize/2);
-                    score += (gridSize - centerDistance) * 0.01;
-                    
-                    if (score > maxScore) {
-                        maxScore = score;
-                        bestRegion = { gx, gy };
-                    }
-                }
+        });
+
+        // Load face-api models
+        async function loadFaceModels() {
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+                faceApiReady = true;
+                console.log('Face detection models loaded');
+            } catch (error) {
+                console.warn('Face-api.js failed to load, using fallback detection');
+                faceApiReady = false;
             }
-            
-            // If we found a good region, return face bounds
-            if (maxScore > 2) { // Threshold for detection
-                const face = {
-                    x: bestRegion.gx * cellWidth,
-                    y: bestRegion.gy * cellHeight,
-                    width: cellWidth * 4,
-                    height: cellHeight * 4,
-                    confidence: maxScore / 16 // Normalize to 0-1
-                };
-                
-                // Expand bounds with padding
-                const padding = settings.padding;
-                face.x = Math.max(0, face.x - padding);
-                face.y = Math.max(0, face.y - padding);
-                face.width = Math.min(width - face.x, face.width + padding * 2);
-                face.height = Math.min(height - face.y, face.height + padding * 2);
-                
-                return face;
-            }
-            
-            return null;
         }
 
-        // Smooth face tracking
-        function smoothFaceTracking(detectedFace) {
-            if (!detectedFace) {
-                // Use last known position if recently lost
-                if (faceHistory.length > 0) {
-                    const lastFace = faceHistory[faceHistory.length - 1];
-                    if (frameCount - lastFace.frame < 10) {
-                        return lastFace.face;
+        // Get region based on detection mode
+        function getEffectRegion() {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            switch(settings.detectionMode) {
+                case 'center':
+                    return {
+                        x: width * 0.25,
+                        y: height * 0.2,
+                        width: width * 0.5,
+                        height: height * 0.6
+                    };
+                    
+                case 'full':
+                    return {
+                        x: 0,
+                        y: 0,
+                        width: width,
+                        height: height
+                    };
+                    
+                case 'mouse':
+                    const size = 200 + settings.padding;
+                    return {
+                        x: Math.max(0, Math.min(width - size, mouseX - size/2)),
+                        y: Math.max(0, Math.min(height - size, mouseY - size/2)),
+                        width: size,
+                        height: size
+                    };
+                    
+                case 'auto':
+                default:
+                    // Try face detection
+                    if (lastDetection) {
+                        return lastDetection;
                     }
+                    // Fallback to center
+                    return {
+                        x: width * 0.25,
+                        y: height * 0.2,
+                        width: width * 0.5,
+                        height: height * 0.6
+                    };
+            }
+        }
+
+        // Detect face using face-api.js
+        async function detectFace() {
+            if (!faceApiReady || settings.detectionMode !== 'auto') return;
+            
+            detectionCounter++;
+            // Only detect every 5 frames for performance
+            if (detectionCounter % 5 !== 0) return;
+            
+            try {
+                const detections = await faceapi.detectAllFaces(
+                    video, 
+                    new faceapi.TinyFaceDetectorOptions({
+                        inputSize: 320,
+                        scoreThreshold: 0.3
+                    })
+                );
+                
+                if (detections.length > 0) {
+                    const face = detections[0].box;
+                    const padding = settings.padding;
+                    
+                    lastDetection = {
+                        x: Math.max(0, face.x - padding),
+                        y: Math.max(0, face.y - padding),
+                        width: Math.min(canvas.width - face.x + padding, face.width + padding * 2),
+                        height: Math.min(canvas.height - face.y + padding, face.height + padding * 2)
+                    };
                 }
-                return null;
+            } catch (error) {
+                console.warn('Face detection error:', error);
             }
-            
-            // Add to history
-            faceHistory.push({ face: detectedFace, frame: frameCount });
-            if (faceHistory.length > 5) {
-                faceHistory.shift();
-            }
-            
-            // Average recent positions for smoothing
-            if (faceHistory.length > 2) {
-                let avgX = 0, avgY = 0, avgW = 0, avgH = 0;
-                faceHistory.forEach(item => {
-                    avgX += item.face.x;
-                    avgY += item.face.y;
-                    avgW += item.face.width;
-                    avgH += item.face.height;
-                });
-                const count = faceHistory.length;
-                return {
-                    x: Math.floor(avgX / count),
-                    y: Math.floor(avgY / count),
-                    width: Math.floor(avgW / count),
-                    height: Math.floor(avgH / count),
-                    confidence: detectedFace.confidence
-                };
-            }
-            
-            return detectedFace;
         }
 
         function applyRGBSplit(imageData, region, intensity) {
@@ -454,13 +426,11 @@
                 for (let x = startX; x < endX; x++) {
                     const idx = (y * width + x) * 4;
                     
-                    // Shift red channel left
                     if (x > startX + shift) {
                         const shiftIdx = (y * width + (x - shift)) * 4;
                         data[idx] = tempData[shiftIdx];
                     }
                     
-                    // Shift blue channel right
                     if (x < endX - shift) {
                         const shiftIdx = (y * width + (x + shift)) * 4;
                         data[idx + 2] = tempData[shiftIdx + 2];
@@ -639,7 +609,7 @@
             document.getElementById('fps').textContent = fps;
         }
 
-        function animate() {
+        async function animate() {
             if (!isRunning) return;
             
             updateFPS();
@@ -647,60 +617,45 @@
             // Draw video to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
+            // Detect face if in auto mode
+            await detectFace();
+            
+            // Get effect region
+            currentRegion = getEffectRegion();
+            
             // Get image data
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             
-            // Detect face
-            const detectedFace = detectFace(imageData);
-            currentFace = smoothFaceTracking(detectedFace);
-            
-            // Update face status
-            const faceStatus = document.getElementById('faceStatus');
-            if (currentFace) {
-                faceStatus.textContent = `DETECTED (${Math.round(currentFace.confidence * 100)}%)`;
-                faceStatus.className = 'face-indicator';
-            } else {
-                faceStatus.textContent = 'NOT DETECTED';
-                faceStatus.className = 'no-face';
-            }
-            
             // Apply effects
-            const region = settings.faceOnly && currentFace ? currentFace : {
-                x: 0,
-                y: 0,
-                width: canvas.width,
-                height: canvas.height
-            };
-            
             const speedMultiplier = settings.speed / 50;
             const adjustedFrame = frameCount * speedMultiplier;
             
             switch(settings.effectType) {
                 case 'rgb':
-                    applyRGBSplit(imageData, region, settings.intensity);
+                    applyRGBSplit(imageData, currentRegion, settings.intensity);
                     break;
                 case 'pixelate':
-                    applyPixelate(imageData, region, settings.intensity);
+                    applyPixelate(imageData, currentRegion, settings.intensity);
                     break;
                 case 'noise':
-                    applyNoise(imageData, region, settings.intensity);
+                    applyNoise(imageData, currentRegion, settings.intensity);
                     break;
                 case 'wave':
-                    applyWave(imageData, region, settings.intensity, adjustedFrame);
+                    applyWave(imageData, currentRegion, settings.intensity, adjustedFrame);
                     break;
                 case 'corrupt':
-                    applyCorruption(imageData, region, settings.intensity);
+                    applyCorruption(imageData, currentRegion, settings.intensity);
                     break;
                 case 'scanner':
-                    applyScanner(imageData, region, settings.intensity, adjustedFrame);
+                    applyScanner(imageData, currentRegion, settings.intensity, adjustedFrame);
                     break;
                 case 'all':
-                    if (Math.random() < 0.3) applyRGBSplit(imageData, region, settings.intensity / 2);
-                    if (Math.random() < 0.3) applyPixelate(imageData, region, settings.intensity / 3);
-                    if (Math.random() < 0.5) applyNoise(imageData, region, settings.intensity / 2);
-                    if (Math.sin(adjustedFrame * 0.05) > 0) applyWave(imageData, region, settings.intensity / 2, adjustedFrame);
-                    if (Math.random() < 0.1) applyCorruption(imageData, region, settings.intensity);
-                    applyScanner(imageData, region, settings.intensity / 3, adjustedFrame);
+                    if (Math.random() < 0.3) applyRGBSplit(imageData, currentRegion, settings.intensity / 2);
+                    if (Math.random() < 0.3) applyPixelate(imageData, currentRegion, settings.intensity / 3);
+                    if (Math.random() < 0.5) applyNoise(imageData, currentRegion, settings.intensity / 2);
+                    if (Math.sin(adjustedFrame * 0.05) > 0) applyWave(imageData, currentRegion, settings.intensity / 2, adjustedFrame);
+                    if (Math.random() < 0.1) applyCorruption(imageData, currentRegion, settings.intensity);
+                    applyScanner(imageData, currentRegion, settings.intensity / 3, adjustedFrame);
                     break;
             }
             
@@ -714,17 +669,13 @@
                 ctx.filter = 'none';
             }
             
-            // Draw face bounds if enabled
-            if (settings.showBounds && currentFace) {
+            // Draw bounds if enabled
+            if (settings.showBounds && currentRegion) {
                 ctx.strokeStyle = '#0ff';
                 ctx.lineWidth = 2;
-                ctx.strokeRect(currentFace.x, currentFace.y, currentFace.width, currentFace.height);
-                
-                // Draw confidence
-                ctx.fillStyle = '#0ff';
-                ctx.font = '12px Courier New';
-                ctx.fillText(`${Math.round(currentFace.confidence * 100)}%`, 
-                           currentFace.x, currentFace.y - 5);
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(currentRegion.x, currentRegion.y, currentRegion.width, currentRegion.height);
+                ctx.setLineDash([]);
             }
             
             frameCount++;
@@ -736,6 +687,14 @@
             const startScreen = document.getElementById('startScreen');
             const controls = document.getElementById('controls');
             const status = document.getElementById('status');
+            const loadStatus = document.getElementById('loadStatus');
+            
+            // Load face detection models in background
+            loadStatus.classList.remove('hidden');
+            loadFaceModels().then(() => {
+                loadStatus.textContent = faceApiReady ? 'Face detection ready!' : 'Using fallback detection';
+                setTimeout(() => loadStatus.classList.add('hidden'), 2000);
+            });
             
             initBtn.addEventListener('click', async () => {
                 initBtn.disabled = true;
@@ -786,8 +745,10 @@
                 document.getElementById('paddingValue').textContent = settings.padding;
             });
             
-            document.getElementById('faceOnly').addEventListener('change', (e) => {
-                settings.faceOnly = e.target.checked;
+            document.getElementById('detectionMode').addEventListener('change', (e) => {
+                settings.detectionMode = e.target.value;
+                document.getElementById('currentMode').textContent = e.target.options[e.target.selectedIndex].text;
+                lastDetection = null; // Reset detection when mode changes
             });
             
             document.getElementById('showBounds').addEventListener('change', (e) => {
