@@ -3,64 +3,104 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Webcam Face Blur</title>
+  <title>Webcam Face FX — Glitch / Distort / Blur</title>
   <style>
     :root {
-      --bg: #0f1115;
-      --fg: #e5e7eb;
-      --muted: #9aa0aa;
-      --accent: #6ee7b7;
-      --danger: #f87171;
+      --bg: #0f1115; --panel: #11141a; --stroke: #1f2430; --fg: #e5e7eb; --muted:#9aa0aa; --accent:#6ee7b7; --danger:#f87171;
     }
     html, body { height: 100%; }
-    body {
-      margin: 0; background: var(--bg); color: var(--fg);
-      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      display: grid; place-items: center;
-    }
-    .wrap { width: min(960px, 96vw); }
-    .panel {
-      background: #11141a; border: 1px solid #1f2430; border-radius: 16px; padding: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
-    }
-    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
-    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    button, select, .badge {
-      background: #0b0e13; color: var(--fg); border: 1px solid #1f2430; border-radius: 12px; padding: 8px 12px; cursor: pointer;
-    }
-    button:hover { border-color: #2e3748; }
-    button:disabled { opacity: .6; cursor: not-allowed; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; display: grid; place-items: center; }
+    .wrap { width: min(1120px, 96vw); }
+    .panel { background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 10px; }
+    h1 { font-size: 18px; margin:0; letter-spacing:.2px; }
+    .controls { display:grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap:10px; align-items:center; }
+    .row { display: contents; }
+    .col-span-3{ grid-column: span 3; } .col-span-4{ grid-column: span 4; } .col-span-6{ grid-column: span 6; } .col-span-12{ grid-column: span 12; }
+    label { font-size: 12px; color: var(--muted); display:flex; flex-direction:column; gap:6px; }
+    input[type="range"], select, button, .badge { background:#0b0e13; color:var(--fg); border:1px solid var(--stroke); border-radius: 10px; padding:8px 10px; }
+    input[type="checkbox"]{ transform: translateY(1px); }
+    .inline { display:flex; gap:10px; align-items:center; }
+    button { cursor:pointer; }
+    button:hover { border-color:#2e3748; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
     .badge { font-size: 12px; }
-    #stage { position: relative; aspect-ratio: 16/9; background: #0c1016; border-radius: 16px; overflow: hidden; }
-    #canvas { display: block; width: 100%; height: 100%; }
-    #video { display: none; }
-    .note { color: var(--muted); margin-top: 10px; font-size: 13px; }
+    #stage { position: relative; aspect-ratio: 16/9; background: #0c1016; border-radius: 16px; overflow: hidden; margin-top: 10px; }
+    #glcanvas { display:block; width:100%; height:100%; }
+    #video { display:none; }
+    .note { color:var(--muted); margin-top:10px; font-size: 12px; }
     .error { color: var(--danger); }
-    footer { margin-top: 12px; display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
+    footer { margin-top:10px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:12px; }
     a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    a:hover{ text-decoration: underline; }
+    .gridline { height:1px; background:#1b1f2a; grid-column: 1 / -1; margin:2px 0; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="panel">
       <header>
-        <h1>Webcam Face Blur</h1>
-        <div class="controls">
+        <h1>Webcam Face FX</h1>
+        <div class="inline">
           <button id="startBtn">Start camera</button>
           <button id="stopBtn" disabled>Stop</button>
-          <label class="badge"><input type="checkbox" id="mirrorChk" checked> Mirror</label>
+          <label class="badge inline"><input type="checkbox" id="mirrorChk" checked> Mirror</label>
+          <label class="badge inline"><input type="checkbox" id="animateChk" checked> Animate</label>
           <span id="status" class="badge">Idle</span>
         </div>
       </header>
+
+      <div class="controls">
+        <div class="row">
+          <label class="col-span-3">Effect
+            <select id="effect">
+              <option value="0">Glitch (blocks + chroma)</option>
+              <option value="1">Distort (wave)</option>
+              <option value="2">Blur (box)</option>
+              <option value="3">Pixelate</option>
+              <option value="4">Combo: Glitch + Distort + Chroma</option>
+            </select>
+          </label>
+          <label class="col-span-3">Intensity <span class="inline"><input type="range" id="intensity" min="0" max="1" step="0.01" value="0.8"><span id="intensityVal" class="badge">0.80</span></span></label>
+          <label class="col-span-3">Speed <span class="inline"><input type="range" id="speed" min="0" max="5" step="0.01" value="1.2"><span id="speedVal" class="badge">1.20</span></span></label>
+          <label class="col-span-3">Feather (px) <span class="inline"><input type="range" id="feather" min="0" max="48" step="1" value="10"><span id="featherVal" class="badge">10</span></span></label>
+        </div>
+
+        <div class="row gridline"></div>
+
+        <div class="row">
+          <label class="col-span-3">Blur radius (px) <span class="inline"><input type="range" id="blur" min="0" max="24" step="1" value="12"><span id="blurVal" class="badge">12</span></span></label>
+          <label class="col-span-3">Chroma shift (px) <span class="inline"><input type="range" id="chroma" min="0" max="12" step="1" value="4"><span id="chromaVal" class="badge">4</span></span></label>
+          <label class="col-span-3">Pixel size (px) <span class="inline"><input type="range" id="pixel" min="1" max="40" step="1" value="12"><span id="pixelVal" class="badge">12</span></span></label>
+          <label class="col-span-3">Distort freq <span class="inline"><input type="range" id="freq" min="0" max="40" step="0.5" value="9"><span id="freqVal" class="badge">9.0</span></span></label>
+        </div>
+
+        <div class="row">
+          <label class="col-span-3">Distort amp (px) <span class="inline"><input type="range" id="amp" min="0" max="40" step="1" value="10"><span id="ampVal" class="badge">10</span></span></label>
+          <label class="col-span-3">Glitch block (px) <span class="inline"><input type="range" id="block" min="2" max="120" step="2" value="22"><span id="blockVal" class="badge">22</span></span></label>
+          <label class="col-span-3">Glitch probability <span class="inline"><input type="range" id="prob" min="0" max="1" step="0.01" value="0.4"><span id="probVal" class="badge">0.40</span></span></label>
+          <label class="col-span-3">Faces max <span class="inline"><input type="range" id="maxfaces" min="1" max="5" step="1" value="3"><span id="maxfacesVal" class="badge">3</span></span></label>
+        </div>
+
+        <div class="row">
+          <div class="col-span-12 inline" style="justify-content: flex-end; gap:8px;">
+            <button id="presetSoft">Preset: Soft Blur</button>
+            <button id="presetGlitch">Preset: Heavy Glitch</button>
+            <button id="presetWavy">Preset: Wavy Distort</button>
+            <button id="randomBtn">Randomize</button>
+          </div>
+        </div>
+      </div>
+
       <div id="stage">
         <video id="video" playsinline muted></video>
-        <canvas id="canvas" aria-label="camera with face blur"></canvas>
+        <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
       </div>
+
       <div id="msg" class="note"></div>
       <footer>
-        <span>Runs entirely in your browser. HTTPS required for camera access.</span>
-        <span>Built for Chrome; uses the Shape Detection <code>FaceDetector</code> API.</span>
+        <span>Runs in-browser. HTTPS required. Uses <code>FaceDetector</code> + WebGL.</span>
+        <span id="status2" class="badge">—</span>
       </footer>
     </div>
   </div>
@@ -68,189 +108,115 @@
 <script>
 (() => {
   const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d', { willReadFrequently: false });
+  const canvas = document.getElementById('glcanvas');
   const startBtn = document.getElementById('startBtn');
   const stopBtn = document.getElementById('stopBtn');
   const mirrorChk = document.getElementById('mirrorChk');
+  const animateChk = document.getElementById('animateChk');
   const statusEl = document.getElementById('status');
+  const status2El = document.getElementById('status2');
   const msgEl = document.getElementById('msg');
 
-  let stream = null;
-  let rafId = null;
-  let detector = null;
+  const ui = {
+    effect: document.getElementById('effect'),
+    intensity: hook('intensity','intensityVal'),
+    speed: hook('speed','speedVal'),
+    blur: hook('blur','blurVal'),
+    chroma: hook('chroma','chromaVal'),
+    pixel: hook('pixel','pixelVal'),
+    freq: hook('freq','freqVal'),
+    amp: hook('amp','ampVal'),
+    block: hook('block','blockVal'),
+    prob: hook('prob','probVal'),
+    feather: hook('feather','featherVal'),
+    maxfaces: hook('maxfaces','maxfacesVal'),
+  };
+
+  function hook(id, outId){
+    const el = document.getElementById(id);
+    const out = document.getElementById(outId);
+    const set = () => { out.textContent = el.value; };
+    el.addEventListener('input', set); set();
+    return el;
+  }
+
+  // State
+  let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
   let lastDetections = [];
   let lastDetTime = 0;
-  const DETECT_EVERY_MS = 120; // run face detection ~8 FPS for performance
+  const DETECT_EVERY_MS = 110; // throttle face detection
+  const MAX_FACES = 5;
+  const faceRects = new Float32Array(MAX_FACES * 4); // x,y,w,h in 0..1 UV space
 
-  const faceApiAvailable = 'FaceDetector' in window;
+  // --- WebGL setup ---
+  const vertSrc = `
+  attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);} 
+  `;
+  const fragSrc = `
+  precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform vec2 u_resolution; uniform float u_time; 
+  uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_feather; 
+  uniform int u_faceCount; uniform vec4 u_faces[${MAX_FACES}];
 
-  function setStatus(text) { statusEl.textContent = text; }
-  function setMsg(text, isError=false) {
-    msgEl.textContent = text || '';
-    msgEl.classList.toggle('error', !!isError);
-  }
+  float hash(float n){ return fract(sin(n)*43758.5453123); }
+  float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 
-  function fitCanvasToVideo() {
-    if (!video.videoWidth) return;
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    canvas.width = w;
-    canvas.height = h;
-  }
-
-  async function initDetector() {
-    if (!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.');
-    detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 5 });
-  }
-
-  async function start() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setMsg('getUserMedia is not supported in this browser. Try Chrome, Edge, or a modern browser.', true);
-      return;
-    }
-
-    try {
-      setStatus('Requesting camera...');
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      video.srcObject = stream;
-      await video.play();
-      fitCanvasToVideo();
-      window.addEventListener('resize', fitCanvasToVideo);
-
-      // Initialize detector (or tell the user if missing)
-      try {
-        await initDetector();
-        setMsg('');
-      } catch (e) {
-        console.warn(e);
-        setMsg('FaceDetector API not available. Use Chrome (latest) and make sure "Experimental Web Platform features" are enabled, or ask me for a MediaPipe fallback.', true);
-      }
-
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      loop();
-    } catch (err) {
-      console.error(err);
-      const httpsHint = location.protocol !== 'https:' ? ' • Tip: GitHub Pages serves over HTTPS; local files or insecure HTTP will block the camera.' : '';
-      setMsg('Could not start camera: ' + err.message + httpsHint, true);
-      setStatus('Error');
-    }
-  }
-
-  function stop() {
-    if (rafId) cancelAnimationFrame(rafId), rafId = null;
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    setStatus('Stopped');
-  }
-
-  function drawFrame() {
-    if (!video.videoWidth) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-
-    ctx.save();
-    // Mirror if requested
-    if (mirrorChk.checked) {
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-    }
-
-    // Draw the base video frame
-    ctx.drawImage(video, 0, 0, w, h);
-
-    // Overlay blurred patches where faces are
-    if (lastDetections && lastDetections.length) {
-      for (const face of lastDetections) {
-        const { x, y, width, height } = face.boundingBox || face.boundingBox || face; // be liberal
-
-        // Grow the blur box a bit to cover hair/edges
-        const grow = Math.round(Math.max(width, height) * 0.15);
-        const bx = Math.max(0, x - grow);
-        const by = Math.max(0, y - grow);
-        const bw = Math.min(w - bx, width + 2*grow);
-        const bh = Math.min(h - by, height + 2*grow);
-
-        // Clip to a rounded rectangle so blur looks nicer
-        const r = Math.floor(Math.min(bw, bh) * 0.12);
-        roundedRect(ctx, bx, by, bw, bh, r);
-        ctx.clip();
-
-        // Draw the same region with a blur filter
-        ctx.filter = 'blur(22px)';
-        ctx.drawImage(video, bx, by, bw, bh, bx, by, bw, bh);
-
-        ctx.filter = 'none';
-        ctx.beginPath(); // reset clip
-        ctx.restore();
-        ctx.save();
-        if (mirrorChk.checked) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+  bool insideFace(vec2 uv){
+    for(int i=0;i<${MAX_FACES};++i){
+      if(i >= u_faceCount) break;
+      vec4 r = u_faces[i]; // x,y,w,h
+      if(uv.x >= r.x && uv.x <= r.x+r.z && uv.y >= r.y && uv.y <= r.y+r.w){
+        // feather: shrink inner rect a bit for soft edges
+        float fx = u_feather / u_resolution.x; float fy = u_feather / u_resolution.y;
+        if(uv.x >= r.x+fx && uv.x <= r.x+r.z-fx && uv.y >= r.y+fy && uv.y <= r.y+r.w-fy) return true;
+        // edge feather (smoothstep ribbon)
+        float dx = min(uv.x - r.x, (r.x+r.z) - uv.x);
+        float dy = min(uv.y - r.y, (r.y+r.w) - uv.y);
+        float d = min(dx, dy);
+        float f = smoothstep(0.0, max(fx,fy), d);
+        return f > 0.5; // approximate
       }
     }
-
-    ctx.restore();
+    return false;
   }
 
-  function roundedRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+  vec4 sampleChroma(vec2 uv, float px){
+    vec2 o = vec2(px) / u_resolution; // pixels to UV
+    float c = u_chroma / u_resolution.x; // horizontal shift in UV
+    vec3 col; col.r = texture2D(u_tex, uv + vec2(c,0.0)).r; col.g = texture2D(u_tex, uv).g; col.b = texture2D(u_tex, uv - vec2(c,0.0)).b; return vec4(col,1.0);
   }
 
-  async function detectFaces(now) {
-    if (!detector) return [];
-    try {
-      const faces = await detector.detect(video);
-      // FaceDetector returns an array of {boundingBox: {x,y,width,height}, landmarks:[...]}
-      return faces || [];
-    } catch (e) {
-      // Detection can fail sporadically between frames; swallow and keep going
-      return [];
-    }
+  vec4 doBlur(vec2 uv){
+    // simple 3x3 box blur with adjustable radius in pixels
+    vec2 off = vec2(u_blur) / u_resolution; vec4 acc = vec4(0.0);
+    for(int dx=-1; dx<=1; ++dx){ for(int dy=-1; dy<=1; ++dy){ acc += texture2D(u_tex, uv + off*vec2(float(dx), float(dy))); } }
+    return acc / 9.0;
   }
 
-  async function loop(now) {
-    rafId = requestAnimationFrame(loop);
-
-    // Draw current frame
-    drawFrame();
-
-    // Throttle detection
-    if (!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS) {
-      lastDetTime = performance.now();
-      if (detector) {
-        setStatus('Detecting…');
-        detectFaces().then(faces => {
-          lastDetections = faces.map(f => ({ boundingBox: f.boundingBox }));
-          setStatus(faces.length ? `Faces: ${faces.length}` : 'No face');
-        });
-      } else {
-        setStatus('Camera on');
-      }
-    }
+  vec2 glitchUV(vec2 uv){
+    // row-based horizontal offsets, randomized in time
+    float rows = u_resolution.y / max(1.0, u_block); // how many rows
+    float row = floor(uv.y * rows);
+    float t = floor(u_time * (2.0 + u_speed*20.0));
+    float r = hash(row + t*13.17);
+    float active = step(1.0 - u_prob, r);
+    float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active; // [-0.125..0.125]
+    return uv + vec2(shift, 0.0);
   }
 
-  startBtn.addEventListener('click', start);
-  stopBtn.addEventListener('click', stop);
+  vec2 distortUV(vec2 uv){
+    float twopi = 6.2831853; float sx = sin((uv.y * (1.0 + u_freq*0.05) + u_time * (0.2 + u_speed*0.6)) * twopi);
+    float cy = cos((uv.x * (0.6 + u_freq*0.04) + u_time * (0.3 + u_speed*0.5)) * twopi);
+    vec2 d = vec2(sx, cy) * (u_amp / u_resolution);
+    return uv + d * u_intensity;
+  }
 
-  // Auto-start if permissions are already granted
-  (async () => {
-    try {
-      const p = await navigator.permissions.query({ name: 'camera' });
-      if (p.state === 'granted') start();
-    } catch {}
-  })();
-})();
-</script>
-</body>
-</html>
+  vec4 pixelate(vec2 uv){
+    float ps = max(1.0, u_pixel);
+    vec2 grid = u_resolution / ps; vec2 uvp = (floor(uv * grid) + 0.5) / grid; 
+    return texture2D(u_tex, uvp);
+  }
+
+  void main(){
+    vec2 uv = v_uv; // already 0..1
+    vec4 base = texture2D(u_tex, uv);
+    bool mask = insideFace(uv
