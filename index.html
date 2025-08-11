@@ -1,10 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="utf-t" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V2 (Refined)</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title>Face Glitch V2</title> <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     <style>
@@ -50,7 +49,7 @@
         .container {
             display: flex;
             width: 100%;
-            max-width: 1600px;
+            max-width: 1600px; /* V2 Change: Increased max-width for wider layout */
             height: 90vh;
             border-radius: var(--radius-md);
             overflow: hidden;
@@ -60,7 +59,7 @@
         }
 
         .main-stage {
-            flex: 3;
+            flex: 3; /* V2 Change: More space for the canvas */
             position: relative;
             background: #0d0f13;
             display: flex;
@@ -81,7 +80,7 @@
 
         .controls-panel {
             flex: 1;
-            min-width: 400px;
+            min-width: 400px; /* V2 Change: Ensure controls have enough space */
             padding: 24px;
             display: flex;
             flex-direction: column;
@@ -127,7 +126,7 @@
             cursor: not-allowed;
         }
         
-        .btn-small {
+        .btn-small { /* V2 Change: Smaller button style */
             padding: 4px 8px;
             font-size: 12px;
         }
@@ -174,6 +173,7 @@
             background: rgba(110, 231, 183, 0.1);
         }
 
+        /* V2 Change: Active state now supports multiple selections */
         .effect-btn.active {
             border-color: var(--primary-color);
             background: var(--primary-color);
@@ -192,6 +192,7 @@
             border-radius: var(--radius-md);
             margin-bottom: 16px;
             background: var(--primary-bg);
+            /* V2 Change: Simpler show/hide logic */
             display: none; 
         }
 
@@ -240,6 +241,7 @@
             gap: 16px;
         }
         
+        /* V2 Change: Grid for preset management */
         .preset-grid {
              display: grid;
              grid-template-columns: 1fr auto auto;
@@ -273,6 +275,7 @@
             gap: 6px;
         }
         
+        /* V2 Change: Full-width items for single-column layouts */
         .control-item.full-width {
             grid-column: 1 / -1;
         }
@@ -534,11 +537,12 @@
                         <label><input type="checkbox" id="animateChk" checked> Animate Effects</label>
                         <label><input type="checkbox" id="trackCenterChk" checked> Track Center of Face</label>
                         <label><input type="checkbox" id="preciseMaskChk" checked> Precise Face Mesh Mask</label>
-                        </div>
+                        <label><input type="checkbox" id="invert"> Invert Mask</label>
+                    </div>
                 </div>
             </div>
             
-             <div id="presetsTools" class="control-group global">
+            <div id="presetsTools" class="control-group global">
                  <div class="control-group-header">Presets</div>
                  <div class="control-group-content">
                      <div class="preset-grid">
@@ -570,17 +574,19 @@
         const preciseMaskChk = document.getElementById('preciseMaskChk');
         const status2El = document.getElementById('status2');
         const msgEl = document.getElementById('msg');
-        // REFINEMENT: Removed invertChk
+        const invertChk = document.getElementById('invert');
         const effectSelector = document.querySelector('.effect-selector');
         const dynamicControls = document.querySelectorAll('.dynamic-controls .control-group');
         const effectBtns = document.querySelectorAll('.effect-btn');
         const controlsPanel = document.querySelector('.controls-panel');
+        // V2 Change: Preset UI
         const savePresetBtn = document.getElementById('savePresetBtn');
         const deletePresetBtn = document.getElementById('deletePresetBtn');
         const presetNameInput = document.getElementById('presetName');
         const presetList = document.getElementById('presetList');
         const randomBtn = document.getElementById('randomBtn');
 
+        // V2 Change: List of all available effects
         const ALL_EFFECTS = Array.from(effectBtns).map(btn => btn.dataset.effect);
         let activeEffects = new Set();
 
@@ -599,22 +605,23 @@
             mix: hook('mix', 'mixVal'),
             feather: hook('feather', 'featherVal'),
             pad: hook('pad', 'padVal'),
+            // Effect-specific
             smLen: hook('smLen', 'smLenVal'),
             smAng: hook('smAng', 'smAngVal'),
-            smWobble: hook('smWobble', 'smWobbleVal'),
+            smWobble: hook('smWobble', 'smWobbleVal'), // V2 New
             samples: hook('samples', 'samplesVal'),
             nScale: hook('nScale', 'nScaleVal'),
             nStrength: hook('nStrength', 'nStrengthVal'),
             pixel: hook('pixel', 'pixelVal'),
-            pixelThreshold: hook('pixelThreshold', 'pixelThresholdVal'),
+            pixelThreshold: hook('pixelThreshold', 'pixelThresholdVal'), // V2 New
             block: hook('block', 'blockVal'),
             prob: hook('prob', 'probVal'),
-            slitSize: hook('slitSize', 'slitSizeVal'),
-            slitSpeed: hook('slitSpeed', 'slitSpeedVal'),
+            slitSize: hook('slitSize', 'slitSizeVal'), // V2 New
+            slitSpeed: hook('slitSpeed', 'slitSpeedVal'), // V2 New
             chroma: hook('chroma', 'chromaVal'),
         };
 
-        let stream = null, rafId = null, gl = null, program = null, tex = null, buf = null;
+        let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
         let lastFacesMesh = [];
         let effectCenter = { x: 0.5, y: 0.5 };
         const maskCanvas = document.createElement('canvas');
@@ -627,6 +634,7 @@
         const FM_MIN_INTERVAL = 60;
         const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
         
+        // V2 Change: Refactored and new GLSL shader for effect stacking
         const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
         const fragSrc = `
             precision highp float; 
@@ -639,9 +647,12 @@
             uniform float u_time; 
             uniform vec2 u_center; 
             uniform float u_mix, u_speed;
+            
+            // Masking
+            uniform int u_maskMode, u_invert;
             uniform float u_feather;
             
-            // Effect Flags
+            // Effect Flags (used for stacking)
             uniform bool u_Smear_active;
             uniform bool u_Displacement_active;
             uniform bool u_Pixelate_active;
@@ -661,23 +672,22 @@
             // --- HELPERS ---
             float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
             float noise(vec2 p) {
-                vec2 i = floor(p); vec2 f = fract(p);
+                vec2 i = floor(p);
+                vec2 f = fract(p);
                 vec2 u = f*f*(3.0-2.0*f);
                 return mix(mix(rand(i + vec2(0.0,0.0)), rand(i + vec2(1.0,0.0)), u.x),
                            mix(rand(i + vec2(0.0,1.0)), rand(i + vec2(1.0,1.0)), u.x), u.y);
             }
 
             // --- MASKING LOGIC ---
-            // REFINEMENT: This function now calculates the INVERTED mask value.
-            // A value of 0.0 means we are ON the face.
-            // A value of 1.0 means we are OFF the face.
-            // The feathering is done with smoothstep for a high-quality soft edge.
-            float getInvertedMask(vec2 uv) {
+            float getMask(vec2 uv) {
+                // V2 Change: Feathering is now done via smoothstep for a clean soft edge
                 float m = texture2D(u_maskTex, uv).r;
                 float feather_amount = u_feather / u_resolution.y;
-                // smoothstep creates the soft feather edge.
                 m = smoothstep(0.5 - feather_amount, 0.5 + feather_amount, m);
-                return 1.0 - m; // Always inverted
+
+                if (u_invert == 1) m = 1.0 - m;
+                return clamp(m, 0.0, 1.0);
             }
 
             // --- EFFECT FUNCTIONS ---
@@ -691,6 +701,7 @@
                     if (i >= u_samples) break;
                     float t = float(i);
                     float w = 1.0 - t / float(u_samples);
+                    // The smear "seeps" because it samples from the original texture regardless of mask
                     acc += texture2D(u_tex, uv - step_uv * t) * w; 
                     w_sum += w;
                 }
@@ -706,7 +717,7 @@
             vec2 applyPixelate(vec2 uv) {
                 if (rand(uv + u_time) > u_pixelThreshold) {
                     float pixel_size = u_pixel;
-                    if(u_pixelThreshold > 0.0) {
+                    if(u_pixelThreshold > 0.0) { // Make pixels smaller when thresholding
                        pixel_size = max(1.0, u_pixel * (1.0 - u_pixelThreshold));
                     }
                     vec2 res_factor = u_resolution / pixel_size;
@@ -730,6 +741,7 @@
                 if(abs(uv.y - slit_y) < slit_h) {
                     return uv;
                 }
+                // Sample from the slit position
                 return vec2(uv.x, slit_y);
             }
 
@@ -746,32 +758,28 @@
                 vec4 effect_color = base_color;
                 vec2 effect_uv = v_uv;
 
-                // --- EFFECT STACKING PIPELINE ---
+                // --- V2: EFFECT STACKING PIPELINE ---
+                
+                // 1. UV Displacement Effects
                 if (u_Displacement_active) { effect_uv = applyDisplacement(effect_uv); }
                 if (u_Pixelate_active)     { effect_uv = applyPixelate(effect_uv); }
                 if (u_Glitch_active)      { effect_uv = applyGlitch(effect_uv); }
                 if (u_SlitScan_active)    { effect_uv = applySlitScan(effect_uv); }
                 
+                // 2. Sample texture with final UVs
                 effect_color = texture2D(u_tex, effect_uv);
 
+                // 3. Color-based Effects (that read multiple pixels)
                 if (u_Smear_active) { effect_color = applySmear(effect_color, v_uv); }
                 
-                // Mix in Chroma last, but use the UVs before smear
-                if (u_Chroma_active) { 
-                    effect_color = mix(effect_color, applyChroma(effect_uv), 0.5);
-                }
+                // 4. Final color channel shifts
+                if (u_Chroma_active) { effect_color = applyChroma(effect_uv); }
 
                 // --- MASKING & MIXING ---
-                float inverted_mask = getInvertedMask(v_uv);
-                
-                // REFINEMENT: This is the new mixing logic for seeping effects.
-                // It chooses between the final effect color and the base color.
-                // Because the effect (like smear) is calculated for the whole screen,
-                // it naturally "seeps" across the mask boundary.
-                vec4 final_color = mix(effect_color, base_color, inverted_mask);
+                float m = getMask(v_uv);
+                vec4 final_color = mix(base_color, effect_color, m * u_mix);
 
-                // Apply global mix
-                gl_FragColor = mix(base_color, final_color, u_mix);
+                gl_FragColor = final_color;
             }
         `;
         
@@ -797,6 +805,7 @@
                     let cx = sx / lm.length;
                     let cy = sy / lm.length;
                     
+                    // V2 Fix: Correct coordinates for mirror and WebGL space
                     if(mirrorChk.checked) cx = 1.0 - cx;
                     cy = 1.0 - cy;
 
@@ -808,7 +817,8 @@
         
         function fit() {
             if (!video.videoWidth) return;
-            const w = video.videoWidth; const h = video.videoHeight;
+            const w = video.videoWidth;
+            const h = video.videoHeight;
             canvas.width = w; canvas.height = h;
             maskCanvas.width = w; maskCanvas.height = h;
             if (gl) gl.viewport(0, 0, w, h);
@@ -829,13 +839,17 @@
             gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
 
             tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             
             maskTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, maskTex);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         }
         
         async function start() {
@@ -877,6 +891,7 @@
             maskCtx.save();
             maskCtx.clearRect(0, 0, W, H);
             
+            // V2 Fix: Handle mirroring by translating the canvas context
             if(mirrorChk.checked){
                 maskCtx.translate(W, 0);
                 maskCtx.scale(-1, 1);
@@ -890,22 +905,27 @@
                 const lm = lastFacesMesh[0];
                 if (!lm || lm.length < 468) { maskCtx.restore(); return; }
 
+                // Calculate bounding box for padding
                 let minX = W, minY = H, maxX = 0, maxY = 0;
                 for(const p of lm) {
-                    minX = Math.min(minX, p.x * W); minY = Math.min(minY, p.y * H);
-                    maxX = Math.max(maxX, p.x * W); maxY = Math.max(maxY, p.y * H);
+                    minX = Math.min(minX, p.x * W);
+                    minY = Math.min(minY, p.y * H);
+                    maxX = Math.max(maxX, p.x * W);
+                    maxY = Math.max(maxY, p.y * H);
                 }
                 const centerX = (minX + maxX) / 2;
                 const centerY = (minY + maxY) / 2;
-                const padFactor = 1 + padding/100;
 
+                // Draw padded oval
                 const p0 = lm[FACE_OVAL[0]];
-                maskCtx.moveTo(centerX + (p0.x*W - centerX) * padFactor, centerY + (p0.y*H - centerY) * padFactor);
+                maskCtx.moveTo(centerX + (p0.x*W - centerX) * (1 + padding/100), centerY + (p0.y*H - centerY) * (1 + padding/100));
                 for(let i = 1; i < FACE_OVAL.length; i++){
                     const p = lm[FACE_OVAL[i]];
-                    maskCtx.lineTo(centerX + (p.x*W - centerX) * padFactor, centerY + (p.y*H - centerY) * padFactor);
+                    maskCtx.lineTo(centerX + (p.x*W - centerX) * (1 + padding/100), centerY + (p.y*H - centerY) * (1 + padding/100));
                 }
                 maskCtx.closePath();
+            } else {
+                // Fallback: draw nothing if no face
             }
 
             maskCtx.fill();
@@ -916,6 +936,7 @@
             rafId = requestAnimationFrame(loop);
             if (!video.videoWidth) return;
 
+            // Face tracking
             if (faceMeshReady && !fmBusy && (performance.now() - lastFmTime) > FM_MIN_INTERVAL) {
                 fmBusy = true; lastFmTime = performance.now();
                 faceMesh.send({ image: video }).finally(() => { fmBusy = false; });
@@ -923,34 +944,42 @@
 
             if(canvas.width === 0) fit();
             
+            let maskMode = 0;
             if (preciseMaskChk.checked) {
                 drawMaskFromMesh();
                 gl.activeTexture(gl.TEXTURE1);
                 gl.bindTexture(gl.TEXTURE_2D, maskTex);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+                maskMode = 1;
             }
 
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, tex);
-            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch (e) {}
+            try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch (e) { /* on some browsers this can throw an error if the video isn't ready */ }
             
             gl.useProgram(program);
             
+            // Set uniforms
             gl.uniform1i(getU('u_tex'), 0);
             gl.uniform1i(getU('u_maskTex'), 1);
             gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
             const t = animateChk.checked ? performance.now() / 1000 : 0;
             gl.uniform1f(getU('u_time'), t);
             gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
+            gl.uniform1i(getU('u_maskMode'), maskMode);
+            gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
             
+            // Global controls
             gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
             gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
             gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
             
+            // V2 Change: Set uniforms for each active effect
             for (const effect of ALL_EFFECTS) {
                 gl.uniform1i(getU(`u_${effect}_active`), activeEffects.has(effect));
             }
             
+            // Effect-specific uniforms (always set them)
             gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
             gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value));
             gl.uniform1f(getU('u_smWobble'), parseFloat(ui.smWobble.value));
@@ -969,13 +998,21 @@
             status2El.textContent = `${lastFacesMesh.length > 0 ? 'Face OK' : 'No Face'} @ ${canvas.width}x${canvas.height}`;
         }
         
-        // --- Event Handlers & UI Logic ---
+        // --- V2: Event Handlers & UI Logic ---
         function updateEffectUI() {
             dynamicControls.forEach(panel => {
-                panel.classList.toggle('active', activeEffects.has(panel.dataset.effect));
+                if (activeEffects.has(panel.dataset.effect)) {
+                    panel.classList.add('active');
+                } else {
+                    panel.classList.remove('active');
+                }
             });
             effectBtns.forEach(btn => {
-                btn.classList.toggle('active', activeEffects.has(btn.dataset.effect));
+                 if (activeEffects.has(btn.dataset.effect)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
             });
         }
         
@@ -1000,7 +1037,7 @@
         startBtn.addEventListener('click', start);
         stopBtn.addEventListener('click', stop);
         
-        // --- Preset Management Logic ---
+        // --- V2: Preset Management Logic ---
         function getAppState() {
             const state = { controls: {}, checkboxes: {}, effects: Array.from(activeEffects) };
             for(const key in ui) {
@@ -1014,15 +1051,17 @@
 
         function setAppState(state) {
             if(!state) return;
+            // Set controls
             if(state.controls){
                 for(const key in state.controls) {
                     const el = ui[key];
                     if(el) {
                         el.value = state.controls[key];
-                        el.dispatchEvent(new Event('input'));
+                        el.dispatchEvent(new Event('input')); // Update slider label
                     }
                 }
             }
+            // Set checkboxes
             if(state.checkboxes){
                  document.querySelectorAll('.options-list input[type="checkbox"]').forEach(chk => {
                     if(typeof state.checkboxes[chk.id] !== 'undefined') {
@@ -1030,14 +1069,20 @@
                     }
                 });
             }
+            // Set active effects
             if(state.effects){
                 activeEffects = new Set(state.effects);
                 updateEffectUI();
             }
         }
 
-        function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV2Presets') || '{}'); }
-        function savePresets(presets) { localStorage.setItem('faceGlitchV2Presets', JSON.stringify(presets)); }
+        function getPresets() {
+            return JSON.parse(localStorage.getItem('faceGlitchV2Presets') || '{}');
+        }
+        
+        function savePresets(presets) {
+            localStorage.setItem('faceGlitchV2Presets', JSON.stringify(presets));
+        }
 
         function populatePresetList() {
             const presets = getPresets();
@@ -1052,7 +1097,10 @@
 
         savePresetBtn.addEventListener('click', () => {
             const name = presetNameInput.value.trim();
-            if(!name) { setMsg('Please enter a name for the preset.', true); return; }
+            if(!name) {
+                setMsg('Please enter a name for the preset.', true);
+                return;
+            }
             const presets = getPresets();
             presets[name] = getAppState();
             savePresets(presets);
@@ -1063,7 +1111,10 @@
 
         deletePresetBtn.addEventListener('click', () => {
              const name = presetList.value;
-             if(!name) { setMsg('Select a preset to delete.', true); return; }
+             if(!name) {
+                setMsg('Select a preset to delete.', true);
+                return;
+            }
              const presets = getPresets();
              delete presets[name];
              savePresets(presets);
@@ -1085,24 +1136,33 @@
         randomBtn.addEventListener('click', () => {
             const rand = (min,max) => min + Math.random() * (max-min);
             const setRand=(el,min,max,step=1)=>{ if(!el) return; const v = (Math.round(rand(min,max)/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
+            
+            // Randomize controls
             Object.values(ui).forEach(el => {
                 if(el) setRand(el, parseFloat(el.min), parseFloat(el.max), parseFloat(el.step) || 1);
             });
+            // Randomize checkboxes
             document.querySelectorAll('.options-list input[type="checkbox"]').forEach(chk => chk.checked = Math.random() > 0.5);
+
+            // Randomize active effects
             activeEffects.clear();
             ALL_EFFECTS.forEach(effect => {
                 if(Math.random() > 0.6) activeEffects.add(effect);
             });
-            if(activeEffects.size === 0) activeEffects.add(ALL_EFFECTS[Math.floor(rand(0, ALL_EFFECTS.length))]);
+            if(activeEffects.size === 0) activeEffects.add(ALL_EFFECTS[Math.floor(rand(0, ALL_EFFECTS.length))]); // Ensure at least one
             updateEffectUI();
             setMsg('Parameters randomized!');
         });
 
+        // Initial population
         populatePresetList();
+        
+        // Set initial state (e.g., a default effect)
         activeEffects.add('Displacement');
         activeEffects.add('Chroma');
         updateEffectUI();
 
+        // Auto-start if camera permission is already granted
         (async () => { try { const p = await navigator.permissions.query({ name: 'camera' }); if (p.state === 'granted') start(); } catch { } })();
     })();
     </script>
