@@ -174,6 +174,11 @@
                         </div>
                     </div>
 
+                    <!-- Global Controls Section -->
+                    <div id="global-controls-container" class="mt-6">
+                        <!-- Global controls (like masking) will be generated here -->
+                    </div>
+
                     <!-- Effects Section -->
                     <div class="bg-bg-tertiary rounded-lg p-4 mt-6">
                         <h2 class="font-bold mb-3 text-lg font-mono">ACTIVE EFFECTS</h2>
@@ -205,7 +210,7 @@
             </div>
 
             <div class="p-4 border-t border-border-color text-center">
-                <p class="text-xs text-text-secondary font-mono">UNKNOWN v3.1</p>
+                <p class="text-xs text-text-secondary font-mono">UNKNOWN v3.2 FINAL</p>
             </div>
         </div>
     </div>
@@ -223,7 +228,7 @@
 
 import { initUI, updateUIState, showErrorMessage, hideLoadingOverlay, setStatus, setFullState, populateInitialControls } from './ui.js';
 import { GlitchEngine } from './webgl.js';
-import { initFaceLandmarker, detectFaces } from './face.js';
+import { initFaceLandmarker, detectFaces, drawFaceMask, getMaskCanvas } from './face.js';
 
 // --- Global State ---
 let glitchEngine = null;
@@ -248,9 +253,12 @@ async function renderLoop() {
         // Detect faces in the current frame
         const faceResults = await detectFaces(faceLandmarker, videoElement);
         
+        // Draw the face mask onto its dedicated canvas
+        drawFaceMask(faceResults.faceLandmarks, videoElement.videoWidth, videoElement.videoHeight);
+
         // Update the WebGL engine with the new video frame and face data
         if (glitchEngine) {
-            glitchEngine.update(videoElement, faceResults);
+            glitchEngine.update(videoElement, faceResults, getMaskCanvas());
             glitchEngine.render();
         }
 
@@ -297,7 +305,6 @@ async function startCamera() {
  */
 async function main() {
     // 1. Initialize UI components and get references
-    // Pass the state management functions to the UI module.
     const { canvas, video, startButton } = initUI(getAppState, setAppState);
     videoElement = video;
     glitchEngine = new GlitchEngine(canvas);
@@ -311,24 +318,19 @@ async function main() {
         try {
             updateUIState({ isLoading: true, errorMessage: '' });
             
-            // 3. Initialize Face Landmarker (heavy operation)
             setStatus('Loading AI Model...');
             faceLandmarker = await initFaceLandmarker();
 
-            // 4. Start the camera
             setStatus('Initializing Camera...');
             await startCamera();
 
-            // 5. Initialize WebGL Engine with video dimensions
             glitchEngine.setup(videoElement.videoWidth, videoElement.videoHeight);
 
-            // 6. Hide loading overlay and start the main loop
             hideLoadingOverlay();
             isRunning = true;
             renderLoop();
 
         } catch (error) {
-            // Error handling is managed within the functions
             updateUIState({ isLoading: false });
             setStatus('ERROR', false);
         }
@@ -337,30 +339,20 @@ async function main() {
 
 // --- State Management Bridge between UI and WebGL ---
 
-/**
- * Gets the entire current state from the Glitch Engine.
- * This is passed to the UI module so it can read the state.
- * @returns {object} The current application state.
- */
 function getAppState() {
-    if (!glitchEngine) return { activeEffects: [], uniforms: {}, effects: [] };
-    const { uniforms, effects } = glitchEngine.getUniformDefinitions();
+    if (!glitchEngine) return { activeEffects: [], uniforms: {}, effects: [], globalUniforms: [] };
+    const { uniforms, effects, globalUniforms } = glitchEngine.getUniformDefinitions();
     return {
         activeEffects: glitchEngine.getActiveEffects(),
-        uniforms: uniforms,
-        effects: effects
+        uniforms,
+        effects,
+        globalUniforms
     };
 }
 
-/**
- * Updates the Glitch Engine's state from the UI.
- * This is passed to the UI module so it can write to the state.
- * @param {object} newState - The new state to apply.
- */
 function setAppState(newState) {
     if (!glitchEngine) return;
 
-    // Update the engine's state
     if (newState.activeEffects) {
         glitchEngine.setActiveEffects(newState.activeEffects);
     }
@@ -368,7 +360,6 @@ function setAppState(newState) {
         glitchEngine.updateUniforms(newState.uniforms);
     }
 
-    // Also update the UI to reflect any changes (e.g., loading a preset)
     setFullState(newState);
 }
 
@@ -396,11 +387,10 @@ const getEl = (id) => document.getElementById(id);
 /**
  * Creates a slider control component.
  * @param {object} uniform - The uniform object from the effects definition.
- * @param {string} effectName - The name of the effect this uniform belongs to.
  * @returns {HTMLElement} The control group element.
  */
-function createSlider(uniform, effectName) {
-    const id = `slider-${effectName}-${uniform.name}`;
+function createSlider(uniform) {
+    const id = `slider-${uniform.name}`;
     const controlEl = document.createElement('div');
     controlEl.className = 'space-y-2';
 
@@ -426,14 +416,12 @@ function createSlider(uniform, effectName) {
     slider.max = uniform.max;
     slider.step = uniform.step;
     slider.value = uniform.value;
-    slider.dataset.effect = effectName;
     slider.dataset.uniform = uniform.name;
 
     slider.addEventListener('input', (e) => {
         const newValue = parseFloat(e.target.value);
         valueSpan.textContent = newValue.toFixed(uniform.step < 1 ? 2 : 0);
-        const uniformUpdate = {};
-        uniformUpdate[uniform.name] = newValue;
+        const uniformUpdate = { [uniform.name]: newValue };
         setAppStateCallback({ uniforms: uniformUpdate });
     });
 
@@ -442,13 +430,64 @@ function createSlider(uniform, effectName) {
 }
 
 /**
+ * Creates a checkbox control component.
+ */
+function createCheckbox(uniform) {
+    const id = `checkbox-${uniform.name}`;
+    const controlEl = document.createElement('label');
+    controlEl.className = 'flex items-center space-x-3 cursor-pointer';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = id;
+    checkbox.checked = uniform.value > 0.5;
+    checkbox.className = 'custom-checkbox';
+    checkbox.dataset.uniform = uniform.name;
+
+    checkbox.addEventListener('change', (e) => {
+        const newValue = e.target.checked ? 1.0 : 0.0;
+        const uniformUpdate = { [uniform.name]: newValue };
+        setAppStateCallback({ uniforms: uniformUpdate });
+    });
+
+    const label = document.createElement('span');
+    label.textContent = uniform.label;
+    label.className = 'text-text-secondary';
+
+    controlEl.append(checkbox, label);
+    return controlEl;
+}
+
+/**
  * Creates and populates the controls for all defined effects for the Admin view.
  */
 function populateAdminControls() {
-    const { uniforms: allUniforms, effects } = getAppStateCallback();
-    const container = elements.effectsControlsContainer;
-    container.innerHTML = ''; // Clear existing controls
+    const { uniforms: allUniforms, effects, globalUniforms } = getAppStateCallback();
+    
+    // Populate Global Controls
+    const globalContainer = elements.globalControlsContainer;
+    globalContainer.innerHTML = '';
+    if (globalUniforms.length > 0) {
+        const group = document.createElement('div');
+        group.className = 'bg-bg-tertiary rounded-lg p-4 space-y-4';
+        const header = document.createElement('h2');
+        header.className = 'font-bold mb-3 text-lg font-mono';
+        header.textContent = 'GLOBAL CONTROLS';
+        group.appendChild(header);
 
+        globalUniforms.map(uname => allUniforms[uname]).forEach(uniform => {
+            if (uniform.type === 'bool') {
+                group.appendChild(createCheckbox(uniform));
+            } else {
+                group.appendChild(createSlider(uniform));
+            }
+        });
+        globalContainer.appendChild(group);
+    }
+
+    // Populate Effect-Specific Controls
+    const effectsContainer = elements.effectsControlsContainer;
+    effectsContainer.innerHTML = ''; 
     effects.forEach(effect => {
         const effectUniforms = effect.uniforms.map(uname => allUniforms[uname]);
 
@@ -459,13 +498,13 @@ function populateAdminControls() {
             
             const header = document.createElement('h3');
             header.className = 'font-bold font-mono text-lg';
-            header.textContent = effect.name;
+            header.textContent = effect.label;
             group.appendChild(header);
 
             effectUniforms.forEach(uniform => {
-                group.appendChild(createSlider(uniform, effect.name));
+                group.appendChild(createSlider(uniform));
             });
-            container.appendChild(group);
+            effectsContainer.appendChild(group);
         }
     });
 }
@@ -487,15 +526,11 @@ function populateEffectToggles() {
         button.addEventListener('click', () => {
             const { activeEffects } = getAppStateCallback();
             const wasActive = activeEffects.includes(effect.name);
-            let newActiveEffects;
-            if (wasActive) {
-                newActiveEffects = activeEffects.filter(e => e !== effect.name);
-            } else {
-                newActiveEffects = [...activeEffects, effect.name];
-            }
+            const newActiveEffects = wasActive 
+                ? activeEffects.filter(e => e !== effect.name)
+                : [...activeEffects, effect.name];
             setAppStateCallback({ activeEffects: newActiveEffects });
         });
-
         container.appendChild(button);
     });
     updateEffectToggleStyles();
@@ -509,13 +544,12 @@ function updateEffectToggleStyles() {
     document.querySelectorAll('#effect-toggles [data-effect]').forEach(el => {
         const effectName = el.dataset.effect;
         const isActive = activeEffects.includes(effectName);
-        if (isActive) {
-            el.classList.add('bg-accent-primary', 'text-bg-primary', 'border-accent-primary');
-            el.classList.remove('bg-transparent', 'text-text-primary', 'border-border-color');
-        } else {
-            el.classList.remove('bg-accent-primary', 'text-bg-primary', 'border-accent-primary');
-            el.classList.add('bg-transparent', 'text-text-primary', 'border-border-color');
-        }
+        el.classList.toggle('bg-accent-primary', isActive);
+        el.classList.toggle('text-bg-primary', isActive);
+        el.classList.toggle('border-accent-primary', isActive);
+        el.classList.toggle('bg-transparent', !isActive);
+        el.classList.toggle('text-text-primary', !isActive);
+        el.classList.toggle('border-border-color', !isActive);
     });
 }
 
@@ -524,21 +558,16 @@ function updateEffectToggleStyles() {
  */
 function switchView(viewName) {
     currentView = viewName;
-    if (viewName === 'admin') {
-        elements.adminView.style.display = 'block';
-        elements.visitorView.style.display = 'none';
-        elements.adminViewBtn.classList.add('bg-bg-tertiary', 'text-text-primary');
-        elements.adminViewBtn.classList.remove('text-text-secondary');
-        elements.visitorViewBtn.classList.remove('bg-bg-tertiary', 'text-text-primary');
-        elements.visitorViewBtn.classList.add('text-text-secondary');
-    } else {
-        elements.adminView.style.display = 'none';
-        elements.visitorView.style.display = 'block';
-        elements.visitorViewBtn.classList.add('bg-bg-tertiary', 'text-text-primary');
-        elements.visitorViewBtn.classList.remove('text-text-secondary');
-        elements.adminViewBtn.classList.remove('bg-bg-tertiary', 'text-text-primary');
-        elements.adminViewBtn.classList.add('text-text-secondary');
-    }
+    elements.adminView.style.display = viewName === 'admin' ? 'block' : 'none';
+    elements.visitorView.style.display = viewName === 'visitor' ? 'block' : 'none';
+    
+    elements.adminViewBtn.classList.toggle('bg-bg-tertiary', viewName === 'admin');
+    elements.adminViewBtn.classList.toggle('text-text-primary', viewName === 'admin');
+    elements.adminViewBtn.classList.toggle('text-text-secondary', viewName !== 'admin');
+    
+    elements.visitorViewBtn.classList.toggle('bg-bg-tertiary', viewName === 'visitor');
+    elements.visitorViewBtn.classList.toggle('text-text-primary', viewName === 'visitor');
+    elements.visitorViewBtn.classList.toggle('text-text-secondary', viewName !== 'visitor');
 }
 
 // --- Preset Management ---
@@ -564,16 +593,14 @@ function savePresets(presets) {
 function populatePresetLists() {
     const presets = getPresets();
     const presetNames = Object.keys(presets);
+    const createOption = (name) => new Option(name, name);
 
-    // Clear existing options
     elements.presetList.innerHTML = '<option value="">Load Preset...</option>';
     elements.visitorPresetList.innerHTML = '<option value="">Choose a Style...</option>';
 
     presetNames.forEach(name => {
-        const optionAdmin = new Option(name, name);
-        const optionVisitor = new Option(name, name);
-        elements.presetList.add(optionAdmin);
-        elements.visitorPresetList.add(optionVisitor);
+        elements.presetList.add(createOption(name));
+        elements.visitorPresetList.add(createOption(name));
     });
 }
 
@@ -586,7 +613,6 @@ function saveCurrentPreset() {
     const presets = getPresets();
     const { activeEffects, uniforms } = getAppStateCallback();
     
-    // Only save the values, not the full uniform definitions
     const uniformValues = {};
     for(const key in uniforms) {
         uniformValues[key] = uniforms[key].value;
@@ -595,7 +621,7 @@ function saveCurrentPreset() {
     presets[name] = { activeEffects, uniforms: uniformValues };
     savePresets(presets);
     populatePresetLists();
-    elements.presetList.value = name; // Select the newly saved preset
+    elements.presetList.value = name;
     alert(`Preset '${name}' saved!`);
 }
 
@@ -624,7 +650,6 @@ function loadSelectedPreset(selectElement) {
     if (preset) {
         setAppStateCallback(preset);
         elements.presetName.value = name;
-        // Make sure both dropdowns are in sync
         elements.presetList.value = name;
         elements.visitorPresetList.value = name;
     }
@@ -636,7 +661,6 @@ function randomizeState() {
     const { uniforms, effects } = getAppStateCallback();
     const newUniforms = {};
     
-    // Randomize all sliders
     for (const key in uniforms) {
         const uniform = uniforms[key];
         if (uniform.min !== undefined) {
@@ -646,12 +670,10 @@ function randomizeState() {
         }
     }
 
-    // Randomize active effects
     const newActiveEffects = effects
         .map(e => e.name)
         .filter(() => Math.random() > 0.5);
     
-    // Ensure at least one effect is active
     if (newActiveEffects.length === 0) {
         newActiveEffects.push(effects[Math.floor(Math.random() * effects.length)].name);
     }
@@ -664,41 +686,31 @@ function randomizeState() {
 
 // --- Public Functions ---
 
-/**
- * Sets the entire UI to match a given state object.
- * Used for loading presets or randomizing.
- * @param {object} state - The full state object { activeEffects, uniforms }.
- */
 export function setFullState(state) {
     if (!state) return;
     
-    // Update sliders
     if (state.uniforms) {
         for (const [name, value] of Object.entries(state.uniforms)) {
             const slider = document.querySelector(`input[data-uniform="${name}"]`);
             if (slider) {
                 slider.value = value;
-                // Update the text label next to the slider
                 const valueSpan = getEl(`${slider.id}-value`);
                 if (valueSpan) {
                     valueSpan.textContent = parseFloat(value).toFixed(slider.step < 1 ? 2 : 0);
                 }
             }
+             const checkbox = document.querySelector(`input[type="checkbox"][data-uniform="${name}"]`);
+            if (checkbox) {
+                checkbox.checked = value > 0.5;
+            }
         }
     }
 
-    // Update active effect toggles
     if (state.activeEffects) {
         updateEffectToggleStyles();
     }
 }
 
-/**
- * Initializes all UI elements and sets up event listeners.
- * @param {function} getStateCb - Callback to get the current effect state.
- * @param {function} setStateCb - Callback to update the effect state.
- * @returns {object} An object containing references to key DOM elements.
- */
 export function initUI(getStateCb, setStateCb) {
     getAppStateCallback = getStateCb;
     setAppStateCallback = setStateCb;
@@ -716,6 +728,7 @@ export function initUI(getStateCb, setStateCb) {
         visitorViewBtn: getEl('visitor-view-btn'),
         adminView: getEl('admin-view'),
         visitorView: getEl('visitor-view'),
+        globalControlsContainer: getEl('global-controls-container'),
         effectsControlsContainer: getEl('effects-controls-container'),
         effectToggles: getEl('effect-toggles'),
         presetList: getEl('preset-list'),
@@ -726,7 +739,6 @@ export function initUI(getStateCb, setStateCb) {
         randomizeBtn: getEl('randomize-btn'),
     };
     
-    // Setup event listeners
     elements.adminViewBtn.addEventListener('click', () => switchView('admin'));
     elements.visitorViewBtn.addEventListener('click', () => switchView('visitor'));
     elements.savePresetBtn.addEventListener('click', saveCurrentPreset);
@@ -745,10 +757,6 @@ export function initUI(getStateCb, setStateCb) {
     };
 }
 
-/**
- * Populates the UI controls for the first time after the engine is ready.
- * @param {object} initialState - The initial state from the engine.
- */
 export function populateInitialControls(initialState) {
     populateAdminControls(initialState);
     populateEffectToggles(initialState);
@@ -756,15 +764,9 @@ export function populateInitialControls(initialState) {
 }
 
 export function updateUIState({ isLoading, errorMessage }) {
-    if (isLoading) {
-        elements.loadingSpinner.style.display = 'block';
-        elements.startButton.disabled = true;
-        elements.startButton.classList.add('opacity-50');
-    } else {
-        elements.loadingSpinner.style.display = 'none';
-        elements.startButton.disabled = false;
-        elements.startButton.classList.remove('opacity-50');
-    }
+    elements.loadingSpinner.style.display = isLoading ? 'block' : 'none';
+    elements.startButton.disabled = isLoading;
+    elements.startButton.classList.toggle('opacity-50', isLoading);
     elements.errorMessage.textContent = errorMessage || '';
 }
 
@@ -778,13 +780,9 @@ export function showErrorMessage(message) {
 
 export function setStatus(text, isLive = false) {
     elements.statusText.textContent = text;
-    if (isLive) {
-        elements.statusIndicator.classList.add('bg-accent-primary', 'pulse-live');
-        elements.statusIndicator.classList.remove('bg-danger-color');
-    } else {
-        elements.statusIndicator.classList.remove('bg-accent-primary', 'pulse-live');
-        elements.statusIndicator.classList.add('bg-danger-color');
-    }
+    elements.statusIndicator.classList.toggle('bg-accent-primary', isLive);
+    elements.statusIndicator.classList.toggle('pulse-live', isLive);
+    elements.statusIndicator.classList.toggle('bg-danger-color', !isLive);
 }
 ```javascript
 // webgl.js
@@ -793,15 +791,8 @@ export function setStatus(text, isLive = false) {
 // shaders, textures, and rendering pipeline.
 
 import { vertexShaderSource, fragmentShaderSource } from './shaders.js';
-import { effectDefinitions } from './effects.js';
+import { effectDefinitions, globalUniformDefinitions } from './effects.js';
 
-/**
- * Creates and compiles a WebGL shader.
- * @param {WebGLRenderingContext} gl - The WebGL context.
- *param {number} type - The shader type (VERTEX_SHADER or FRAGMENT_SHADER).
- * @param {string} source - The GLSL source code.
- * @returns {WebGLShader} The compiled shader.
- */
 function createShader(gl, type, source) {
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -814,13 +805,6 @@ function createShader(gl, type, source) {
     return shader;
 }
 
-/**
- * Creates a WebGL program from vertex and fragment shaders.
- * @param {WebGLRenderingContext} gl - The WebGL context.
- * @param {WebGLShader} vs - The vertex shader.
- * @param {WebGLShader} fs - The fragment shader.
- * @returns {WebGLProgram} The linked WebGL program.
- */
 function createProgram(gl, vs, fs) {
     const program = gl.createProgram();
     gl.attachShader(program, vs);
@@ -834,11 +818,6 @@ function createProgram(gl, vs, fs) {
     return program;
 }
 
-/**
- * Creates a WebGL texture with standard parameters.
- * @param {WebGLRenderingContext} gl - The WebGL context.
- * @returns {WebGLTexture} The created texture.
- */
 function createTexture(gl) {
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -849,88 +828,88 @@ function createTexture(gl) {
     return texture;
 }
 
+function createFramebuffer(gl, texture) {
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    return fb;
+}
 
 export class GlitchEngine {
     constructor(canvas) {
         this.canvas = canvas;
         this.gl = canvas.getContext('webgl', { premultipliedAlpha: false });
-        if (!this.gl) {
-            throw new Error('WebGL is not supported');
-        }
+        if (!this.gl) throw new Error('WebGL is not supported');
 
         this.program = null;
         this.textures = {};
+        this.framebuffers = {};
         this.uniformLocations = new Map();
-
-        // State
-        this.activeEffects = ['Displacement', 'RGBShift']; // Default active effects
+        this.activeEffects = ['Displacement', 'RGBShift', 'Feedback'];
         this.uniforms = {};
         this.initUniforms();
     }
 
-    /**
-     * Initializes all uniforms with their default values from effectDefinitions.
-     */
     initUniforms() {
+        // Initialize effect-specific uniforms
         Object.values(effectDefinitions).forEach(effect => {
             effect.uniforms.forEach(uniform => {
-                // Store the full definition, including min/max/step for the UI
                 this.uniforms[uniform.name] = { ...uniform };
             });
         });
-         // Add global uniforms
+        // Initialize global uniforms
+        globalUniformDefinitions.forEach(uniform => {
+            this.uniforms[uniform.name] = { ...uniform };
+        });
+        // Add internal uniforms
         this.uniforms['u_time'] = { value: 0 };
         this.uniforms['u_resolution'] = { value: [0, 0] };
-        this.uniforms['u_face_detected'] = { value: 0 };
-        this.uniforms['u_face_center'] = { value: [0.5, 0.5] };
     }
 
-    /**
-     * Sets up the WebGL environment, shaders, and initial buffers.
-     * @param {number} width - The width of the source video.
-     * @param {number} height - The height of the source video.
-     */
     setup(width, height) {
         const gl = this.gl;
 
-        // --- Compile Shaders and Link Program ---
         const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
         const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
         this.program = createProgram(gl, vertexShader, fragmentShader);
-        gl.useProgram(this.program);
-
-        // --- Create Buffers ---
+        
         const positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        const positions = [ -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0 ];
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        const posLocation = gl.getAttribLocation(this.program, 'a_position');
+        gl.enableVertexAttribArray(posLocation);
+        gl.vertexAttribPointer(posLocation, 2, gl.FLOAT, false, 0, 0);
 
-        const positionAttributeLocation = gl.getAttribLocation(this.program, 'a_position');
-        gl.enableVertexAttribArray(positionAttributeLocation);
-        gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
-
-        // --- Create Textures ---
         this.textures.video = createTexture(gl);
+        this.textures.mask = createTexture(gl);
         
-        // --- Set initial resolution ---
-        this.resize(width, height);
+        // Create ping-pong framebuffers for feedback
+        this.textures.read = createTexture(gl);
+        this.textures.write = createTexture(gl);
+        
+        this.resize(width, height); // This will also size the framebuffer textures
+
+        this.framebuffers.read = createFramebuffer(gl, this.textures.read);
+        this.framebuffers.write = createFramebuffer(gl, this.textures.write);
+        
         console.log("WebGL Engine Setup Complete");
     }
 
-    /**
-     * Resizes the canvas and WebGL viewport.
-     */
     resize(width, height) {
+        const gl = this.gl;
         this.canvas.width = width;
         this.canvas.height = height;
-        this.gl.viewport(0, 0, width, height);
+
+        // Resize framebuffer textures
+        for (const key of ['read', 'write']) {
+            gl.bindTexture(gl.TEXTURE_2D, this.textures[key]);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        }
+        
         this.updateUniforms({ u_resolution: [width, height] });
     }
 
-    /**
-     * Updates the engine with new data for the next frame.
-     */
-    update(videoElement, faceResults) {
+    update(videoElement, faceResults, maskCanvas) {
         const gl = this.gl;
 
         // Update video texture
@@ -938,65 +917,78 @@ export class GlitchEngine {
         gl.bindTexture(gl.TEXTURE_2D, this.textures.video);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, videoElement);
         
-        // Update face data uniforms
-        const faceDetected = faceResults.faceLandmarks && faceResults.faceLandmarks.length > 0;
-        this.updateUniforms({ 'u_face_detected': faceDetected ? 1.0 : 0.0 });
-        if(faceDetected) {
-            const landmarks = faceResults.faceLandmarks[0];
-            const noseTip = landmarks[1]; // MediaPipe landmark for nose tip
-            this.updateUniforms({ 'u_face_center': [1.0 - noseTip.x, 1.0 - noseTip.y] }); // Flip coordinates
-        }
+        // Update mask texture
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.mask);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
     }
 
-    /**
-     * Renders a single frame to the canvas.
-     */
+    swapFramebuffers() {
+        // Swap textures
+        [this.textures.read, this.textures.write] = [this.textures.write, this.textures.read];
+        // Swap framebuffers
+        [this.framebuffers.read, this.framebuffers.write] = [this.framebuffers.write, this.framebuffers.read];
+    }
+
     render() {
         const gl = this.gl;
-        gl.clearColor(0, 0, 0, 1);
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+        gl.useProgram(this.program);
+
+        // --- Pass 1: Render effects into the 'write' framebuffer ---
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffers.write);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        gl.useProgram(this.program);
+        // Set all uniforms for the main effect pass
+        this.setUniform('u_video_texture', 0);
+        this.setUniform('u_mask_texture', 1);
+        this.setUniform('u_feedback_texture', 2); // Previous frame's output
         
-        // --- Set All Uniforms ---
-        this.setUniform('u_video_texture', 0); // Texture unit 0
-        this.setUniform('u_time', performance.now() / 1000.0);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this.textures.read);
 
-        // Set effect-specific uniforms from our state
+        this.setUniform('u_time', performance.now() / 1000.0);
         for (const [name, uniform] of Object.entries(this.uniforms)) {
             this.setUniform(name, uniform.value);
         }
-
-        // Set active effect flags
         for (const effect of Object.values(effectDefinitions)) {
-            const isActive = this.activeEffects.includes(effect.name);
-            this.setUniform(`u_${effect.name}_active`, isActive);
+            this.setUniform(`u_${effect.name}_active`, this.activeEffects.includes(effect.name));
         }
 
-        // --- Draw ---
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // --- Pass 2: Render the result to the actual canvas ---
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        
+        // Here we could use a simpler shader, but for now, we'll just re-render
+        // with the final texture. A simpler approach is to just draw the texture.
+        // For simplicity in this step, we'll just use the result from the FBO.
+        // This is not the most optimal way, but it works.
+        // A better way would be a second, simple shader program.
+        // Let's do it the simple way: just draw the resulting texture.
+        // We can't do that without another shader, so we'll just re-render to canvas.
+        // This is inefficient but visually identical for this setup.
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+
+        // Swap for the next frame
+        this.swapFramebuffers();
     }
 
-    /**
-     * A generic uniform setter that handles different types.
-     */
     setUniform(name, value) {
         if (!this.program) return;
         const gl = this.gl;
         let location = this.uniformLocations.get(name);
         if (location === undefined) {
             location = gl.getUniformLocation(this.program, name);
-            if (!location) {
-                // Cache the negative result to avoid repeated lookups for non-existent uniforms
-                this.uniformLocations.set(name, null);
-                return; 
-            }
-            this.uniformLocations.set(name, location);
+            this.uniformLocations.set(name, location || null);
         }
-        if (location === null) return; // Known non-existent uniform
+        if (!location) return;
 
-        if (typeof value === 'number') {
-            // Check if it's an integer for uniform1i, otherwise float
+        if (typeof value === 'boolean') {
+            gl.uniform1i(location, value ? 1 : 0);
+        } else if (typeof value === 'number') {
             gl.uniform1f(location, value);
         } else if (Array.isArray(value)) {
             switch (value.length) {
@@ -1004,26 +996,19 @@ export class GlitchEngine {
                 case 3: gl.uniform3fv(location, value); break;
                 case 4: gl.uniform4fv(location, value); break;
             }
-        } else if (typeof value === 'boolean') {
-             gl.uniform1i(location, value ? 1 : 0);
         }
     }
     
     // --- Public State Management ---
 
-    getActiveEffects() {
-        return [...this.activeEffects];
-    }
-
-    setActiveEffects(effects) {
-        this.activeEffects = [...effects];
-    }
-
+    getActiveEffects = () => [...this.activeEffects];
+    setActiveEffects = (effects) => { this.activeEffects = [...effects]; };
+    
     getUniformDefinitions() {
-        // Return a copy of all defined uniforms and their properties
         return {
             uniforms: this.uniforms,
-            effects: Object.values(effectDefinitions)
+            effects: Object.values(effectDefinitions),
+            globalUniforms: globalUniformDefinitions.map(u => u.name)
         };
     }
 
@@ -1038,30 +1023,23 @@ export class GlitchEngine {
 ```javascript
 // face.js
 
-// This module handles the setup and execution of the MediaPipe Face Landmarker task.
+// This module handles the setup and execution of the MediaPipe Face Landmarker task,
+// and drawing the face mask to a canvas.
 
-// Import from the CDN
 import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
-
-// --- Constants ---
-export { FACEMESH_TESSELATION } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
-
+import { FACEMESH_TESSELATION } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.js";
 
 // --- State ---
 let faceLandmarker = null;
 let runningMode = "VIDEO";
-
+const maskCanvas = document.createElement('canvas');
+const maskCtx = maskCanvas.getContext('2d');
 
 /**
  * Initializes the FaceLandmarker task.
- * This is an async function because it needs to load the model files.
- * @returns {Promise<FaceLandmarker>} A promise that resolves with the initialized FaceLandmarker instance.
  */
 export async function initFaceLandmarker() {
-    if (faceLandmarker) {
-        console.log("Face Landmarker already initialized.");
-        return faceLandmarker;
-    }
+    if (faceLandmarker) return faceLandmarker;
 
     const filesetResolver = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
@@ -1082,24 +1060,56 @@ export async function initFaceLandmarker() {
     return faceLandmarker;
 }
 
-
 /**
  * Detects faces in a given video frame.
- * @param {FaceLandmarker} landmarker - The initialized FaceLandmarker instance.
- * @param {HTMLVideoElement} videoElement - The video element to process.
- * @returns {object} The detection results.
  */
 export async function detectFaces(landmarker, videoElement) {
-    if (!landmarker) {
-        console.error("Face Landmarker is not initialized.");
-        return {};
+    if (!landmarker) return {};
+    return await landmarker.detectForVideo(videoElement, performance.now());
+}
+
+/**
+ * Draws the detected face landmarks as a filled shape on the mask canvas.
+ * @param {Array} faceLandmarks - An array of face landmark arrays.
+ * @param {number} width - The width of the canvas.
+ * @param {number} height - The height of the canvas.
+ */
+export function drawFaceMask(faceLandmarks, width, height) {
+    if (maskCanvas.width !== width || maskCanvas.height !== height) {
+        maskCanvas.width = width;
+        maskCanvas.height = height;
     }
 
-    // detectForVideo can be slow, so we don't await it in the main loop
-    // For this implementation, we will await it to keep logic simple.
-    const results = await landmarker.detectForVideo(videoElement, performance.now());
-    
-    return results;
+    maskCtx.clearRect(0, 0, width, height);
+
+    if (faceLandmarks && faceLandmarks.length > 0) {
+        const landmarks = faceLandmarks[0];
+        maskCtx.fillStyle = '#FFFFFF';
+        maskCtx.beginPath();
+        
+        // Use the tesselation data to draw triangles covering the face
+        FACEMESH_TESSELATION.forEach(triangle => {
+            const p1 = landmarks[triangle[0]];
+            const p2 = landmarks[triangle[1]];
+            const p3 = landmarks[triangle[2]];
+
+            // Flip horizontally to match video
+            maskCtx.moveTo((1 - p1.x) * width, p1.y * height);
+            maskCtx.lineTo((1 - p2.x) * width, p2.y * height);
+            maskCtx.lineTo((1 - p3.x) * width, p3.y * height);
+            maskCtx.closePath();
+        });
+        
+        maskCtx.fill();
+    }
+}
+
+/**
+ * Returns the canvas element used for drawing the mask.
+ * @returns {HTMLCanvasElement}
+ */
+export function getMaskCanvas() {
+    return maskCanvas;
 }
 ```javascript
 // shaders.js
@@ -1125,18 +1135,22 @@ export const fragmentShaderSource = `
 
     // Textures
     uniform sampler2D u_video_texture;
+    uniform sampler2D u_feedback_texture;
+    uniform sampler2D u_mask_texture;
 
     // Global Uniforms
     uniform float u_time;
     uniform vec2 u_resolution;
-    uniform float u_face_detected;
-    uniform vec2 u_face_center; // Flipped coordinates [0,1]
+    uniform float u_mask_invert;
+    uniform float u_mask_feather;
+    uniform float u_mask_padding;
 
     // Effect Flags
     uniform bool u_RGBShift_active;
     uniform bool u_Displacement_active;
     uniform bool u_Pixelate_active;
     uniform bool u_Scanlines_active;
+    uniform bool u_Feedback_active;
 
     // Effect-specific Uniforms
     uniform float u_rgb_amount;
@@ -1146,16 +1160,15 @@ export const fragmentShaderSource = `
     uniform float u_pixel_size;
     uniform float u_scanline_density;
     uniform float u_scanline_opacity;
-
+    uniform float u_feedback_amount;
+    uniform float u_feedback_zoom;
 
     // --- Helper Functions ---
     float random(vec2 st) {
         return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
     }
 
-
     // --- Effect Functions ---
-
     vec4 applyRGBShift(sampler2D tex, vec2 uv, float amount, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle));
         vec2 offset = dir * amount / u_resolution.x;
@@ -1166,7 +1179,7 @@ export const fragmentShaderSource = `
     }
 
     vec2 applyDisplacement(vec2 uv, float amount, float speed) {
-        float noise_val = random(uv + u_time * speed) - 0.5; // From -0.5 to 0.5
+        float noise_val = random(uv + u_time * speed) - 0.5;
         vec2 offset = vec2(noise_val) * amount / u_resolution.x;
         return uv + offset;
     }
@@ -1183,44 +1196,79 @@ export const fragmentShaderSource = `
         return color * line;
     }
 
+    vec4 applyFeedback(vec4 current_color, vec2 uv, float amount, float zoom) {
+        vec2 zoom_uv = (uv - 0.5) * (1.0 - zoom) + 0.5;
+        vec4 feedback_color = texture2D(u_feedback_texture, zoom_uv);
+        return mix(current_color, feedback_color, amount);
+    }
+
+    // --- Masking ---
+    float getMaskValue(vec2 uv) {
+        // Sample the mask texture. The mask is drawn white on black.
+        float mask = texture2D(u_mask_texture, uv).r;
+        
+        // Apply feathering using smoothstep
+        float feather_px = u_mask_feather / u_resolution.y;
+        float padded_mask = mask - (u_mask_padding / 100.0);
+        float feathered_mask = smoothstep(0.0, feather_px, padded_mask);
+
+        // Invert if needed
+        if (u_mask_invert > 0.5) {
+            return 1.0 - feathered_mask;
+        }
+        return feathered_mask;
+    }
+
 
     void main() {
         vec2 uv = v_texcoord;
+        vec4 original_color = texture2D(u_video_texture, uv);
 
         // --- Effect Pipeline ---
-        // The order matters here. UV effects first, then color effects.
+        vec2 effected_uv = uv;
 
         // 1. UV manipulation effects
-        if (u_Displacement_active) {
-            uv = applyDisplacement(uv, u_noise_amount, u_noise_speed);
-        }
-        if (u_Pixelate_active) {
-            uv = applyPixelate(uv, u_pixel_size);
-        }
+        if (u_Displacement_active) { effected_uv = applyDisplacement(effected_uv, u_noise_amount, u_noise_speed); }
+        if (u_Pixelate_active) { effected_uv = applyPixelate(effected_uv, u_pixel_size); }
 
         // 2. Sample the texture with the (potentially modified) UVs
-        vec4 color = texture2D(u_video_texture, uv);
+        vec4 effected_color = texture2D(u_video_texture, effected_uv);
 
         // 3. Color manipulation effects
-        if (u_RGBShift_active) {
-            color = applyRGBShift(u_video_texture, uv, u_rgb_amount, u_rgb_angle);
-        }
-        if (u_Scanlines_active) {
-            color = applyScanlines(color, v_texcoord, u_scanline_density, u_scanline_opacity);
-        }
+        if (u_RGBShift_active) { effected_color = applyRGBShift(u_video_texture, effected_uv, u_rgb_amount, u_rgb_angle); }
+        if (u_Scanlines_active) { effected_color = applyScanlines(effected_color, uv, u_scanline_density, u_scanline_opacity); }
 
-        // --- Final Output ---
-        gl_FragColor = color;
+        // 4. Feedback is applied last to the result of all other effects
+        if (u_Feedback_active) { effected_color = applyFeedback(effected_color, uv, u_feedback_amount, u_feedback_zoom); }
+        
+        // --- Masking and Final Composition ---
+        float mask = getMaskValue(v_texcoord);
+        vec4 final_color = mix(original_color, effected_color, mask);
+
+        gl_FragColor = final_color;
     }
 `;
 ```javascript
 // effects.js
 
 // This module defines the properties of all available glitch effects,
-// including their names and the uniforms they use. This centralized
-// definition makes it easy to add or modify effects.
+// including their names and the uniforms they use.
+
+export const globalUniformDefinitions = [
+    { name: 'u_mask_invert', label: 'Invert Mask', type: 'bool', value: 0.0 },
+    { name: 'u_mask_feather', label: 'Mask Feather', type: 'float', value: 5.0, min: 0.0, max: 50.0, step: 0.1 },
+    { name: 'u_mask_padding', label: 'Mask Padding', type: 'float', value: 0.0, min: -50.0, max: 100.0, step: 1.0 }
+];
 
 export const effectDefinitions = {
+    Feedback: {
+        name: 'Feedback',
+        label: 'Feedback',
+        uniforms: [
+            { name: 'u_feedback_amount', label: 'Amount', type: 'float', value: 0.85, min: 0.0, max: 0.99, step: 0.01 },
+            { name: 'u_feedback_zoom', label: 'Zoom', type: 'float', value: 0.01, min: -0.1, max: 0.1, step: 0.001 }
+        ]
+    },
     RGBShift: {
         name: 'RGBShift',
         label: 'RGB Shift',
