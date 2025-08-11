@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V2</title>
+    <title>Face Glitch V2.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -173,10 +173,25 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
             margin-bottom: 16px;
-            overflow: hidden;
             background: var(--primary-bg);
+            opacity: 0;
+            visibility: hidden;
+            max-height: 0;
+            transition: all 0.3s ease-in-out;
         }
-
+        
+        .control-group.global {
+            opacity: 1;
+            visibility: visible;
+            max-height: 500px;
+        }
+        
+        .control-group.active {
+            opacity: 1;
+            visibility: visible;
+            max-height: 500px; /* Needs to be large enough to contain all content */
+        }
+        
         .control-group-header {
             padding: 12px 16px;
             display: flex;
@@ -201,20 +216,18 @@
             content: '-';
             transform: rotate(180deg);
         }
-
+        
         .control-group-content {
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-in-out, opacity 0.3s ease-in-out;
             padding: 0 16px;
-            border-top: 1px solid var(--border-color);
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
         }
-
+        
         .control-group.expanded .control-group-content {
-            max-height: 500px; /* A large value to allow content to show */
-            opacity: 1;
+            max-height: 500px;
             padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
         }
         
         .control-grid {
@@ -340,7 +353,7 @@
         </div>
         <div class="controls-panel">
             <div class="header">
-                <h1>Face Glitch V2</h1>
+                <h1>Face Glitch V2.1</h1>
                 <div class="header-actions">
                     <button id="startBtn" class="btn btn-primary">Start Camera</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
@@ -359,7 +372,7 @@
             </div>
 
             <div class="dynamic-controls">
-                <div id="smearControls" class="control-group expanded" data-effect="5">
+                <div id="smearControls" class="control-group active" data-effect="5">
                     <div class="control-group-header">Smear Controls</div>
                     <div class="control-group-content">
                         <div class="control-grid">
@@ -384,12 +397,12 @@
                     <div class="control-group-content">
                         <div class="control-grid">
                             <div class="control-item">
-                                <label class="slider-label">Blur Radius (px)<span id="smLenVal_b">40</span></label>
-                                <input type="range" id="smLen_b" min="0" max="120" step="1" value="40" class="slider-input">
+                                <label class="slider-label">Blur Radius (px)<span id="radialBlurLenVal">40</span></label>
+                                <input type="range" id="radialBlurLen" min="0" max="120" step="1" value="40" class="slider-input">
                             </div>
                             <div class="control-item">
-                                <label class="slider-label">Samples<span id="samplesVal_b">12</span></label>
-                                <input type="range" id="samples_b" min="1" max="32" step="1" value="12" class="slider-input">
+                                <label class="slider-label">Samples<span id="radialBlurSamplesVal">12</span></label>
+                                <input type="range" id="radialBlurSamples" min="1" max="32" step="1" value="12" class="slider-input">
                             </div>
                         </div>
                     </div>
@@ -480,9 +493,8 @@
                 </div>
             </div>
 
-            <div class="section-heading">Global Controls</div>
-            <div class="control-group expanded">
-                <div class="control-group-header">Core & Masking</div>
+            <div id="globalControls" class="control-group global expanded">
+                <div class="control-group-header">Global Controls</div>
                 <div class="control-group-content">
                     <div class="control-grid">
                         <div class="control-item">
@@ -513,8 +525,16 @@
                             <label class="slider-label">Mask Padding (px)<span id="padVal">16</span></label>
                             <input type="range" id="pad" min="0" max="120" step="1" value="16" class="slider-input">
                         </div>
+                        <div class="control-item">
+                            <label class="slider-label">Mask Shape (Fallback):
+                                <select id="shape" class="btn">
+                                    <option value="0">Rounded Rect</option>
+                                    <option value="1">Ellipse</option>
+                                </select>
+                            </label>
+                        </div>
                     </div>
-                    <div class="control-grid">
+                    <div class="options-list">
                         <label>
                             <input type="checkbox" id="mirrorChk" checked> Mirror Camera
                         </label>
@@ -530,20 +550,12 @@
                         <label>
                             <input type="checkbox" id="invert"> Invert Mask
                         </label>
-                        <label>
-                            Mask Shape (Fallback):
-                            <select id="shape" class="btn">
-                                <option value="0">Rounded Rect</option>
-                                <option value="1">Ellipse</option>
-                            </select>
-                        </label>
                     </div>
                 </div>
             </div>
             
-            <div class="section-heading">Presets & Tools</div>
-            <div class="control-group expanded">
-                <div class="control-group-header">Presets</div>
+            <div id="presetsTools" class="control-group global expanded">
+                <div class="control-group-header">Presets & Tools</div>
                 <div class="control-group-content">
                     <div class="control-grid">
                         <button id="presetSoft" class="btn">Soft Blur</button>
@@ -629,8 +641,8 @@
         swirl: hook('swirl', 'swirlVal'),
         nScale: hook('nScale', 'nScaleVal'),
         nStrength: hook('nStrength', 'nStrengthVal'),
-        smLen_b: hook('smLen_b', 'smLenVal_b'),
-        samples_b: hook('samples_b', 'samplesVal_b')
+        radialBlurLen: hook('radialBlurLen', 'radialBlurLenVal'),
+        radialBlurSamples: hook('radialBlurSamples', 'radialBlurSamplesVal')
     };
 
     let stream = null, rafId = null, detector = null, gl = null, program = null, tex = null, buf = null;
@@ -768,46 +780,56 @@
         maskCtx.drawImage(tmpCanvas, 0, 0);
         maskCtx.filter = 'none';
     }
-
+    
     function setCommonUniforms(timeSec){
-        // Dynamically set uniforms based on the active effect
-        let smLenVal = 0, samplesVal = 0;
-        if (ui.effect.value == 5) { // Smear
-            smLenVal = ui.smLen ? parseFloat(ui.smLen.value) : 0;
-            samplesVal = ui.samples ? parseInt(ui.samples.value, 10) : 1;
-        } else if (ui.effect.value == 6) { // Radial Blur
-            smLenVal = ui.smLen_b ? parseFloat(ui.smLen_b.value) : 0;
-            samplesVal = ui.samples_b ? parseInt(ui.samples_b.value, 10) : 1;
-        }
+        const effectId = parseInt(ui.effect.value, 10);
+        gl.uniform1i(getU('u_effect'), effectId);
         
-        gl.uniform1i(getU('u_effect'), parseInt(ui.effect.value,10));
         gl.uniform1f(getU('u_intensity'), parseFloat(ui.intensity.value));
         gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value));
-        gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
-        gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
         gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
-        gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
-        gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
-        gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
-        gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
         gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
         gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
         gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
-
-        // Set the effect-specific uniforms conditionally
-        gl.uniform1f(getU('u_smLen'), smLenVal);
-        gl.uniform1i(getU('u_samples'), samplesVal);
-        
-        gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value) * 3.14159265 / 180.0);
-        gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
-        gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
-        gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
-        
         gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
         gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
         gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
         gl.uniform1f(getU('u_time'), timeSec);
         gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
+        
+        // Dynamic controls based on effect type
+        switch(effectId) {
+            case 5: // Smear
+                gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value));
+                gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value) * 3.14159265 / 180.0);
+                gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value,10));
+                break;
+            case 6: // Radial Blur
+                gl.uniform1f(getU('u_smLen'), parseFloat(ui.radialBlurLen.value));
+                gl.uniform1i(getU('u_samples'), parseInt(ui.radialBlurSamples.value,10));
+                break;
+            case 8: // Noise Flow
+                gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value));
+                gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value));
+                break;
+            case 0: // Glitch
+                gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
+                gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
+                break;
+            case 1: // Wavy Distort
+                gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value));
+                gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
+                break;
+            case 7: // Swirl
+                gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value));
+                break;
+            case 2: // Box Blur
+                gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
+                break;
+            case 3: // Pixelate
+                gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value));
+                break;
+        }
     }
 
     async function ensureFaceMesh(){
@@ -884,9 +906,9 @@
     function updateEffectUI(effectId) {
         dynamicControls.forEach(panel => {
             if (panel.dataset.effect === effectId) {
-                panel.classList.add('expanded');
+                panel.classList.add('active');
             } else {
-                panel.classList.remove('expanded');
+                panel.classList.remove('active');
             }
         });
         ui.effect.value = effectId;
@@ -912,12 +934,12 @@
 
     document.getElementById('presetSoft').addEventListener('click', () => {
         const effectCard = document.querySelector('[data-effect="2"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        updateEffectUI('2'); ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.smLen.value=20; ui.smAng.value=0; ui.samples.value=12; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
+        updateEffectUI('2'); ui.blur.value=24; ui.intensity.value=1; ui.chroma.value=2; ui.feather.value=20; ui.mix.value=0.95; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=18; ui.seed.value=3; ui.samples.value=12; ui.smLen.value=20; ui.smAng.value=0; ui.swirl.value=0.5; ui.nScale.value=2.5; ui.nStrength.value=8;
         if(ui.blur) ui.blur.dispatchEvent(new Event('input')); if(ui.intensity) ui.intensity.dispatchEvent(new Event('input')); if(ui.chroma) ui.chroma.dispatchEvent(new Event('input')); if(ui.feather) ui.feather.dispatchEvent(new Event('input')); if(ui.mix) ui.mix.dispatchEvent(new Event('input')); if(ui.pad) ui.pad.dispatchEvent(new Event('input')); if(ui.seed) ui.seed.dispatchEvent(new Event('input'));
     });
     document.getElementById('presetGlitch').addEventListener('click', () => {
         const effectCard = document.querySelector('[data-effect="0"]'); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
-        updateEffectUI('0'); ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.smLen.value=12; ui.smAng.value=0; ui.samples.value=8;
+        updateEffectUI('0'); ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=10; ui.speed.value=2.2; ui.feather.value=10; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=8; ui.seed.value=11; ui.samples.value=8; ui.smLen.value=12; ui.smAng.value=0;
         if(ui.block) ui.block.dispatchEvent(new Event('input')); if(ui.prob) ui.prob.dispatchEvent(new Event('input')); if(ui.intensity) ui.intensity.dispatchEvent(new Event('input')); if(ui.chroma) ui.chroma.dispatchEvent(new Event('input')); if(ui.speed) ui.speed.dispatchEvent(new Event('input')); if(ui.feather) ui.feather.dispatchEvent(new Event('input')); if(ui.mix) ui.mix.dispatchEvent(new Event('input')); if(ui.pad) ui.pad.dispatchEvent(new Event('input')); if(ui.seed) ui.seed.dispatchEvent(new Event('input'));
     });
     document.getElementById('presetSmear').addEventListener('click', () => {
@@ -930,7 +952,7 @@
         const effectCard = document.querySelector(`[data-effect="${randEffect}"]`); if(effectCard) { effectBtns.forEach(c => c.classList.remove('active')); effectCard.classList.add('active'); }
         updateEffectUI(randEffect);
         const setRand=(el,min,max,step=1)=>{ if(!el) return; const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
-        setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1);
+        setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,48,1); setRand(ui.chroma,0,20,1); setRand(ui.pixel,2,48,1); setRand(ui.freq,0,50,0.5); setRand(ui.amp,0,50,1); setRand(ui.block,4,140,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,80,1); setRand(ui.seed,0,100,1); setRand(ui.smLen,0,120,1); setRand(ui.smAng,0,360,1); setRand(ui.samples,4,28,1); setRand(ui.swirl,-5,5,0.01); setRand(ui.nScale,0.5,6,0.1); setRand(ui.nStrength,0,50,1); setRand(ui.radialBlurLen, 0, 120, 1); setRand(ui.radialBlurSamples, 1, 32, 1);
         shapeSel.value = Math.random() < 0.5 ? '0' : '1'; invertChk.checked = Math.random() < 0.2; preciseMaskChk.checked = Math.random() < 0.7; trackCenterChk.checked = Math.random() < 0.8;
     });
 
