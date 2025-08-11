@@ -5,35 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Webcam Face FX — Glitch / Distort / Blur</title>
   <style>
-    :root {
-      --bg: #0f1115; --panel: #11141a; --stroke: #1f2430; --fg: #e5e7eb; --muted:#9aa0aa; --accent:#6ee7b7; --danger:#f87171;
-    }
-    html, body { height: 100%; }
-    body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; display: grid; place-items: center; }
-    .wrap { width: min(1120px, 96vw); }
-    .panel { background: var(--panel); border: 1px solid var(--stroke); border-radius: 16px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
-    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 10px; }
-    h1 { font-size: 18px; margin:0; letter-spacing:.2px; }
-    .controls { display:grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap:10px; align-items:center; }
-    .row { display: contents; }
-    .col-span-3{ grid-column: span 3; } .col-span-4{ grid-column: span 4; } .col-span-6{ grid-column: span 6; } .col-span-12{ grid-column: span 12; }
-    label { font-size: 12px; color: var(--muted); display:flex; flex-direction:column; gap:6px; }
-    input[type="range"], select, button, .badge { background:#0b0e13; color:var(--fg); border:1px solid var(--stroke); border-radius: 10px; padding:8px 10px; }
-    input[type="checkbox"]{ transform: translateY(1px); }
+    :root { --bg:#0f1115; --panel:#11141a; --stroke:#1f2430; --fg:#e5e7eb; --muted:#9aa0aa; --accent:#6ee7b7; --danger:#f87171; }
+    html, body { height:100%; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; display:grid; place-items:center; }
+    .wrap { width:min(1120px,96vw); }
+    .panel { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; padding:14px; box-shadow:0 8px 30px rgba(0,0,0,.35); }
+    header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    h1 { font-size:18px; margin:0; letter-spacing:.2px; }
+    .controls { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:10px; align-items:center; }
+    .row { display:contents; }
+    .col-span-3{ grid-column:span 3; } .col-span-4{ grid-column:span 4; } .col-span-6{ grid-column:span 6; } .col-span-12{ grid-column:span 12; }
+    label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:6px; }
+    input[type="range"], select, button, .badge { background:#0b0e13; color:var(--fg); border:1px solid var(--stroke); border-radius:10px; padding:8px 10px; }
+    input[type="checkbox"]{ transform:translateY(1px); }
     .inline { display:flex; gap:10px; align-items:center; }
     button { cursor:pointer; }
     button:hover { border-color:#2e3748; }
     button:disabled { opacity:.6; cursor:not-allowed; }
-    .badge { font-size: 12px; }
-    #stage { position: relative; aspect-ratio: 16/9; background: #0c1016; border-radius: 16px; overflow: hidden; margin-top: 10px; }
+    .badge { font-size:12px; }
+    #stage { position:relative; aspect-ratio:16/9; background:#0c1016; border-radius:16px; overflow:hidden; margin-top:10px; }
     #glcanvas { display:block; width:100%; height:100%; }
     #video { display:none; }
-    .note { color:var(--muted); margin-top:10px; font-size: 12px; }
-    .error { color: var(--danger); }
+    .note { color:var(--muted); margin-top:10px; font-size:12px; }
+    .error { color:var(--danger); }
     footer { margin-top:10px; display:flex; justify-content:space-between; align-items:center; color:var(--muted); font-size:12px; }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover{ text-decoration: underline; }
-    .gridline { height:1px; background:#1b1f2a; grid-column: 1 / -1; margin:2px 0; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+    .gridline { height:1px; background:#1b1f2a; grid-column:1 / -1; margin:2px 0; }
   </style>
 </head>
 <body>
@@ -61,29 +59,41 @@
               <option value="4">Combo: Glitch + Distort + Chroma</option>
             </select>
           </label>
-          <label class="col-span-3">Intensity <span class="inline"><input type="range" id="intensity" min="0" max="1" step="0.01" value="0.8"><span id="intensityVal" class="badge">0.80</span></span></label>
+          <label class="col-span-3">Intensity <span class="inline"><input type="range" id="intensity" min="0" max="1" step="0.01" value="0.85"><span id="intensityVal" class="badge">0.85</span></span></label>
           <label class="col-span-3">Speed <span class="inline"><input type="range" id="speed" min="0" max="5" step="0.01" value="1.2"><span id="speedVal" class="badge">1.20</span></span></label>
-          <label class="col-span-3">Feather (px) <span class="inline"><input type="range" id="feather" min="0" max="48" step="1" value="10"><span id="featherVal" class="badge">10</span></span></label>
+          <label class="col-span-3">Feather (px) <span class="inline"><input type="range" id="feather" min="0" max="64" step="1" value="14"><span id="featherVal" class="badge">14</span></span></label>
         </div>
 
         <div class="row gridline"></div>
 
         <div class="row">
-          <label class="col-span-3">Blur radius (px) <span class="inline"><input type="range" id="blur" min="0" max="24" step="1" value="12"><span id="blurVal" class="badge">12</span></span></label>
-          <label class="col-span-3">Chroma shift (px) <span class="inline"><input type="range" id="chroma" min="0" max="12" step="1" value="4"><span id="chromaVal" class="badge">4</span></span></label>
-          <label class="col-span-3">Pixel size (px) <span class="inline"><input type="range" id="pixel" min="1" max="40" step="1" value="12"><span id="pixelVal" class="badge">12</span></span></label>
-          <label class="col-span-3">Distort freq <span class="inline"><input type="range" id="freq" min="0" max="40" step="0.5" value="9"><span id="freqVal" class="badge">9.0</span></span></label>
+          <label class="col-span-3">Blur radius (px) <span class="inline"><input type="range" id="blur" min="0" max="32" step="1" value="14"><span id="blurVal" class="badge">14</span></span></label>
+          <label class="col-span-3">Chroma shift (px) <span class="inline"><input type="range" id="chroma" min="0" max="16" step="1" value="5"><span id="chromaVal" class="badge">5</span></span></label>
+          <label class="col-span-3">Pixel size (px) <span class="inline"><input type="range" id="pixel" min="1" max="48" step="1" value="12"><span id="pixelVal" class="badge">12</span></span></label>
+          <label class="col-span-3">Distort freq <span class="inline"><input type="range" id="freq" min="0" max="50" step="0.5" value="10"><span id="freqVal" class="badge">10.0</span></span></label>
         </div>
 
         <div class="row">
-          <label class="col-span-3">Distort amp (px) <span class="inline"><input type="range" id="amp" min="0" max="40" step="1" value="10"><span id="ampVal" class="badge">10</span></span></label>
-          <label class="col-span-3">Glitch block (px) <span class="inline"><input type="range" id="block" min="2" max="120" step="2" value="22"><span id="blockVal" class="badge">22</span></span></label>
-          <label class="col-span-3">Glitch probability <span class="inline"><input type="range" id="prob" min="0" max="1" step="0.01" value="0.4"><span id="probVal" class="badge">0.40</span></span></label>
-          <label class="col-span-3">Faces max <span class="inline"><input type="range" id="maxfaces" min="1" max="5" step="1" value="3"><span id="maxfacesVal" class="badge">3</span></span></label>
+          <label class="col-span-3">Distort amp (px) <span class="inline"><input type="range" id="amp" min="0" max="50" step="1" value="14"><span id="ampVal" class="badge">14</span></span></label>
+          <label class="col-span-3">Glitch block (px) <span class="inline"><input type="range" id="block" min="2" max="140" step="2" value="22"><span id="blockVal" class="badge">22</span></span></label>
+          <label class="col-span-3">Glitch probability <span class="inline"><input type="range" id="prob" min="0" max="1" step="0.01" value="0.45"><span id="probVal" class="badge">0.45</span></span></label>
+          <label class="col-span-3">Mix (effect opacity) <span class="inline"><input type="range" id="mix" min="0" max="1" step="0.01" value="1"><span id="mixVal" class="badge">1.00</span></span></label>
         </div>
 
         <div class="row">
-          <div class="col-span-12 inline" style="justify-content: flex-end; gap:8px;">
+          <label class="col-span-3">Mask shape
+            <select id="shape">
+              <option value="0">Rounded Rect</option>
+              <option value="1">Ellipse</option>
+            </select>
+          </label>
+          <label class="col-span-3">Padding (px) <span class="inline"><input type="range" id="pad" min="0" max="100" step="1" value="16"><span id="padVal" class="badge">16</span></span></label>
+          <label class="col-span-3">Seed <span class="inline"><input type="range" id="seed" min="0" max="100" step="1" value="7"><span id="seedVal" class="badge">7</span></span></label>
+          <label class="col-span-3 inline" style="gap:8px; margin-top:20px"><input type="checkbox" id="invert"> Invert mask (apply outside face)</label>
+        </div>
+
+        <div class="row">
+          <div class="col-span-12 inline" style="justify-content:flex-end; gap:8px;">
             <button id="presetSoft">Preset: Soft Blur</button>
             <button id="presetGlitch">Preset: Heavy Glitch</button>
             <button id="presetWavy">Preset: Wavy Distort</button>
@@ -116,6 +126,8 @@
   const statusEl = document.getElementById('status');
   const status2El = document.getElementById('status2');
   const msgEl = document.getElementById('msg');
+  const invertChk = document.getElementById('invert');
+  const shapeSel = document.getElementById('shape');
 
   const ui = {
     effect: document.getElementById('effect'),
@@ -129,7 +141,10 @@
     block: hook('block','blockVal'),
     prob: hook('prob','probVal'),
     feather: hook('feather','featherVal'),
-    maxfaces: hook('maxfaces','maxfacesVal'),
+    mix: hook('mix','mixVal'),
+    pad: hook('pad','padVal'),
+    seed: hook('seed','seedVal'),
+    maxfaces: { value: 5 } // fixed in shader
   };
 
   function hook(id, outId){
@@ -154,33 +169,13 @@
   `;
   const fragSrc = `
   precision highp float; varying vec2 v_uv; uniform sampler2D u_tex; uniform vec2 u_resolution; uniform float u_time; 
-  uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_feather; 
-  uniform int u_faceCount; uniform vec4 u_faces[${MAX_FACES}];
+  uniform int u_effect; uniform float u_intensity, u_speed, u_blur, u_pixel, u_chroma, u_freq, u_amp, u_block, u_prob, u_feather, u_mix, u_seed; 
+  uniform int u_faceCount, u_shape, u_invert; uniform vec4 u_faces[${5}];
 
   float hash(float n){ return fract(sin(n)*43758.5453123); }
   float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
 
-  bool insideFace(vec2 uv){
-    for(int i=0;i<${MAX_FACES};++i){
-      if(i >= u_faceCount) break;
-      vec4 r = u_faces[i]; // x,y,w,h
-      if(uv.x >= r.x && uv.x <= r.x+r.z && uv.y >= r.y && uv.y <= r.y+r.w){
-        // feather: shrink inner rect a bit for soft edges
-        float fx = u_feather / u_resolution.x; float fy = u_feather / u_resolution.y;
-        if(uv.x >= r.x+fx && uv.x <= r.x+r.z-fx && uv.y >= r.y+fy && uv.y <= r.y+r.w-fy) return true;
-        // edge feather (smoothstep ribbon)
-        float dx = min(uv.x - r.x, (r.x+r.z) - uv.x);
-        float dy = min(uv.y - r.y, (r.y+r.w) - uv.y);
-        float d = min(dx, dy);
-        float f = smoothstep(0.0, max(fx,fy), d);
-        return f > 0.5; // approximate
-      }
-    }
-    return false;
-  }
-
-  vec4 sampleChroma(vec2 uv, float px){
-    vec2 o = vec2(px) / u_resolution; // pixels to UV
+  vec4 sampleChroma(vec2 uv){
     float c = u_chroma / u_resolution.x; // horizontal shift in UV
     vec3 col; col.r = texture2D(u_tex, uv + vec2(c,0.0)).r; col.g = texture2D(u_tex, uv).g; col.b = texture2D(u_tex, uv - vec2(c,0.0)).b; return vec4(col,1.0);
   }
@@ -193,10 +188,10 @@
   }
 
   vec2 glitchUV(vec2 uv){
-    // row-based horizontal offsets, randomized in time
+    // row-based horizontal offsets, randomized in time + seed
     float rows = u_resolution.y / max(1.0, u_block); // how many rows
     float row = floor(uv.y * rows);
-    float t = floor(u_time * (2.0 + u_speed*20.0));
+    float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0);
     float r = hash(row + t*13.17);
     float active = step(1.0 - u_prob, r);
     float shift = (hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active; // [-0.125..0.125]
@@ -216,44 +211,43 @@
     return texture2D(u_tex, uvp);
   }
 
-  void main(){
-    vec2 uv = v_uv; // already 0..1
-    vec4 base = texture2D(u_tex, uv);
-    bool mask = insideFace(uv);
-    if(!mask){ gl_FragColor = base; return; }
+  float maskRect(vec2 uv, vec4 r){
+    float inside = step(r.x, uv.x) * step(uv.x, r.x + r.z) * step(r.y, uv.y) * step(uv.y, r.y + r.w);
+    if(inside < 0.5) return 0.0;
+    float fx = u_feather / u_resolution.x; float fy = u_feather / u_resolution.y; float f = max(fx, fy);
+    float dx = min(uv.x - r.x, (r.x + r.z) - uv.x);
+    float dy = min(uv.y - r.y, (r.y + r.w) - uv.y);
+    float d = min(dx, dy);
+    return smoothstep(0.0, f, d);
+  }
 
-    if(u_effect == 0){ // glitch
-      vec2 guv = glitchUV(uv);
-      vec4 col = sampleChroma(guv, 1.0);
-      // occasional line darken for flavor
-      float line = step(0.98, rand(vec2(floor(uv.y*u_resolution.y), floor(u_time*10.0))));
-      col.rgb *= mix(1.0, 0.7, line * u_intensity);
-      gl_FragColor = mix(base, col, 0.9);
-      return;
-    }
-    if(u_effect == 1){ // distort
-      vec2 duv = distortUV(uv);
-      vec4 col = sampleChroma(duv, 1.0);
-      gl_FragColor = mix(base, col, 1.0);
-      return;
-    }
-    if(u_effect == 2){ // blur
-      vec4 b = doBlur(uv);
-      gl_FragColor = mix(base, b, 1.0);
-      return;
-    }
-    if(u_effect == 3){ // pixelate
-      vec4 p = pixelate(uv);
-      // subtle chroma on pixel edges
-      vec4 c = sampleChroma(uv, 1.0);
-      gl_FragColor = mix(p, c, 0.15*u_intensity);
-      return;
-    }
-    // combo
-    vec2 cuv = glitchUV(distortUV(uv));
-    vec4 cb = doBlur(cuv);
-    vec4 cc = sampleChroma(cuv, 1.0);
-    gl_FragColor = mix(cb, cc, 0.5);
+  float maskEllipse(vec2 uv, vec4 r){
+    vec2 c = r.xy + r.zw * 0.5; vec2 rad = r.zw * 0.5; vec2 p = (uv - c) / rad; float rr = dot(p,p);
+    float edge = 1.0 - sqrt(max(rr, 0.0)); // ~distance to edge in normalized radius units
+    float fe = u_feather / min(u_resolution.x, u_resolution.y);
+    return smoothstep(0.0, fe, edge);
+  }
+
+  float faceMask(vec2 uv){
+    float a = 0.0;
+    for(int i=0;i<${5};++i){ if(i>=u_faceCount) break; vec4 r = u_faces[i]; float m = (u_shape==0) ? maskRect(uv,r) : maskEllipse(uv,r); a = max(a, m); }
+    if(u_invert==1) a = 1.0 - a; return clamp(a, 0.0, 1.0);
+  }
+
+  void main(){
+    vec2 uv = v_uv; // 0..1
+    vec4 base = texture2D(u_tex, uv);
+    float m = faceMask(uv);
+
+    // Build effect color depending on mode
+    vec4 eff = base;
+    if(u_effect == 0){ vec2 guv = glitchUV(uv); vec4 col = sampleChroma(guv); float line = step(0.98, rand(vec2(floor(uv.y*u_resolution.y), floor(u_time*10.0+u_seed)))); col.rgb *= mix(1.0, 0.7, line * u_intensity); eff = mix(base, col, 0.9); }
+    else if(u_effect == 1){ vec2 duv = distortUV(uv); vec4 col = sampleChroma(duv); eff = col; }
+    else if(u_effect == 2){ vec4 b = doBlur(uv); eff = b; }
+    else if(u_effect == 3){ vec4 p = pixelate(uv); vec4 c = sampleChroma(uv); eff = mix(p, c, 0.15*u_intensity); }
+    else { vec2 cuv = glitchUV(distortUV(uv)); vec4 cb = doBlur(cuv); vec4 cc = sampleChroma(cuv); eff = mix(cb, cc, 0.5); }
+
+    gl_FragColor = mix(base, eff, m * clamp(u_mix, 0.0, 1.0));
   }
   `;
 
@@ -261,8 +255,6 @@
   function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.classList.toggle('error', !!isError); }
 
   const faceApiAvailable = 'FaceDetector' in window;
-
-  // Warn clearly if not HTTPS / secure context
   if(!isSecureContext){ setMsg('Page is not secure (HTTPS). Camera access will be blocked by the browser.', true); }
 
   async function initDetector(){ if(!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.'); detector = new FaceDetector({ fastMode:true, maxDetectedFaces: 5 }); }
@@ -298,23 +290,26 @@
   function uploadVideoTexture(){ gl.bindTexture(gl.TEXTURE_2D, tex); try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch(e) { /* ignore between frames */ } }
 
   function setFacesUniform(){
-    // write up to MAX_FACES from lastDetections, normalized + mirrored
-    const w = canvas.width, h = canvas.height; const mirror = mirrorChk.checked;
-    const maxFaces = Math.min(parseInt(ui.maxfaces.value,10), MAX_FACES);
+    // expand & write up to MAX_FACES from lastDetections, normalized + mirrored
+    const W = canvas.width, H = canvas.height; const mirror = mirrorChk.checked; const grow = parseFloat(ui.pad.value);
     let count = 0;
-    for(let i=0;i<Math.min(lastDetections.length, maxFaces); i++){
+    for(let i=0;i<Math.min(lastDetections.length, MAX_FACES); i++){
       const bb = lastDetections[i].boundingBox || lastDetections[i];
-      let x = bb.x, y = bb.y, ww = bb.width, hh = bb.height;
-      if(mirror){ x = w - (x + ww); }
-      faceRects[count*4+0] = x / w; faceRects[count*4+1] = y / h; faceRects[count*4+2] = ww / w; faceRects[count*4+3] = hh / h; count++;
+      let x = bb.x, y = bb.y, w = bb.width, h = bb.height;
+      // padding grow (px), clamp to bounds
+      let nx = Math.floor(x - grow), ny = Math.floor(y - grow), nw = Math.ceil(w + 2*grow), nh = Math.ceil(h + 2*grow);
+      if (nx < 0) { nw += nx; nx = 0; }
+      if (ny < 0) { nh += ny; ny = 0; }
+      if (nx + nw > W) nw = W - nx;
+      if (ny + nh > H) nh = H - ny;
+      if (nw <= 2 || nh <= 2) continue; // skip degenerate
+      if(mirror){ nx = W - (nx + nw); }
+      faceRects[count*4+0] = nx / W; faceRects[count*4+1] = ny / H; faceRects[count*4+2] = nw / W; faceRects[count*4+3] = nh / H; count++;
+      if(count>=MAX_FACES) break;
     }
-    // pad remaining with zeros
     for(let j=count;j<MAX_FACES;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; }
     gl.uniform1i(getU('u_faceCount'), count);
-    // set each vec4 individually (WebGL1 doesn't have uniform4fv for arrays reliably across some drivers)
-    for(let k=0;k<MAX_FACES;k++){
-      gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]);
-    }
+    for(let k=0;k<MAX_FACES;k++){ gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]); }
   }
 
   function setCommonUniforms(timeSec){
@@ -329,6 +324,10 @@
     gl.uniform1f(getU('u_block'), parseFloat(ui.block.value));
     gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
     gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value));
+    gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value));
+    gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
+    gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10));
+    gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
     gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height);
     gl.uniform1f(getU('u_time'), timeSec);
   }
@@ -341,12 +340,7 @@
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       video.srcObject = stream;
       await video.play();
-      // ⬇️ Ensure dimensions are available before sizing GL/canvas
-      await new Promise((res) => {
-        if (video.videoWidth && video.videoHeight) return res();
-        const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); };
-        video.addEventListener('loadedmetadata', onMeta, { once: true });
-      });
+      await new Promise((res) => { if (video.videoWidth && video.videoHeight) return res(); const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); }; video.addEventListener('loadedmetadata', onMeta, { once: true }); });
       fit();
       window.addEventListener('resize', fit);
       try { await initDetector(); setMsg(''); } catch(e){ console.warn(e); setMsg('FaceDetector API not available. Use latest Chrome and enable “Experimental Web Platform features”, or ask for a MediaPipe fallback.', true); }
@@ -356,27 +350,21 @@
     } catch(err){
       console.error(err);
       let hint = '';
-      if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-        hint = ' • Permission blocked. Click the camera icon in the address bar and allow access.';
-      }
-      if (err && err.name === 'NotFoundError') {
-        hint = ' • No camera found. If you have multiple, pick one in site settings.';
-      }
+      if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) { hint = ' • Permission blocked. Click the camera icon in the address bar and allow access.'; }
+      if (err && err.name === 'NotFoundError') { hint = ' • No camera found. If you have multiple, pick one in site settings.'; }
       const httpsHint = location.protocol !== 'https:' ? ' • Tip: GitHub Pages serves HTTPS; local files/insecure HTTP will block camera.' : '';
       setMsg('Could not start camera: ' + err.message + hint + httpsHint, true); setStatus('Error');
     }
   }
 
-  function stop()(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
+  function stop(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
 
   async function detectFaces(){ if(!detector) return []; try { return (await detector.detect(video)) || []; } catch(e){ return []; } }
 
   function loop(){
     rafId = requestAnimationFrame(loop);
-    // update detection on a throttle
     if(!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS){ lastDetTime = performance.now(); if(detector){ detectFaces().then(faces => { lastDetections = faces; statusEl.textContent = faces.length ? `Faces: ${faces.length}` : 'No face'; }); } else { statusEl.textContent = 'Camera on'; } }
 
-    // draw
     if(!video.videoWidth){ return; }
     if(canvas.width === 0 || canvas.height === 0){ fit(); }
     uploadVideoTexture();
@@ -392,10 +380,24 @@
   startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
 
   // Presets / randomize
-  document.getElementById('presetSoft').addEventListener('click', () => { ui.effect.value='2'; ui.blur.value=16; ui.intensity.value=1; ui.chroma.value=1; ui.feather.value=18; [ui.blur, ui.intensity, ui.chroma, ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
-  document.getElementById('presetGlitch').addEventListener('click', () => { ui.effect.value='0'; ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=8; ui.speed.value=2.5; ui.feather.value=8; [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
-  document.getElementById('presetWavy').addEventListener('click', () => { ui.effect.value='1'; ui.freq.value=14; ui.amp.value=18; ui.speed.value=1.0; ui.chroma.value=3; ui.feather.value=14; [ui.freq,ui.amp,ui.speed,ui.chroma,ui.feather].forEach(el=>el.dispatchEvent(new Event('input'))); });
-  document.getElementById('randomBtn').addEventListener('click', () => { ui.effect.value = String(Math.floor(Math.random()*5)); const setRand=(el,min,max,step=1)=>{ const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));}; setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,24,1); setRand(ui.chroma,0,12,1); setRand(ui.pixel,4,28,1); setRand(ui.freq,0,30,0.5); setRand(ui.amp,0,30,1); setRand(ui.block,4,80,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); });
+  document.getElementById('presetSoft').addEventListener('click', () => {
+    ui.effect.value='2'; ui.blur.value=18; ui.intensity.value=1; ui.chroma.value=1; ui.feather.value=18; ui.mix.value=0.9; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=24; ui.seed.value=3;
+    [ui.blur, ui.intensity, ui.chroma, ui.feather, ui.mix, ui.pad, ui.seed].forEach(el=>el.dispatchEvent(new Event('input')));
+  });
+  document.getElementById('presetGlitch').addEventListener('click', () => {
+    ui.effect.value='0'; ui.block.value=18; ui.prob.value=0.6; ui.intensity.value=1; ui.chroma.value=8; ui.speed.value=2.5; ui.feather.value=8; ui.mix.value=1; shapeSel.value='0'; invertChk.checked=false; ui.pad.value=10; ui.seed.value=11;
+    [ui.block,ui.prob,ui.intensity,ui.chroma,ui.speed,ui.feather,ui.mix, ui.pad, ui.seed].forEach(el=>el.dispatchEvent(new Event('input')));
+  });
+  document.getElementById('presetWavy').addEventListener('click', () => {
+    ui.effect.value='1'; ui.freq.value=14; ui.amp.value=18; ui.speed.value=1.0; ui.chroma.value=3; ui.feather.value=14; ui.mix.value=0.85; shapeSel.value='1'; invertChk.checked=false; ui.pad.value=14; ui.seed.value=7;
+    [ui.freq,ui.amp,ui.speed,ui.chroma,ui.feather,ui.mix, ui.pad, ui.seed].forEach(el=>el.dispatchEvent(new Event('input')));
+  });
+  document.getElementById('randomBtn').addEventListener('click', () => {
+    ui.effect.value = String(Math.floor(Math.random()*5));
+    const setRand=(el,min,max,step=1)=>{ const v = (Math.round((min + Math.random()*(max-min))/step)*step).toFixed(step<1?2:0); el.value = v; el.dispatchEvent(new Event('input'));};
+    setRand(ui.intensity,0.2,1,0.01); setRand(ui.speed,0,3,0.01); setRand(ui.blur,0,32,1); setRand(ui.chroma,0,16,1); setRand(ui.pixel,4,32,1); setRand(ui.freq,0,40,0.5); setRand(ui.amp,0,40,1); setRand(ui.block,4,120,2); setRand(ui.prob,0,1,0.01); setRand(ui.feather,0,40,1); setRand(ui.mix,0.3,1,0.01); setRand(ui.pad,0,60,1); setRand(ui.seed,0,100,1);
+    shapeSel.value = Math.random() < 0.5 ? '0' : '1'; invertChk.checked = Math.random() < 0.2;
+  });
 
   // Auto-start if camera already granted
   (async () => { try { const p = await navigator.permissions.query({ name:'camera' }); if(p.state==='granted') start(); } catch{} })();
