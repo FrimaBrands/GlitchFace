@@ -51,446 +51,150 @@
         </div>
       </header>
 
-      <div class="controls" id="uiRoot">
-        <div class="sectionTitle">Mask</div>
-        <label class="col-span-3">Feather (px)
-          <span class="inline"><input type="range" id="maskFeather" min="0" max="64" step="1" value="18"><span id="maskFeatherVal" class="badge">18</span></span>
-        </label>
-        <label class="col-span-3">Expand (px)
-          <span class="inline"><input type="range" id="maskExpand" min="-40" max="120" step="1" value="16"><span id="maskExpandVal" class="badge">16</span></span>
-        </label>
-        <label class="col-span-3">Invert mask
-          <span class="inline"><input type="checkbox" id="maskInvert"></span>
-        </label>
-        <label class="col-span-3">Fallback shape
-          <select id="maskShape">
-            <option value="0">Rounded Rect</option>
-            <option value="1">Ellipse</option>
-          </select>
-        </label>
+      <div class="layout">
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-header">
+            <strong>Controls</strong>
+            <div class="inline" style="gap:6px">
+              <button id="collapseBtn" title="Collapse sidebar">⟨⟨</button>
+            </div>
+          </div>
+          <div class="controls" id="uiRoot">
+            <div class="sectionTitle">Mask</div>
+            <label class="col-span-3">Feather (px)
+              <span class="inline"><input type="range" id="maskFeather" min="0" max="64" step="1" value="18"><span id="maskFeatherVal" class="badge">18</span></span>
+            </label>
+            <label class="col-span-3">Expand (px)
+              <span class="inline"><input type="range" id="maskExpand" min="-40" max="120" step="1" value="16"><span id="maskExpandVal" class="badge">16</span></span>
+            </label>
+            <label class="col-span-3">Invert mask
+              <span class="inline"><input type="checkbox" id="maskInvert"></span>
+            </label>
+            <label class="col-span-3">Fallback shape
+              <select id="maskShape">
+                <option value="0">Rounded Rect</option>
+                <option value="1">Ellipse</option>
+              </select>
+            </label>
 
-        <div class="row gridline"></div>
-        <div class="sectionTitle">Pipeline</div>
+            <div class="row gridline"></div>
+            <div class="sectionTitle">Pipeline</div>
 
-        <!-- Stage 1: Distort -->
-        <div class="sectionTitle">Stage A — Distort</div>
-        <label class="col-span-3">Type
-          <select id="s1Type">
-            <option value="0">None</option>
-            <option value="1">Wave (2D)</option>
-            <option value="2">Noise Flow (Perlin)</option>
-            <option value="3">Ripple (center)</option>
-            <option value="4">Swirl (center)</option>
-          </select>
-        </label>
-        <label class="col-span-3">Intensity <span class="inline"><input type="range" id="s1Int" min="0" max="1" step="0.01" value="0.9"><span id="s1IntVal" class="badge">0.90</span></span></label>
-        <label class="col-span-3">Freq X <span class="inline"><input type="range" id="s1Fx" min="0" max="80" step="0.5" value="20"><span id="s1FxVal" class="badge">20.0</span></span></label>
-        <label class="col-span-3">Freq Y <span class="inline"><input type="range" id="s1Fy" min="0" max="80" step="0.5" value="12"><span id="s1FyVal" class="badge">12.0</span></span></label>
-        <label class="col-span-3">Amplitude (px) <span class="inline"><input type="range" id="s1Amp" min="0" max="80" step="1" value="18"><span id="s1AmpVal" class="badge">18</span></span></label>
-        <label class="col-span-3">Noise scale <span class="inline"><input type="range" id="s1Scale" min="0.5" max="12" step="0.1" value="3"><span id="s1ScaleVal" class="badge">3.0</span></span></label>
-        <label class="col-span-3">Noise strength (px) <span class="inline"><input type="range" id="s1Str" min="0" max="80" step="1" value="20"><span id="s1StrVal" class="badge">20</span></span></label>
-        <label class="col-span-3">Swirl amount <span class="inline"><input type="range" id="s1Swirl" min="-6.28" max="6.28" step="0.01" value="2.0"><span id="s1SwirlVal" class="badge">2.00</span></span></label>
-        <label class="col-span-3">Speed <span class="inline"><input type="range" id="s1Speed" min="0" max="5" step="0.01" value="1.0"><span id="s1SpeedVal" class="badge">1.00</span></span></label>
-        <label class="col-span-3">Seed <span class="inline"><input type="range" id="s1Seed" min="0" max="100" step="1" value="7"><span id="s1SeedVal" class="badge">7</span></span></label>
+            <!-- Stage 1: Distort -->
+            <div class="sectionTitle">Stage A — Distort</div>
+            <label class="col-span-3">Type
+              <select id="s1Type">
+                <option value="0">None</option>
+                <option value="1">Wave (2D)</option>
+                <option value="2">Noise Flow (Perlin)</option>
+                <option value="3">Ripple (center)</option>
+                <option value="4">Swirl (center)</option>
+              </select>
+            </label>
+            <label class="col-span-3">Intensity <span class="inline"><input type="range" id="s1Int" min="0" max="1" step="0.01" value="0.9"><span id="s1IntVal" class="badge">0.90</span></span></label>
+            <label class="col-span-3">Freq X <span class="inline"><input type="range" id="s1Fx" min="0" max="80" step="0.5" value="20"><span id="s1FxVal" class="badge">20.0</span></span></label>
+            <label class="col-span-3">Freq Y <span class="inline"><input type="range" id="s1Fy" min="0" max="80" step="0.5" value="12"><span id="s1FyVal" class="badge">12.0</span></span></label>
+            <label class="col-span-3">Amplitude (px) <span class="inline"><input type="range" id="s1Amp" min="0" max="80" step="1" value="18"><span id="s1AmpVal" class="badge">18</span></span></label>
+            <label class="col-span-3">Noise scale <span class="inline"><input type="range" id="s1Scale" min="0.5" max="12" step="0.1" value="3"><span id="s1ScaleVal" class="badge">3.0</span></span></label>
+            <label class="col-span-3">Noise strength (px) <span class="inline"><input type="range" id="s1Str" min="0" max="80" step="1" value="20"><span id="s1StrVal" class="badge">20</span></span></label>
+            <label class="col-span-3">Swirl amount <span class="inline"><input type="range" id="s1Swirl" min="-6.28" max="6.28" step="0.01" value="2.0"><span id="s1SwirlVal" class="badge">2.00</span></span></label>
+            <label class="col-span-3">Speed <span class="inline"><input type="range" id="s1Speed" min="0" max="5" step="0.01" value="1.0"><span id="s1SpeedVal" class="badge">1.00</span></span></label>
+            <label class="col-span-3">Seed <span class="inline"><input type="range" id="s1Seed" min="0" max="100" step="1" value="7"><span id="s1SeedVal" class="badge">7</span></span></label>
 
-        <div class="row gridline"></div>
+            <div class="row gridline"></div>
 
-        <!-- Stage 2: Smear/Blur-->
-        <div class="sectionTitle">Stage B — Smear / Blur</div>
-        <label class="col-span-3">Type
-          <select id="s2Type">
-            <option value="0">None</option>
-            <option value="1">Directional Smear</option>
-            <option value="2">Radial/Zoom Smear</option>
-            <option value="3">Box Blur</option>
-            <option value="4">Pixelate</option>
-          </select>
-        </label>
-        <label class="col-span-3">Length (px) <span class="inline"><input type="range" id="s2Len" min="0" max="220" step="1" value="60"><span id="s2LenVal" class="badge">60</span></span></label>
-        <label class="col-span-3">Angle (°) <span class="inline"><input type="range" id="s2Ang" min="0" max="360" step="1" value="0"><span id="s2AngVal" class="badge">0</span></span></label>
-        <label class="col-span-3">Samples <span class="inline"><input type="range" id="s2Samples" min="1" max="48" step="1" value="24"><span id="s2SamplesVal" class="badge">24</span></span></label>
-        <label class="col-span-3">Blur radius (px) <span class="inline"><input type="range" id="s2Blur" min="0" max="48" step="1" value="16"><span id="s2BlurVal" class="badge">16</span></span></label>
-        <label class="col-span-3">Pixel size (px) <span class="inline"><input type="range" id="s2Pixel" min="1" max="64" step="1" value="16"><span id="s2PixelVal" class="badge">16</span></span></label>
-        <label class="col-span-3">Intensity <span class="inline"><input type="range" id="s2Int" min="0" max="1" step="0.01" value="1"><span id="s2IntVal" class="badge">1.00</span></span></label>
+            <!-- Stage 2: Smear/Blur-->
+            <div class="sectionTitle">Stage B — Smear / Blur</div>
+            <label class="col-span-3">Type
+              <select id="s2Type">
+                <option value="0">None</option>
+                <option value="1">Directional Smear</option>
+                <option value="2">Radial/Zoom Smear</option>
+                <option value="3">Box Blur</option>
+                <option value="4">Pixelate</option>
+              </select>
+            </label>
+            <label class="col-span-3">Length (px) <span class="inline"><input type="range" id="s2Len" min="0" max="220" step="1" value="60"><span id="s2LenVal" class="badge">60</span></span></label>
+            <label class="col-span-3">Angle (°) <span class="inline"><input type="range" id="s2Ang" min="0" max="360" step="1" value="0"><span id="s2AngVal" class="badge">0</span></span></label>
+            <label class="col-span-3">Samples <span class="inline"><input type="range" id="s2Samples" min="1" max="48" step="1" value="24"><span id="s2SamplesVal" class="badge">24</span></span></label>
+            <label class="col-span-3">Blur radius (px) <span class="inline"><input type="range" id="s2Blur" min="0" max="48" step="1" value="16"><span id="s2BlurVal" class="badge">16</span></span></label>
+            <label class="col-span-3">Pixel size (px) <span class="inline"><input type="range" id="s2Pixel" min="1" max="64" step="1" value="16"><span id="s2PixelVal" class="badge">16</span></span></label>
+            <label class="col-span-3">Intensity <span class="inline"><input type="range" id="s2Int" min="0" max="1" step="0.01" value="1"><span id="s2IntVal" class="badge">1.00</span></span></label>
 
-        <div class="row gridline"></div>
+            <div class="row gridline"></div>
 
-        <!-- Stage 3: Glitch/Color -->
-        <div class="sectionTitle">Stage C — Glitch / Color</div>
-        <label class="col-span-3">Type
-          <select id="s3Type">
-            <option value="0">None</option>
-            <option value="1">Glitch Rows</option>
-            <option value="2">RGB Split</option>
-            <option value="3">Posterize</option>
-            <option value="4">Scanlines</option>
-          </select>
-        </label>
-        <label class="col-span-3">Block (px) <span class="inline"><input type="range" id="s3Block" min="2" max="200" step="2" value="24"><span id="s3BlockVal" class="badge">24</span></span></label>
-        <label class="col-span-3">Probability <span class="inline"><input type="range" id="s3Prob" min="0" max="1" step="0.01" value="0.45"><span id="s3ProbVal" class="badge">0.45</span></span></label>
-        <label class="col-span-3">Shift X (px) <span class="inline"><input type="range" id="s3ShiftX" min="0" max="24" step="1" value="6"><span id="s3ShiftXVal" class="badge">6</span></span></label>
-        <label class="col-span-3">Shift Y (px) <span class="inline"><input type="range" id="s3ShiftY" min="0" max="24" step="1" value="2"><span id="s3ShiftYVal" class="badge">2</span></span></label>
-        <label class="col-span-3">Levels <span class="inline"><input type="range" id="s3Levels" min="2" max="32" step="1" value="6"><span id="s3LevelsVal" class="badge">6</span></span></label>
-        <label class="col-span-3">Mix <span class="inline"><input type="range" id="s3Mix" min="0" max="1" step="0.01" value="1"><span id="s3MixVal" class="badge">1.00</span></span></label>
+            <!-- Stage 3: Glitch/Color -->
+            <div class="sectionTitle">Stage C — Glitch / Color</div>
+            <label class="col-span-3">Type
+              <select id="s3Type">
+                <option value="0">None</option>
+                <option value="1">Glitch Rows</option>
+                <option value="2">RGB Split</option>
+                <option value="3">Posterize</option>
+                <option value="4">Scanlines</option>
+              </select>
+            </label>
+            <label class="col-span-3">Block (px) <span class="inline"><input type="range" id="s3Block" min="2" max="200" step="2" value="24"><span id="s3BlockVal" class="badge">24</span></span></label>
+            <label class="col-span-3">Probability <span class="inline"><input type="range" id="s3Prob" min="0" max="1" step="0.01" value="0.45"><span id="s3ProbVal" class="badge">0.45</span></span></label>
+            <label class="col-span-3">Shift X (px) <span class="inline"><input type="range" id="s3ShiftX" min="0" max="24" step="1" value="6"><span id="s3ShiftXVal" class="badge">6</span></span></label>
+            <label class="col-span-3">Shift Y (px) <span class="inline"><input type="range" id="s3ShiftY" min="0" max="24" step="1" value="2"><span id="s3ShiftYVal" class="badge">2</span></span></label>
+            <label class="col-span-3">Levels <span class="inline"><input type="range" id="s3Levels" min="2" max="32" step="1" value="6"><span id="s3LevelsVal" class="badge">6</span></span></label>
+            <label class="col-span-3">Mix <span class="inline"><input type="range" id="s3Mix" min="0" max="1" step="0.01" value="1"><span id="s3MixVal" class="badge">1.00</span></span></label>
 
-        <div class="row gridline"></div>
+            <div class="row gridline"></div>
 
-        <div class="sectionTitle">Feedback (datamosh-ish trail)</div>
-        <label class="col-span-3 inline" style="gap:8px; margin-top:4px"><input type="checkbox" id="fbEnable"> Enable feedback</label>
-        <label class="col-span-3">Decay <span class="inline"><input type="range" id="fbDecay" min="0" max="1" step="0.01" value="0.85"><span id="fbDecayVal" class="badge">0.85</span></span></label>
-        <label class="col-span-3">Warp (px) <span class="inline"><input type="range" id="fbWarp" min="0" max="40" step="1" value="12"><span id="fbWarpVal" class="badge">12</span></span></label>
-        <label class="col-span-3">Chroma (px) <span class="inline"><input type="range" id="fbChroma" min="0" max="16" step="1" value="4"><span id="fbChromaVal" class="badge">4</span></span></label>
+            <div class="sectionTitle">Feedback (datamosh-ish trail)</div>
+            <label class="col-span-3 inline" style="gap:8px; margin-top:4px"><input type="checkbox" id="fbEnable"> Enable feedback</label>
+            <label class="col-span-3">Decay <span class="inline"><input type="range" id="fbDecay" min="0" max="1" step="0.01" value="0.85"><span id="fbDecayVal" class="badge">0.85</span></span></label>
+            <label class="col-span-3">Warp (px) <span class="inline"><input type="range" id="fbWarp" min="0" max="40" step="1" value="12"><span id="fbWarpVal" class="badge">12</span></span></label>
+            <label class="col-span-3">Chroma (px) <span class="inline"><input type="range" id="fbChroma" min="0" max="16" step="1" value="4"><span id="fbChromaVal" class="badge">4</span></span></label>
 
-        <div class="row gridline"></div>
-        <div class="col-span-12 inline" style="justify-content:flex-end; gap:8px;">
-          <button id="presetClean">Preset: Clean subtle</button>
-          <button id="presetGlitch">Preset: Heavy glitch</button>
-          <button id="presetSmear">Preset: Cinematic smear</button>
-          <button id="randomBtn">Randomize</button>
-        </div>
+            <div class="row gridline"></div>
+            <div class="col-span-12 inline" style="justify-content:flex-end; gap:8px; position:sticky; bottom:0; background:linear-gradient(180deg, rgba(17,20,26,0) 0%, rgba(17,20,26,1) 20%); padding-top:8px; }">
+              <button id="presetClean">Preset: Clean subtle</button>
+              <button id="presetGlitch">Preset: Heavy glitch</button>
+              <button id="presetSmear">Preset: Cinematic smear</button>
+              <button id="randomBtn">Randomize</button>
+            </div>
+          </div>
+          <div id="msg" class="note" style="margin-top:10px">This build uses a 3-stage GPU pipeline + optional feedback. The face mask can be FaceMesh or rect/ellipse fallback.</div>
+          <footer class="sidebar-footer">
+            <span>HTTPS • WebGL • FaceDetector / FaceMesh</span>
+            <span id="status2" class="badge">—</span>
+          </footer>
+        </aside>
+
+        <div class="resizer" id="resizer" title="Drag to resize"></div>
+
+        <main class="main">
+          <div id="stage">
+            <video id="video" playsinline muted></video>
+            <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
+          </div>
+        </main>
       </div>
-
-      <div id="stage">
-        <video id="video" playsinline muted></video>
-        <canvas id="glcanvas" aria-label="camera with face effects"></canvas>
-      </div>
-
-      <div id="msg" class="note">This build uses a 3-stage GPU pipeline + optional feedback. The face mask can be FaceMesh or rect/ellipse fallback.</div>
-      <footer>
-        <span>Runs in-browser. HTTPS required. Uses <code>FaceDetector</code> / <code>MediaPipe FaceMesh</code> + WebGL.</span>
-        <span id="status2" class="badge">—</span>
-      </footer>
     </div>
   </div>
 
 <script>
+// --- Layout / sidebar resize ---
 (() => {
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('glcanvas');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const mirrorChk = document.getElementById('mirrorChk');
-  const animateChk = document.getElementById('animateChk');
-  const trackCenterChk = document.getElementById('trackCenterChk');
-  const useMeshMaskChk = document.getElementById('useMeshMaskChk');
-  const statusEl = document.getElementById('status');
-  const status2El = document.getElementById('status2');
-  const msgEl = document.getElementById('msg');
-
-  // Mask UI
-  const mask = {
-    feather: hook('maskFeather','maskFeatherVal'),
-    expand: hook('maskExpand','maskExpandVal'),
-    invert: document.getElementById('maskInvert'),
-    shape: document.getElementById('maskShape'),
-  };
-
-  // Stage 1 Distort
-  const s1 = {
-    type: document.getElementById('s1Type'),
-    Int: hook('s1Int','s1IntVal'), Fx: hook('s1Fx','s1FxVal'), Fy: hook('s1Fy','s1FyVal'), Amp: hook('s1Amp','s1AmpVal'),
-    Scale: hook('s1Scale','s1ScaleVal'), Str: hook('s1Str','s1StrVal'), Swirl: hook('s1Swirl','s1SwirlVal'),
-    Speed: hook('s1Speed','s1SpeedVal'), Seed: hook('s1Seed','s1SeedVal')
-  };
-
-  // Stage 2 Smear/Blur
-  const s2 = {
-    type: document.getElementById('s2Type'),
-    Len: hook('s2Len','s2LenVal'), Ang: hook('s2Ang','s2AngVal'), Samples: hook('s2Samples','s2SamplesVal'),
-    Blur: hook('s2Blur','s2BlurVal'), Pixel: hook('s2Pixel','s2PixelVal'), Int: hook('s2Int','s2IntVal')
-  };
-
-  // Stage 3 Glitch/Color
-  const s3 = {
-    type: document.getElementById('s3Type'),
-    Block: hook('s3Block','s3BlockVal'), Prob: hook('s3Prob','s3ProbVal'), ShiftX: hook('s3ShiftX','s3ShiftXVal'), ShiftY: hook('s3ShiftY','s3ShiftYVal'),
-    Levels: hook('s3Levels','s3LevelsVal'), Mix: hook('s3Mix','s3MixVal')
-  };
-
-  // Feedback
-  const fb = {
-    enable: document.getElementById('fbEnable'),
-    Decay: hook('fbDecay','fbDecayVal'), Warp: hook('fbWarp','fbWarpVal'), Chroma: hook('fbChroma','fbChromaVal')
-  };
-
-  function hook(id, outId){
-    const el = document.getElementById(id);
-    const out = document.getElementById(outId);
-    const set = () => { out.textContent = el.value; };
-    el.addEventListener('input', set); set();
-    return el;
-  }
-
-  // State
-  let stream = null, rafId = null, detector = null, gl = null;
-  let lastDetections = []; // FaceDetector rects
-  let lastFacesMesh = []; // FaceMesh landmarks
-  let lastDetTime = 0;
-  const DETECT_EVERY_MS = 110;
-  const MAX_FACES = 5;
-  const faceRects = new Float32Array(MAX_FACES * 4);
-  let effectCenter = { x: 0.5, y: 0.5 };
-
-  // Mask canvases
-  const maskCanvas = document.createElement('canvas');
-  const maskCtx = maskCanvas.getContext('2d');
-  const tmpCanvas = document.createElement('canvas');
-  const tmpCtx = tmpCanvas.getContext('2d');
-
-  // WebGL objects
-  let prog = null, quadBuf = null;
-  let baseTex = null, maskTex = null;
-  let fboA = null, fboB = null, fboC = null, fboFb = null; // A,B,C stages + feedback buffer
-
-  // MediaPipe FaceMesh (lazy)
-  let faceMesh = null, faceMeshReady = false, fmBusy = false, lastFmTime = 0;
-  const FM_MIN_INTERVAL = 60;
-  const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10];
-
-  // --- GL helpers ---
-  const vertSrc = `
-    attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);} 
-  `;
-  const fragSrc = `
-    precision highp float; varying vec2 v_uv; 
-    uniform sampler2D u_tex; uniform sampler2D u_tex2; uniform sampler2D u_maskTex; 
-    uniform vec2 u_res; uniform float u_time; uniform vec2 u_center; uniform int u_mirror; 
-    uniform int u_mode; // which pass
-    uniform float u_p0; uniform float u_p1; uniform float u_p2; uniform float u_p3; uniform float u_p4; uniform float u_p5; uniform float u_p6; uniform float u_p7; 
-    uniform int u_i0; uniform int u_i1; uniform int u_i2; 
-    uniform float u_feather; uniform int u_maskMode; uniform int u_invert; uniform int u_shape; uniform int u_faceCount; uniform vec4 u_faces[${5}];
-
-    // utils
-    float hash(float n){ return fract(sin(n)*43758.5453123); }
-    float rand(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123); }
-
-    // noise
-    vec3 h3(vec2 p){ vec3 q=vec3(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3)),dot(p,vec2(419.2,371.9))); return fract(sin(q)*43758.5453); }
-    float n2(vec2 p){ vec2 i=floor(p), f=fract(p); float a=dot(h3(i).xy,f); float b=dot(h3(i+vec2(1,0)).xy,f-vec2(1,0)); float c=dot(h3(i+vec2(0,1)).xy,f-vec2(0,1)); float d=dot(h3(i+vec2(1,1)).xy,f-vec2(1,1)); vec2 u=f*f*(3.-2.*f); return mix(mix(a,b,u.x), mix(c,d,u.x), u.y); }
-    vec2 n2v(vec2 p){ return vec2(n2(p), n2(p+vec2(5.2,1.3))); }
-
-    vec2 sampleUV(vec2 uv){ return u_mirror==1 ? vec2(1.0-uv.x, uv.y) : uv; }
-
-    vec4 sampleChroma(sampler2D tex, vec2 uv, float sx, float sy){ vec2 d = vec2(sx/u_res.x, sy/u_res.y); vec3 col; col.r = texture2D(tex, uv + d).r; col.g = texture2D(tex, uv).g; col.b = texture2D(tex, uv - d).b; return vec4(col,1.0); }
-
-    // mask (shapes or texture)
-    float maskRect(vec2 uv, vec4 r){ float inside = step(r.x, uv.x)*step(uv.x, r.x+r.z)*step(r.y, uv.y)*step(uv.y, r.y+r.w); if(inside<0.5) return 0.0; float fx=u_feather/u_res.x; float fy=u_feather/u_res.y; float f=max(fx,fy); float dx=min(uv.x-r.x, (r.x+r.z)-uv.x); float dy=min(uv.y-r.y, (r.y+r.w)-uv.y); float d=min(dx,dy); return smoothstep(0.0,f,d); }
-    float maskEllipse(vec2 uv, vec4 r){ vec2 c=r.xy+r.zw*0.5; vec2 rad=r.zw*0.5; vec2 p=(uv-c)/rad; float rr=dot(p,p); float edge=1.0 - sqrt(max(rr,0.0)); float fe=u_feather/min(u_res.x,u_res.y); return smoothstep(0.0,fe,edge); }
-    float faceMaskShape(vec2 uv){ float a=0.0; for(int i=0;i<${5};++i){ if(i>=u_faceCount) break; vec4 r=u_faces[i]; float m=(u_shape==0)?maskRect(uv,r):maskEllipse(uv,r); a=max(a,m);} return a; }
-    float faceMask(vec2 uv){ float a=(u_maskMode==1)? texture2D(u_maskTex, sampleUV(uv)).r : faceMaskShape(uv); if(u_invert==1) a=1.0-a; return clamp(a,0.0,1.0); }
-
-    // core ops
-    vec2 wave(vec2 uv, float fx, float fy, float amp, float speed){ float twopi=6.2831853; float sx=sin((uv.y*(1.0+fx*0.05)+u_time*(0.2+speed*0.6))*twopi); float cy=cos((uv.x*(0.6+fy*0.04)+u_time*(0.3+speed*0.5))*twopi); vec2 d=vec2(sx,cy)*(amp/u_res); return uv + d; }
-    vec2 flow(vec2 uv, float scale, float strength, float speed, float seed){ vec2 p = uv*scale*2.5 + vec2(u_time*0.1*speed + seed*0.01, seed*0.02); vec2 off = (n2v(p)*2.0-1.0) * (strength/u_res); return uv + off; }
-    vec2 ripple(vec2 uv, vec2 center, float amp, float freq, float speed){ vec2 d=uv-center; float r=length(d); float k = sin(r*freq + u_time*(1.0+speed))*amp/u_res.x; return uv + normalize(d+1e-6)*k; }
-    vec2 swirl(vec2 uv, vec2 center, float amount){ vec2 d=uv-center; float r=length(d); float ang=amount*exp(-r*8.0); float s=sin(ang), c=cos(ang); vec2 rot=vec2(c*d.x - s*d.y, s*d.x + c*d.y); return center + rot; }
-
-    vec4 boxBlur9(sampler2D tex, vec2 uv, float radius){ vec2 off=vec2(radius)/u_res; vec4 acc=vec4(0.0); for(int dx=-1;dx<=1;++dx){ for(int dy=-1; dy<=1; ++dy){ acc += texture2D(tex, uv + off*vec2(float(dx),float(dy))); } } return acc/9.0; }
-
-    vec4 dirSmear(sampler2D tex, vec2 uv, float ang, float len, int taps){ vec2 dir=vec2(cos(ang),sin(ang)); vec2 stepUV=(len/u_res)*dir/max(1.0,float(taps)); vec4 acc=vec4(0.0); float wsum=0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t=float(i); float w=1.0 - t/float(taps); acc+=texture2D(tex, uv - stepUV*t)*w; wsum+=w; } return acc/max(wsum,1e-4); }
-    vec4 radialSmear(sampler2D tex, vec2 uv, vec2 center, float len, int taps){ vec2 dir=normalize(center-uv+1e-6); vec2 stepUV=(len/u_res)*dir/max(1.0,float(taps)); vec4 acc=vec4(0.0); float wsum=0.0; for(int i=0;i<64;i++){ if(i>=taps) break; float t=float(i); float w=1.0 - t/float(taps); acc+=texture2D(tex, uv + stepUV*t)*w; wsum+=w; } return acc/max(wsum,1e-4); }
-
-    vec4 pixelate(sampler2D tex, vec2 uv, float px){ vec2 grid=u_res/max(1.0,px); vec2 uvp=(floor(uv*grid)+0.5)/grid; return texture2D(tex, uvp); }
-    vec4 posterize(vec4 c, float levels){ vec3 q=floor(c.rgb*levels)/levels; return vec4(q, c.a); }
-
-    vec2 glitchRow(vec2 uv, float block, float prob, float seed){ float rows = u_res.y/max(1.0,block); float row=floor(uv.y*rows); float t=floor(u_time*(2.0+seed*0.1)); float r=hash(row + t*13.17 + seed*3.0); float active=step(1.0-prob, r); float shift=(hash(row*7.31 + t*3.17) - 0.5) * 0.25 * active; return uv + vec2(shift,0.0); }
-
-    void main(){
-      vec2 uv = v_uv; // 0..1
-      vec2 su = sampleUV(uv);
-      vec4 col = texture2D(u_tex, su);
-
-      if(u_mode==1){ // Stage A Distort
-        int t = u_i0; // type
-        if(t==1){ su = wave(su, u_p0, u_p1, u_p2, u_p3); }
-        else if(t==2){ su = flow(su, max(0.1,u_p4), u_p5, u_p3, u_p7); }
-        else if(t==3){ su = ripple(su, u_center, u_p2, max(0.1,u_p0), u_p3); }
-        else if(t==4){ su = swirl(su, u_center, u_p6); }
-        col = texture2D(u_tex, su); 
-      }
-      else if(u_mode==2){ // Stage B Smear/Blur
-        int t = u_i0;
-        if(t==1){ col = dirSmear(u_tex, su, u_p1, u_p0, u_i1); }
-        else if(t==2){ col = radialSmear(u_tex, su, u_center, u_p0, u_i1); }
-        else if(t==3){ col = boxBlur9(u_tex, su, u_p2); }
-        else if(t==4){ col = pixelate(u_tex, su, max(1.0,u_p3)); }
-        col = mix(texture2D(u_tex, su), col, clamp(u_p7,0.0,1.0));
-      }
-      else if(u_mode==3){ // Stage C Glitch/Color
-        int t = u_i0;
-        if(t==1){ su = glitchRow(su, max(1.0,u_p0), clamp(u_p1,0.0,1.0), u_p7); col = texture2D(u_tex, su); }
-        else if(t==2){ vec4 cs = sampleChroma(u_tex, su, u_p2, u_p3); col = cs; }
-        else if(t==3){ col = posterize(texture2D(u_tex, su), max(2.0,u_p4)); }
-        else if(t==4){ float line = 0.92 + 0.08*sin(su.y*u_res.y*3.14159); col.rgb *= line; }
-        col = mix(texture2D(u_tex, su), col, clamp(u_p7,0.0,1.0));
-      }
-      else if(u_mode==50){ // Feedback combine: u_tex=current, u_tex2=prev fb
-        vec2 off = (n2v(su*3.1 + u_time)*2.0-1.0) * (u_p0/u_res); // warp
-        vec4 prev = sampleChroma(u_tex2, su+off, u_p1, 0.0);
-        col = mix(col, prev, clamp(u_p2,0.0,1.0)); // mix amount in u_p2 (we'll set to decay)
-      }
-      else if(u_mode==99){ // Compose with mask: u_tex=base, u_tex2=fx
-        float m = faceMask(uv);
-        vec4 fx = texture2D(u_tex2, sampleUV(uv));
-        col = mix(texture2D(u_tex, sampleUV(uv)), fx, m);
-      }
-
-      gl_FragColor = col;
-    }
-  `;
-
-  function setStatus(t){ statusEl.textContent = t; }
-  function setMsg(text, isError=false){ msgEl.textContent = text || ''; msgEl.classList.toggle('error', !!isError); }
-
-  const faceApiAvailable = 'FaceDetector' in window;
-
-  function compile(gl, type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)){ throw new Error(gl.getShaderInfoLog(s)||'shader compile fail'); } return s; }
-
-  function createGL(){
-    gl = canvas.getContext('webgl'); if(!gl) throw new Error('WebGL not available');
-    const vs = compile(gl, gl.VERTEX_SHADER, vertSrc);
-    const fs = compile(gl, gl.FRAGMENT_SHADER, fragSrc);
-    prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog); if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){ throw new Error(gl.getProgramInfoLog(prog)||'link fail'); }
-    quadBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), gl.STATIC_DRAW);
-    gl.useProgram(prog); const a = gl.getAttribLocation(prog, 'a_pos'); gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0);
-
-    baseTex = makeTex(); maskTex = makeTex();
-  }
-
-  function makeTex(){ const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); return t; }
-
-  function makeFBO(){ const tex = makeTex(); const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width, canvas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return { tex, fb }; }
-
-  function ensureFBOs(){ fboA = makeFBO(); fboB = makeFBO(); fboC = makeFBO(); fboFb = makeFBO(); }
-
-  function fit(){ if(!video.videoWidth) return; const w = video.videoWidth, h = video.videoHeight; canvas.width = w; canvas.height = h; maskCanvas.width = w; maskCanvas.height = h; tmpCanvas.width = w; tmpCanvas.height = h; if(gl){ gl.viewport(0,0,w,h); ensureFBOs(); } }
-
-  async function initDetector(){ if(!faceApiAvailable) throw new Error('FaceDetector API not available in this browser.'); detector = new FaceDetector({ fastMode:true, maxDetectedFaces: 5 }); }
-
-  function uploadVideo(){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, baseTex); try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch(e){} gl.uniform1i(gl.getUniformLocation(prog, 'u_tex'), 0); }
-  function uploadMask(){ gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, maskTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas); gl.uniform1i(gl.getUniformLocation(prog, 'u_maskTex'), 2); }
-
-  const U = (name) => gl.getUniformLocation(prog, name);
-  function commonUniforms(mode){ gl.useProgram(prog); gl.uniform1i(U('u_mode'), mode); gl.uniform2f(U('u_res'), canvas.width, canvas.height); gl.uniform1f(U('u_time'), animateChk.checked ? performance.now()/1000 : 0); gl.uniform2f(U('u_center'), effectCenter.x, effectCenter.y); gl.uniform1i(U('u_mirror'), mirrorChk.checked ? 1 : 0); }
-
-  function setMaskUniforms(maskMode){ gl.uniform1f(U('u_feather'), parseFloat(mask.feather.value)); gl.uniform1i(U('u_maskMode'), maskMode); gl.uniform1i(U('u_invert'), mask.invert.checked ? 1 : 0); gl.uniform1i(U('u_shape'), parseInt(mask.shape.value,10)); }
-
-  function setFacesUniform(){ const W=canvas.width, H=canvas.height; const grow=parseFloat(mask.expand.value); let count=0; let cx=0.5, cy=0.5; for(let i=0;i<Math.min(lastDetections.length, MAX_FACES); i++){ const bb = lastDetections[i].boundingBox||lastDetections[i]; let x=bb.x, y=bb.y, w=bb.width, h=bb.height; let nx=Math.floor(x - grow), ny=Math.floor(y - grow), nw=Math.ceil(w + 2*grow), nh=Math.ceil(h + 2*grow); if(nx<0){nw+=nx; nx=0;} if(ny<0){nh+=ny; ny=0;} if(nx+nw>W) nw=W-nx; if(ny+nh>H) nh=H-ny; if(nw<=2||nh<=2) continue; if(mirrorChk.checked){ nx = W - (nx + nw); } faceRects[count*4+0]=nx/W; faceRects[count*4+1]=ny/H; faceRects[count*4+2]=nw/W; faceRects[count*4+3]=nh/H; if(i===0){ cx=(nx+nw*0.5)/W; cy=(ny+nh*0.5)/H; } count++; if(count>=MAX_FACES) break; } for(let j=count;j<MAX_FACES;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; } gl.uniform1i(U('u_faceCount'), count); for(let k=0;k<MAX_FACES;k++){ gl.uniform4f(U(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]); } if(trackCenterChk.checked) effectCenter={x:cx,y:cy}; }
-
-  function drawMaskFromMesh(){ const W=maskCanvas.width, H=maskCanvas.height; maskCtx.clearRect(0,0,W,H); tmpCtx.clearRect(0,0,W,H); tmpCtx.fillStyle='#fff'; tmpCtx.beginPath(); for(const lm of lastFacesMesh){ if(!lm||lm.length<468) continue; const p0=lm[FACE_OVAL[0]]; tmpCtx.moveTo(p0.x*W, p0.y*H); for(let i=1;i<FACE_OVAL.length;i++){ const p=lm[FACE_OVAL[i]]; tmpCtx.lineTo(p.x*W, p.y*H); } tmpCtx.closePath(); } tmpCtx.fill(); maskCtx.filter = `blur(${parseInt(mask.feather.value||0)}px)`; maskCtx.drawImage(tmpCanvas, 0, 0); maskCtx.filter='none'; }
-
-  function bindFBO(f){ gl.bindFramebuffer(gl.FRAMEBUFFER, f?f.fb:null); gl.viewport(0,0,canvas.width,canvas.height); }
-  function drawQuad(){ gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
-
-  function pass(mode, inTex, p=[0,0,0,0,0,0,0,0], i=[0,0,0], inTex2=null){
-    commonUniforms(mode);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, inTex); gl.uniform1i(U('u_tex'), 0);
-    if(inTex2){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, inTex2); gl.uniform1i(U('u_tex2'), 1); }
-    gl.uniform1f(U('u_p0'), p[0]||0); gl.uniform1f(U('u_p1'), p[1]||0); gl.uniform1f(U('u_p2'), p[2]||0); gl.uniform1f(U('u_p3'), p[3]||0); gl.uniform1f(U('u_p4'), p[4]||0); gl.uniform1f(U('u_p5'), p[5]||0); gl.uniform1f(U('u_p6'), p[6]||0); gl.uniform1f(U('u_p7'), p[7]||0);
-    gl.uniform1i(U('u_i0'), i[0]||0); gl.uniform1i(U('u_i1'), i[1]||0); gl.uniform1i(U('u_i2'), i[2]||0);
-    drawQuad();
-  }
-
-  async function start(){
-    if(!navigator.mediaDevices?.getUserMedia){ setMsg('getUserMedia not supported. Try Chrome/Edge/Firefox.', true); return; }
-    if(!isSecureContext){ setMsg('Not HTTPS — camera will be blocked. Use GitHub Pages.', true); return; }
-    try {
-      setStatus('Requesting camera…');
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      video.srcObject = stream; await video.play();
-      await new Promise((res) => { if (video.videoWidth && video.videoHeight) return res(); const onMeta = () => { video.removeEventListener('loadedmetadata', onMeta); res(); }; video.addEventListener('loadedmetadata', onMeta, { once: true }); });
-      fit(); window.addEventListener('resize', fit);
-      try { await initDetector(); setMsg(''); } catch(e){ console.warn(e); setMsg('FaceDetector API not available. Try latest Chrome or enable FaceMesh mask.', true); }
-      createGL(); ensureFBOs();
-      startBtn.disabled = true; stopBtn.disabled = false;
-      loop();
-    } catch(err){ console.error(err); const httpsHint = location.protocol !== 'https:' ? ' • Tip: GitHub Pages serves HTTPS.' : ''; setMsg('Could not start camera: ' + err.message + httpsHint, true); setStatus('Error'); }
-  }
-
-  function stop(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
-
-  async function detectFaces(){ if(!detector) return []; try { return (await detector.detect(video)) || []; } catch(e){ return []; } }
-
-  async function ensureFaceMesh(){ if(faceMeshReady) return true; if(typeof window.FaceMesh === 'undefined'){ await new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload=resolve; s.onerror=()=>reject(new Error('Failed to load MediaPipe FaceMesh')); document.head.appendChild(s); }); } faceMesh = new window.FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` }); faceMesh.setOptions({ maxNumFaces: MAX_FACES, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 }); faceMesh.onResults((res)=>{ lastFacesMesh = res.multiFaceLandmarks ? res.multiFaceLandmarks.map(lm => lm.map(p=>({x:p.x, y:p.y}))) : []; if(trackCenterChk.checked && lastFacesMesh.length){ const lm=lastFacesMesh[0]; let sx=0,sy=0; for(const p of lm){ sx+=p.x; sy+=p.y; } effectCenter={x:sx/lm.length, y:sy/lm.length}; } }); faceMeshReady=true; return true; }
-
-  function loop(){
-    rafId = requestAnimationFrame(loop);
-
-    // Detection
-    if(useMeshMaskChk.checked){ ensureFaceMesh().catch(e=>setMsg(e.message,true)); if(faceMesh && !fmBusy && (performance.now()-lastFmTime)>FM_MIN_INTERVAL){ fmBusy=true; lastFmTime=performance.now(); faceMesh.send({ image: video }).then(()=>{ fmBusy=false; }).catch(()=>{ fmBusy=false; }); } }
-    else if(!lastDetTime || (performance.now()-lastDetTime)>DETECT_EVERY_MS){ lastDetTime=performance.now(); if(detector){ detectFaces().then(faces=>{ lastDetections=faces; statusEl.textContent = faces.length ? `Faces: ${faces.length}` : 'No face'; }); } else { statusEl.textContent='Camera on'; } }
-
-    if(!video.videoWidth) return;
-    if(canvas.width === 0 || canvas.height === 0){ fit(); }
-
-    // Update centers and masks
-    if(!useMeshMaskChk.checked){ setFacesUniform(); }
-    let maskMode = 0; // shapes
-    if(useMeshMaskChk.checked && lastFacesMesh.length){ drawMaskFromMesh(); uploadMask(); maskMode = 1; }
-
-    // Upload camera frame
-    uploadVideo();
-
-    // Stage A
-    bindFBO(fboA);
-    pass(1, baseTex, [parseFloat(s1.Fx.value), parseFloat(s1.Fy.value), parseFloat(s1.Amp.value), parseFloat(s1.Speed.value), parseFloat(s1.Scale.value), parseFloat(s1.Str.value), parseFloat(s1.Swirl.value), parseFloat(s1.Int.value)], [parseInt(s1.type.value,10), 0, 0]);
-
-    // Stage B (input fboA)
-    bindFBO(fboB);
-    pass(2, fboA.tex, [parseFloat(s2.Len.value), (parseFloat(s2.Ang.value)*Math.PI/180), parseFloat(s2.Blur.value), parseFloat(s2.Pixel.value), 0,0,0, parseFloat(s2.Int.value)], [parseInt(s2.type.value,10), parseInt(s2.Samples.value,10), 0]);
-
-    // Stage C (input fboB)
-    bindFBO(fboC);
-    pass(3, fboB.tex, [parseFloat(s3.Block.value), parseFloat(s3.Prob.value), parseFloat(s3.ShiftX.value), parseFloat(s3.ShiftY.value), parseFloat(s3.Levels.value), 0,0, parseFloat(s3.Mix.value)], [parseInt(s3.type.value,10),0,0]);
-
-    // Feedback combine (optional): current=fboC, prev=fboFb
-    if(fb.enable.checked){ bindFBO(fboFb); pass(50, fboC.tex, [parseFloat(fb.Warp.value), parseFloat(fb.Chroma.value), parseFloat(fb.Decay.value), 0,0,0,0,0], [0,0,0], fboFb.tex); }
-
-    // Compose with mask (to screen)
-    bindFBO(null);
-    commonUniforms(99); setMaskUniforms(maskMode);
-    setFacesUniform(); // ensure rects available even if not used
-
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, baseTex); gl.uniform1i(U('u_tex'), 0);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, fb.enable.checked ? fboFb.tex : fboC.tex); gl.uniform1i(U('u_tex2'), 1);
-    drawQuad();
-
-    status2El.textContent = `${canvas.width}×${canvas.height} • A:${s1.type.options[s1.type.selectedIndex].text} • B:${s2.type.options[s2.type.selectedIndex].text} • C:${s3.type.options[s3.type.selectedIndex].text}${useMeshMaskChk.checked ? ' • Mesh mask' : ''}`;
-  }
-
-  startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
-
-  // Presets
-  document.getElementById('presetClean').addEventListener('click', () => {
-    s1.type.value='2'; s1.Fx.value=8; s1.Fy.value=6; s1.Amp.value=6; s1.Scale.value=2.2; s1.Str.value=6; s1.Swirl.value=0; s1.Speed.value=0.6; s1.Int.value=0.5;
-    s2.type.value='3'; s2.Blur.value=10; s2.Int.value=0.6; s2.Len.value=8; s2.Ang.value=0; s2.Samples.value=8; s2.Pixel.value=10;
-    s3.type.value='2'; s3.ShiftX.value=2; s3.ShiftY.value=0; s3.Mix.value=0.4; s3.Block.value=20; s3.Prob.value=0.1; s3.Levels.value=12;
-    [s1.Fx,s1.Fy,s1.Amp,s1.Scale,s1.Str,s1.Swirl,s1.Speed,s1.Int,s2.Blur,s2.Int,s2.Len,s2.Ang,s2.Samples,s2.Pixel,s3.ShiftX,s3.ShiftY,s3.Mix,s3.Block,s3.Prob,s3.Levels].forEach(e=>e.dispatchEvent(new Event('input')));
-  });
-  document.getElementById('presetGlitch').addEventListener('click', () => {
-    s1.type.value='2'; s1.Scale.value=4; s1.Str.value=18; s1.Speed.value=1.8; s1.Amp.value=10; s1.Int.value=1;
-    s2.type.value='1'; s2.Len.value=90; s2.Ang.value=0; s2.Samples.value=28; s2.Int.value=1;
-    s3.type.value='1'; s3.Block.value=16; s3.Prob.value=0.65; s3.ShiftX.value=8; s3.ShiftY.value=2; s3.Mix.value=1; s3.Levels.value=8;
-    [s1.Scale,s1.Str,s1.Speed,s1.Amp,s1.Int,s2.Len,s2.Ang,s2.Samples,s2.Int,s3.Block,s3.Prob,s3.ShiftX,s3.ShiftY,s3.Mix,s3.Levels].forEach(e=>e.dispatchEvent(new Event('input')));
-  });
-  document.getElementById('presetSmear').addEventListener('click', () => {
-    s1.type.value='1'; s1.Fx.value=10; s1.Fy.value=14; s1.Amp.value=8; s1.Speed.value=0.8; s1.Int.value=0.7;
-    s2.type.value='2'; s2.Len.value=140; s2.Samples.value=36; s2.Int.value=1; s2.Blur.value=8;
-    s3.type.value='2'; s3.ShiftX.value=4; s3.ShiftY.value=0; s3.Mix.value=0.6; s3.Levels.value=10;
-    [s1.Fx,s1.Fy,s1.Amp,s1.Speed,s1.Int,s2.Len,s2.Samples,s2.Int,s2.Blur,s3.ShiftX,s3.ShiftY,s3.Mix,s3.Levels].forEach(e=>e.dispatchEvent(new Event('input')));
-  });
-
-  document.getElementById('randomBtn').addEventListener('click', () => {
-    const r=(min,max,step=1)=>{ const v=min+Math.random()*(max-min); return (Math.round(v/step)*step).toFixed(step<1?2:0); };
-    s1.type.value=String(Math.floor(Math.random()*5)); s1.Fx.value=r(0,80,0.5); s1.Fy.value=r(0,80,0.5); s1.Amp.value=r(0,80,1); s1.Scale.value=r(0.5,8,0.1); s1.Str.value=r(0,80,1); s1.Swirl.value=r(-6.28,6.28,0.01); s1.Speed.value=r(0,5,0.01); s1.Int.value=r(0,1,0.01);
-    s2.type.value=String(Math.floor(Math.random()*5)); s2.Len.value=r(0,220,1); s2.Ang.value=r(0,360,1); s2.Samples.value=r(4,48,1); s2.Blur.value=r(0,48,1); s2.Pixel.value=r(2,48,1); s2.Int.value=r(0,1,0.01);
-    s3.type.value=String(Math.floor(Math.random()*5)); s3.Block.value=r(2,200,2); s3.Prob.value=r(0,1,0.01); s3.ShiftX.value=r(0,24,1); s3.ShiftY.value=r(0,24,1); s3.Levels.value=r(2,32,1); s3.Mix.value=r(0,1,0.01);
-    [s1.Fx,s1.Fy,s1.Amp,s1.Scale,s1.Str,s1.Swirl,s1.Speed,s1.Int,s2.Len,s2.Ang,s2.Samples,s2.Blur,s2.Pixel,s2.Int,s3.Block,s3.Prob,s3.ShiftX,s3.ShiftY,s3.Levels,s3.Mix].forEach(e=>e.dispatchEvent(new Event('input')));
-  });
-
-  startBtn.addEventListener('click', start); stopBtn.addEventListener('click', stop);
-  (async () => { try { const p = await navigator.permissions.query({ name:'camera' }); if(p.state==='granted') start(); } catch{} })();
+  const root = document.documentElement;
+  const sidebar = document.getElementById('sidebar');
+  const resizer = document.getElementById('resizer');
+  const collapseBtn = document.getElementById('collapseBtn');
+  const LS_KEY = 'facefx.sidebar.w';
+  let sidebarW = parseInt(localStorage.getItem(LS_KEY) || '380', 10);
+  function applyW(){ sidebar.style.width = sidebarW + 'px'; }
+  applyW();
+  let dragging = false;
+  resizer.addEventListener('mousedown', (e)=>{ dragging=true; document.body.classList.add('resizing'); e.preventDefault(); });
+  window.addEventListener('mousemove', (e)=>{ if(!dragging) return; sidebarW = Math.max(260, Math.min(560, e.clientX - sidebar.getBoundingClientRect().left + sidebarW - sidebar.offsetWidth)); applyW(); localStorage.setItem(LS_KEY, sidebarW); window.dispatchEvent(new Event('resize')); });
+  window.addEventListener('mouseup', ()=>{ if(dragging){ dragging=false; document.body.classList.remove('resizing'); } });
+  collapseBtn.addEventListener('click', ()=>{ if(sidebar.offsetWidth>40){ sidebarW = 0; sidebar.style.width = '0px'; } else { sidebarW = parseInt(localStorage.getItem(LS_KEY) || '380',10); applyW(); } window.dispatchEvent(new Event('resize')); });
 })();
 </script>
-</body>
+
+<script>
+
 </html>
