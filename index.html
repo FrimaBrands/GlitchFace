@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Face Glitch V3 - Stacking Edition</title>
+    <title>Face Glitch V3.1 - Stacking Edition</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -240,9 +240,7 @@
             margin-bottom: 4px;
         }
         
-        .slider-input {
-            width: 100%; height: 4px; border-radius: 2px; background: var(--border-color); -webkit-appearance: none; appearance: none; outline: none;
-        }
+        .slider-input { width: 100%; height: 4px; border-radius: 2px; background: var(--border-color); -webkit-appearance: none; appearance: none; outline: none; }
 
         .slider-input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
         .slider-input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--primary-color); cursor: pointer; border: 2px solid #0d0f13; }
@@ -273,7 +271,7 @@
         </div>
         <div class="controls-panel">
             <div class="header">
-                <h1>Glitch V3</h1>
+                <h1>Glitch V3.1</h1>
                 <div class="header-actions">
                     <button id="startBtn" class="btn btn-primary">Start Camera</button>
                     <button id="stopBtn" class="btn" disabled>Stop</button>
@@ -492,7 +490,7 @@
     const FM_MIN_INTERVAL = 60;
     const FACE_OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109, 10];
     
-    // --- GLSL SHADERS (V3 with Stacking) ---
+    // --- GLSL SHADERS (V3.1 with Stacking and Fixes) ---
     const vertSrc = `attribute vec2 a_pos; varying vec2 v_uv; void main(){ v_uv = a_pos; gl_Position = vec4(a_pos*2.0-1.0, 0.0, 1.0);}`;
     const fragSrc = `
         precision highp float; varying vec2 v_uv; uniform sampler2D u_tex, u_maskTex;
@@ -503,6 +501,10 @@
         uniform bool u_enableGlitch, u_enableWavy, u_enableBoxBlur, u_enablePixelate, u_enableSmear, u_enableRadialBlur, u_enableSwirl, u_enableNoiseFlow;
         uniform bool u_smearOscillate;
         uniform int u_pixelPattern, u_noisePattern;
+
+        // *** FIX 1: DECLARE MISSING UNIFORMS ***
+        uniform float u_radialBlurLen;
+        uniform int u_radialBlurSamples;
 
         // --- UTILITY FUNCTIONS ---
         float hash(float n){ return fract(sin(n)*43758.5453); }
@@ -535,7 +537,22 @@
         vec4 applyPixelate(vec2 uv){ float p = getPattern(uv, u_pixelPattern); float size = mix(1.0, u_pixel, p); vec2 Puv = (floor(uv * u_resolution / max(1.0,size)) + 0.5) * max(1.0,size) / u_resolution; return sampleChroma(u_tex, Puv); }
         vec4 applyGlitch(vec4 col, vec2 uv){ float rows = u_resolution.y / max(1.0, u_block); float row = floor(uv.y * rows); float t = floor(u_time * (2.0 + u_speed*20.0) + u_seed*10.0); float r = hash(row + t*13.17); float active = step(1.0 - u_prob, r); vec2 guv = uv + vec2((hash(row*7.31 + t*3.17) - 0.5) * 0.25 * u_intensity * active, 0.0); vec4 glitchCol = sampleChroma(u_tex, guv); float line = step(0.98, rand(vec2(row, floor(u_time*10.0+u_seed)))); glitchCol.rgb *= mix(1.0, 0.7, line * u_intensity); return mix(col, glitchCol, 0.9); }
         vec4 applyDirSmear(vec2 uv, float len){ float ang = radians(u_smAng); if (u_smearOscillate) { ang += sin(u_time * (u_speed + 1.0)) * 3.14; } vec2 dir = vec2(cos(ang), sin(ang)); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(u_samples)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=u_samples) break; float t = float(i); float w = 1.0 - t/float(u_samples); acc += texture2D(u_tex, uv - stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
-        vec4 applyRadialBlur(vec2 uv, vec2 center, float len){ vec2 dir = normalize(uv - center + 1e-6); vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(u_samples)); vec4 acc = vec4(0.0); float wsum = 0.0; for(int i=0;i<64;i++){ if(i>=u_samples) break; float t = float(i); float w = 1.0 - t/float(u_samples); acc += texture2D(u_tex, uv - stepUV * t) * w; wsum += w; } return acc / max(wsum, 1e-4); }
+        
+        // *** FIX 2: USE THE CORRECT SAMPLE UNIFORM ***
+        vec4 applyRadialBlur(vec2 uv, vec2 center, float len){ 
+            vec2 dir = normalize(uv - center + 1e-6); 
+            vec2 stepUV = (len / u_resolution) * dir / max(1.0, float(u_radialBlurSamples)); 
+            vec4 acc = vec4(0.0); 
+            float wsum = 0.0; 
+            for(int i=0;i<64;i++){ 
+                if(i>=u_radialBlurSamples) break; 
+                float t = float(i); 
+                float w = 1.0 - t/float(u_radialBlurSamples); 
+                acc += texture2D(u_tex, uv - stepUV * t) * w; 
+                wsum += w; 
+            } 
+            return acc / max(wsum, 1e-4); 
+        }
 
         // --- MASKING LOGIC ---
         float maskRect(vec2 uv, vec4 r){ float fx=u_feather/u_resolution.x, fy=u_feather/u_resolution.y; vec2 d=abs(uv - (r.xy+r.zw*0.5)) - r.zw*0.5 + max(fx,fy); return smoothstep(max(fx,fy), 0.0, length(max(d,0.0))); }
@@ -584,267 +601,4 @@
     function fit(){ if(!video.videoWidth) return; const w=video.videoWidth, h=video.videoHeight; canvas.width=w; canvas.height=h; maskCanvas.width=w; maskCanvas.height=h; tmpCanvas.width=w; tmpCanvas.height=h; if(gl) gl.viewport(0,0,w,h); }
     function createGL(){
         gl = canvas.getContext('webgl'); if(!gl) throw new Error('WebGL not available');
-        function compile(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)||'shader compile fail'); return s; }
-        const vs = compile(gl.VERTEX_SHADER, vertSrc), fs = compile(gl.FRAGMENT_SHADER, fragSrc);
-        program = gl.createProgram(); gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program); if(!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)||'link fail');
-        buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), gl.STATIC_DRAW);
-        gl.useProgram(program);
-        const a_pos = gl.getAttribLocation(program, 'a_pos');
-        gl.enableVertexAttribArray(a_pos); gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
-        tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-        maskTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, maskTex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    }
-    const U = {}; function getU(name){ return U[name] || (U[name] = gl.getUniformLocation(program, name)); }
-
-    // --- GL RENDERING LOGIC ---
-    function uploadVideoTexture(){ gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex); try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video); } catch(e) {} gl.uniform1i(getU('u_tex'), 0); }
-    function uploadMaskTexture(){ gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, maskTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas); gl.uniform1i(getU('u_maskTex'), 1); }
-    function setFacesUniform(){
-        const W = canvas.width, H = canvas.height, mirror = mirrorChk.checked, grow = parseFloat(ui.pad.value); let count = 0, cx = 0.5, cy = 0.5;
-        for(let i=0; i<Math.min(lastDetections.length, MAX_FACES); i++){
-            const bb = lastDetections[i].boundingBox || lastDetections[i];
-            let x=bb.x, y=bb.y, w=bb.width, h=bb.height; let nx = Math.floor(x-grow), ny=Math.floor(y-grow), nw=Math.ceil(w+2*grow), nh=Math.ceil(h+2*grow);
-            if(nx<0){nw+=nx;nx=0;} if(ny<0){nh+=ny;ny=0;} if(nx+nw>W)nw=W-nx; if(ny+nh>H)nh=H-ny; if(nw<=2||nh<=2)continue;
-            if(mirror) nx = W - (nx + nw);
-            faceRects[count*4+0]=nx/W; faceRects[count*4+1]=ny/H; faceRects[count*4+2]=nw/W; faceRects[count*4+3]=nh/H; count++;
-            if(i===0){ cx=(nx+nw*0.5)/W; cy=(ny+nh*0.5)/H; } if(count>=MAX_FACES) break;
-        }
-        for(let j=count;j<MAX_FACES;j++){ faceRects[j*4+0]=0; faceRects[j*4+1]=0; faceRects[j*4+2]=0; faceRects[j*4+3]=0; }
-        gl.uniform1i(getU('u_faceCount'), count);
-        for(let k=0;k<MAX_FACES;k++){ gl.uniform4f(getU(`u_faces[${k}]`), faceRects[k*4], faceRects[k*4+1], faceRects[k*4+2], faceRects[k*4+3]); }
-        if(trackCenterChk.checked) effectCenter = { x: cx, y: cy };
-    }
-    function drawMaskFromMesh(){
-        const W = maskCanvas.width, H = maskCanvas.height; maskCtx.clearRect(0,0,W,H); tmpCtx.clearRect(0,0,W,H); tmpCtx.fillStyle = '#fff'; tmpCtx.beginPath();
-        for(const lm of lastFacesMesh){ if(!lm || lm.length < 468) continue; const p0 = lm[FACE_OVAL[0]]; tmpCtx.moveTo(p0.x*W, p0.y*H); for(let i=1;i<FACE_OVAL.length;i++){ const p = lm[FACE_OVAL[i]]; tmpCtx.lineTo(p.x*W, p.y*H); } tmpCtx.closePath(); }
-        tmpCtx.fill(); maskCtx.filter = `blur(${parseInt(ui.feather.value||0)}px)`; maskCtx.drawImage(tmpCanvas, 0, 0); maskCtx.filter = 'none';
-    }
-    function setCommonUniforms(timeSec){
-        // Global uniforms
-        gl.uniform1f(getU('u_intensity'), parseFloat(ui.intensity.value)); gl.uniform1f(getU('u_speed'), parseFloat(ui.speed.value)); gl.uniform1f(getU('u_chroma'), parseFloat(ui.chroma.value));
-        gl.uniform1f(getU('u_feather'), parseFloat(ui.feather.value)); gl.uniform1f(getU('u_mix'), parseFloat(ui.mix.value)); gl.uniform1f(getU('u_seed'), parseFloat(ui.seed.value));
-        gl.uniform1i(getU('u_shape'), parseInt(shapeSel.value,10)); gl.uniform1i(getU('u_invert'), invertChk.checked ? 1 : 0);
-        gl.uniform2f(getU('u_resolution'), canvas.width, canvas.height); gl.uniform1f(getU('u_time'), timeSec); gl.uniform2f(getU('u_center'), effectCenter.x, effectCenter.y);
-
-        // Send enable flags for the stack
-        gl.uniform1i(getU('u_enableGlitch'), activeEffects.includes('0') ? 1:0); gl.uniform1i(getU('u_enableWavy'), activeEffects.includes('1') ? 1:0);
-        gl.uniform1i(getU('u_enableBoxBlur'), activeEffects.includes('2') ? 1:0); gl.uniform1i(getU('u_enablePixelate'), activeEffects.includes('3') ? 1:0);
-        gl.uniform1i(getU('u_enableSmear'), activeEffects.includes('5') ? 1:0); gl.uniform1i(getU('u_enableRadialBlur'), activeEffects.includes('6') ? 1:0);
-        gl.uniform1i(getU('u_enableSwirl'), activeEffects.includes('7') ? 1:0); gl.uniform1i(getU('u_enableNoiseFlow'), activeEffects.includes('8') ? 1:0);
-
-        // Send individual effect params
-        gl.uniform1f(getU('u_smLen'), parseFloat(ui.smLen.value)); gl.uniform1f(getU('u_smAng'), parseFloat(ui.smAng.value)); gl.uniform1i(getU('u_samples'), parseInt(ui.samples.value,10));
-        gl.uniform1i(getU('u_smearOscillate'), ui.smearOscillate.checked ? 1:0);
-        gl.uniform1f(getU('u_radialBlurLen'), parseFloat(ui.radialBlurLen.value)); gl.uniform1i(getU('u_samples'), parseInt(ui.radialBlurSamples.value,10));
-        gl.uniform1f(getU('u_nScale'), parseFloat(ui.nScale.value)); gl.uniform1f(getU('u_nStrength'), parseFloat(ui.nStrength.value)); gl.uniform1i(getU('u_noisePattern'), parseInt(ui.noisePattern.value, 10));
-        gl.uniform1f(getU('u_block'), parseFloat(ui.block.value)); gl.uniform1f(getU('u_prob'), parseFloat(ui.prob.value));
-        gl.uniform1f(getU('u_freq'), parseFloat(ui.freq.value)); gl.uniform1f(getU('u_amp'), parseFloat(ui.amp.value));
-        gl.uniform1f(getU('u_swirl'), parseFloat(ui.swirl.value)); gl.uniform1f(getU('u_blur'), parseFloat(ui.blur.value));
-        gl.uniform1f(getU('u_pixel'), parseFloat(ui.pixel.value)); gl.uniform1i(getU('u_pixelPattern'), parseInt(ui.pixelPattern.value, 10));
-    }
-    async function ensureFaceMesh(){
-        if(faceMeshReady) return true;
-        if(typeof window.FaceMesh === 'undefined'){
-            await new Promise((resolve, reject) => { const s = document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js'; s.onload=resolve; s.onerror=()=>reject(new Error('Failed to load MediaPipe')); document.head.appendChild(s); });
-        }
-        faceMesh = new window.FaceMesh({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` });
-        faceMesh.setOptions({ maxNumFaces: MAX_FACES, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        faceMesh.onResults((res) => {
-            lastFacesMesh = res.multiFaceLandmarks ? res.multiFaceLandmarks.map(lm => lm.map(p => ({x:p.x, y:p.y}))) : [];
-            if(trackCenterChk.checked && lastFacesMesh.length){ const lm = lastFacesMesh[0]; let sx=0, sy=0; for(const p of lm){ sx+=p.x; sy+=p.y; } effectCenter = { x: sx/lm.length, y: sy/lm.length }; }
-        });
-        faceMeshReady = true; return true;
-    }
-
-    // --- MAIN APP FLOW (START/STOP/LOOP) ---
-    async function start(){
-        if(!navigator.mediaDevices?.getUserMedia){ setMsg('getUserMedia not supported.', true); return; }
-        if(!isSecureContext){ setMsg('Page must be secure (HTTPS).', true); return; }
-        try {
-            setStatus('Requesting camera…');
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-            video.srcObject = stream; await video.play();
-            await new Promise(res => { if(video.videoWidth && video.videoHeight) return res(); video.addEventListener('loadedmetadata', res, {once:true}); });
-            fit(); window.addEventListener('resize', fit);
-            try { await initDetector(); setMsg(''); } catch(e){ console.warn(e); setMsg('FaceDetector API not available. Using MediaPipe for tracking.', false); }
-            createGL(); startBtn.disabled = true; stopBtn.disabled = false;
-            loop();
-        } catch(err){
-            console.error(err); let hint = '';
-            if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) hint = ' • Permission blocked. Check address bar.';
-            if (err && err.name === 'NotFoundError') hint = ' • No camera found.';
-            setMsg('Camera error: ' + err.message + hint, true); setStatus('Error');
-        }
-    }
-    function stop(){ if(rafId) cancelAnimationFrame(rafId), rafId=null; if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } startBtn.disabled=false; stopBtn.disabled=true; setStatus('Stopped'); }
-    async function detectFaces(){ if(!detector) return []; try { return (await detector.detect(video)) || []; } catch(e){ return []; } }
-    function loop(){
-        rafId = requestAnimationFrame(loop);
-        if(preciseMaskChk.checked){
-            ensureFaceMesh().catch(e => setMsg(e.message, true));
-            if(faceMesh && !fmBusy && (performance.now() - lastFmTime) > FM_MIN_INTERVAL){ fmBusy=true; lastFmTime=performance.now(); faceMesh.send({ image: video }).finally(() => { fmBusy = false; }); }
-        } else if(!lastDetTime || (performance.now() - lastDetTime) > DETECT_EVERY_MS){
-            lastDetTime = performance.now(); if(detector){ detectFaces().then(faces => { lastDetections = faces; }); }
-        }
-        if(!video.videoWidth || canvas.width === 0 || canvas.height === 0){ fit(); return; }
-        let maskMode = 0;
-        if(preciseMaskChk.checked && lastFacesMesh.length){ drawMaskFromMesh(); uploadMaskTexture(); maskMode = 1; }
-        if(!preciseMaskChk.checked) setFacesUniform();
-        uploadVideoTexture();
-        gl.useProgram(program);
-        gl.uniform1i(getU('u_maskMode'), maskMode);
-        if(preciseMaskChk.checked) gl.uniform1i(getU('u_faceCount'), 0);
-        const t = animateChk.checked ? performance.now()/1000 : 0;
-        setCommonUniforms(t);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        status2El.textContent = `${canvas.width}×${canvas.height}${preciseMaskChk.checked ? ' • Mesh' : ''}`;
-    }
-    
-    // --- UI & PRESET LOGIC ---
-    function updateEffectUI() {
-        dynamicControls.forEach(panel => {
-            panel.classList.toggle('active', activeEffects.includes(panel.dataset.effect));
-        });
-        const activeNames = activeEffects.map(id => {
-            const btn = document.querySelector(`.effect-btn[data-effect="${id}"]`);
-            return btn ? btn.dataset.name : `Effect ${id}`;
-        });
-        activeEffectsListEl.textContent = activeNames.length > 0 ? `Active: ${activeNames.join(', ')}` : 'Active: None';
-    }
-
-    effectBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const effectId = btn.dataset.effect;
-            btn.classList.toggle('active-stack');
-            if (activeEffects.includes(effectId)) {
-                activeEffects = activeEffects.filter(id => id !== effectId);
-            } else {
-                activeEffects.push(effectId);
-            }
-            updateEffectUI();
-        });
-    });
-
-    document.querySelectorAll('.control-group-header').forEach(header => {
-        header.addEventListener('click', () => header.parentElement.classList.toggle('expanded'));
-    });
-    
-    // Preset Management
-    const presetNameInput = document.getElementById('presetName');
-    const savePresetBtn = document.getElementById('savePresetBtn');
-    const deletePresetBtn = document.getElementById('deletePresetBtn');
-    const presetSelect = document.getElementById('presetSelect');
-
-    function getPresets() {
-        try { return JSON.parse(localStorage.getItem(PRESET_STORAGE_KEY) || '{}'); } catch { return {}; }
-    }
-    function savePresets(presets) {
-        localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
-    }
-    function populatePresetList() {
-        const presets = getPresets();
-        presetSelect.innerHTML = '<option value="">Load a preset...</option>';
-        Object.keys(presets).sort().forEach(name => {
-            const option = document.createElement('option');
-            option.value = name; option.textContent = name;
-            presetSelect.appendChild(option);
-        });
-    }
-
-    savePresetBtn.addEventListener('click', () => {
-        const name = presetNameInput.value.trim();
-        if (!name) { setMsg("Please enter a name for the preset.", true); return; }
-        
-        const settings = { activeEffects: [...activeEffects] };
-        document.querySelectorAll('[data-control-id]').forEach(el => {
-            const id = el.dataset.controlId;
-            settings[id] = el.type === 'checkbox' ? el.checked : el.value;
-        });
-        
-        const presets = getPresets();
-        presets[name] = settings;
-        savePresets(presets);
-        populatePresetList();
-        presetSelect.value = name;
-        setMsg(`Preset '${name}' saved.`, false);
-    });
-
-    presetSelect.addEventListener('change', () => {
-        const name = presetSelect.value;
-        if (!name) return;
-        
-        const presets = getPresets();
-        const settings = presets[name];
-        if (!settings) return;
-
-        // Load settings
-        Object.keys(settings).forEach(id => {
-            const el = document.querySelector(`[data-control-id="${id}"]`);
-            if (el) {
-                if (el.type === 'checkbox') { el.checked = settings[id]; } 
-                else { el.value = settings[id]; }
-                el.dispatchEvent(new Event('input', { bubbles: true })); // Update UI displays
-            }
-        });
-        
-        activeEffects = settings.activeEffects || [];
-        effectBtns.forEach(btn => {
-            btn.classList.toggle('active-stack', activeEffects.includes(btn.dataset.effect));
-        });
-        updateEffectUI();
-        presetNameInput.value = name;
-        setMsg(`Preset '${name}' loaded.`, false);
-    });
-
-    deletePresetBtn.addEventListener('click', () => {
-        const name = presetSelect.value;
-        if (!name) { setMsg("Select a preset to delete.", true); return; }
-        const presets = getPresets();
-        delete presets[name];
-        savePresets(presets);
-        populatePresetList();
-        presetNameInput.value = '';
-        setMsg(`Preset '${name}' deleted.`, false);
-    });
-
-    // Built-in presets and randomize
-    function loadConfig(config) {
-        // Deactivate all first
-        activeEffects = [];
-        effectBtns.forEach(btn => btn.classList.remove('active-stack'));
-        
-        Object.keys(config).forEach(key => {
-            const el = document.getElementById(key);
-            if (el) {
-                if (el.type === 'checkbox') el.checked = config[key];
-                else el.value = config[key];
-                el.dispatchEvent(new Event('input'));
-            } else if (key === 'activeEffects') {
-                activeEffects = config.activeEffects;
-                activeEffects.forEach(id => document.querySelector(`[data-effect="${id}"]`).classList.add('active-stack'));
-            }
-        });
-        updateEffectUI();
-    }
-    
-    document.getElementById('presetSoft').addEventListener('click', () => loadConfig({activeEffects:['5'],smLen:80,smAng:0,samples:24,smearOscillate:true,intensity:1,mix:1,chroma:4,feather:16,pad:12}));
-    document.getElementById('presetGlitch').addEventListener('click', () => loadConfig({activeEffects:['0','8'],block:18,prob:0.6,nScale:4,nStrength:12,intensity:1,chroma:10,speed:2.2,feather:10,mix:1,pad:8}));
-    document.getElementById('presetWavy').addEventListener('click', () => loadConfig({activeEffects:['1','3'],freq:25,amp:20,pixel:16,pixelPattern:'1',intensity:1,speed:1,feather:12,invert:true}));
-    document.getElementById('randomBtn').addEventListener('click', () => {
-        const rand = (min,max,step=1)=>(Math.round((min+Math.random()*(max-min))/step)*step).toFixed(step<1?2:0);
-        const randEffects = effectBtns.filter(() => Math.random() < 0.3).map(btn => btn.dataset.effect);
-        loadConfig({
-            activeEffects: randEffects.length ? randEffects : [String(Math.floor(Math.random()*8))],
-            intensity:rand(0.2,1,0.01), speed:rand(0,3,0.01), blur:rand(0,48), chroma:rand(0,20), pixel:rand(2,48), freq:rand(0,50,0.5), amp:rand(0,50), block:rand(4,140,2), prob:rand(0,1,0.01), feather:rand(0,40), mix:rand(0.3,1,0.01), pad:rand(0,80), seed:rand(0,100), smLen:rand(0,120), smAng:rand(0,360), samples:rand(4,28), swirl:rand(-5,5,0.01), nScale:rand(0.5,6,0.1), nStrength:rand(0,50), radialBlurLen: rand(0,120),
-            shape: Math.random() < 0.5 ? '0' : '1', invert: Math.random() < 0.2, preciseMaskChk: Math.random() < 0.5
-        });
-    });
-
-    // --- LIFECYCLE ---
-    startBtn.addEventListener('click', start);
-    stopBtn.addEventListener('click', stop);
-    (async () => { populatePresetList(); try { if((await navigator.permissions.query({name:'camera'})).state==='granted') start(); } catch{} })();
-})();
-</script>
-</body>
-</html>
+        function compile(type
