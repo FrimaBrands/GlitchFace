@@ -171,7 +171,7 @@
         Object.keys(controlDefinitions).forEach(id => createSliderControl(id, controlDefinitions[id]));
         
         let stream = null, rafId = null, gl = null;
-        let effectProgram = null, displayProgram = null; // BUG FIX: Two separate programs
+        let effectProgram = null, displayProgram = null;
         let videoTex = null, maskTex = null;
         let fbos = [], currentFBO = 0;
         let lastFacesMesh = [];
@@ -208,8 +208,7 @@
                 if(u_Smear_active) final_color=applySmear(v_uv,final_color);
                 gl_FragColor=mix(base_color,final_color,u_mix);
             }`;
-
-        // BUG FIX: New, simple shader to just display a texture
+            
         const displayFragSrc = `
             precision highp float; varying vec2 v_uv;
             uniform sampler2D u_displayTex;
@@ -284,7 +283,6 @@
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
             // --- Pass 2: Display Pass (draw FBO to canvas) ---
-            // BUG FIX: Use the simple display program
             gl.useProgram(displayProgram);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.viewport(0, 0, canvas.width, canvas.height);
@@ -322,20 +320,26 @@
                 const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vsSrc); gl.compileShader(vs);
                 const fs = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs, fsSrc); gl.compileShader(fs);
                 if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) { setMsg("Shader Error: " + gl.getShaderInfoLog(fs), true); throw new Error("Shader compile error"); }
-                const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-                prog.id = programIdCounter++; // For unique uniform caching
+                const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+
+                // BUG FIX: Bind attribute location BEFORE linking.
+                // This guarantees a_pos is at location 0 for both programs.
+                gl.bindAttribLocation(prog, 0, 'a_pos');
+
+                gl.linkProgram(prog);
+                prog.id = programIdCounter++;
                 return prog;
             };
 
-            // BUG FIX: Compile two separate programs
             effectProgram = compileProgram(vertSrc, effectFragSrc);
             displayProgram = compileProgram(vertSrc, displayFragSrc);
             
             const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), gl.STATIC_DRAW);
-            const a_pos = gl.getAttribLocation(effectProgram, 'a_pos');
-            gl.enableVertexAttribArray(a_pos);
-            gl.vertexAttribPointer(a_pos, 2, gl.FLOAT, false, 0, 0);
+            
+            // BUG FIX: Now that a_pos is always at location 0, this single setup works for both programs.
+            gl.enableVertexAttribArray(0);
+            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
             videoTex = createTexture(); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
             maskTex = createTexture();
