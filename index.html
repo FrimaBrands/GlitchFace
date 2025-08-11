@@ -1,251 +1,538 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Face Blur Camera (with fallback)</title>
-  <style>
-    :root { --bg:#0b0d10; --fg:#e7eaee; --muted:#98a2b3; --card:#12161b; --accent:#6ea8fe; }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-    .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
-    .card { width: min(960px, 92vw); background: var(--card); border: 1px solid #1d232c; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: hidden; }
-    .stage { position: relative; background: #000; aspect-ratio: 16/9; }
-    video, canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-    video { opacity: 0; pointer-events: none; } /* draw to canvas */
-    .ui { display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 14px 16px; align-items: center; border-top: 1px solid #1d232c; }
-    .ui .spacer { flex: 1 1 auto; }
-    .btn { appearance: none; border: 1px solid #223; background: #10151b; color: var(--fg); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight: 600; }
-    .btn[disabled] { opacity: .5; cursor: not-allowed; }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: #0a0b0e; }
-    label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); }
-    input[type="range"] { width: 180px; }
-    .status { color: var(--muted); }
-    details { padding: 0 16px 14px; color: var(--muted); }
-    kbd { background:#0c1016; padding:2px 6px; border-radius:6px; border:1px solid #1d232c; }
-  </style>
-  <!-- MediaPipe fallback (loads only if needed) -->
-  <script defer src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Glitch Effect</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0ff;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            position: absolute;
+            display: none;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            z-index: 10;
+            max-width: 300px;
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #0ff;
+            font-size: 1.2em;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            background: #111;
+            outline: none;
+            -webkit-appearance: none;
+            height: 5px;
+            border-radius: 5px;
+            border: 1px solid #0ff;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #0ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #0ff;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #0ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #0ff;
+        }
+
+        select {
+            width: 100%;
+            padding: 5px;
+            background: #111;
+            color: #0ff;
+            border: 1px solid #0ff;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #111;
+            color: #0ff;
+            border: 2px solid #0ff;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover:not(:disabled) {
+            background: #0ff;
+            color: #000;
+            box-shadow: 0 0 15px #0ff;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 20;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        #startScreen h1 {
+            margin-bottom: 20px;
+            font-size: 2em;
+            text-shadow: 0 0 20px #0ff;
+        }
+
+        #startScreen p {
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        .glitch-text {
+            animation: glitch 2s infinite;
+        }
+
+        @keyframes glitch {
+            0%, 100% { text-shadow: 2px 0 #f0f, -2px 0 #0ff; }
+            25% { text-shadow: -2px 0 #f0f, 2px 0 #0ff; }
+            50% { text-shadow: 2px 0 #0ff, -2px 0 #f0f; }
+            75% { text-shadow: -2px 0 #0ff, 2px 0 #f0f; }
+        }
+
+        .status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #0ff;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="stage">
-        <video id="video" playsinline muted></video>
+    <div id="container">
+        <video id="video" autoplay muted playsinline></video>
         <canvas id="canvas"></canvas>
-      </div>
+        
+        <div id="startScreen">
+            <h1 class="glitch-text">FACE GLITCH</h1>
+            <p>Apply real-time glitch effects to your webcam</p>
+            <button id="initBtn">START CAMERA</button>
+        </div>
+        
+        <div id="controls" class="hidden">
+            <h2 class="glitch-text">CONTROLS</h2>
+            
+            <div class="control-group">
+                <label>Effect Type</label>
+                <select id="effectType">
+                    <option value="rgb">RGB Split</option>
+                    <option value="pixelate">Pixelate</option>
+                    <option value="noise">Digital Noise</option>
+                    <option value="wave">Wave Distortion</option>
+                    <option value="corrupt">Data Corruption</option>
+                    <option value="scanner">Scanner Lines</option>
+                    <option value="all">All Effects</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Intensity: <span id="intensityValue">50</span>%</label>
+                <input type="range" id="intensity" min="0" max="100" value="50">
+            </div>
+            
+            <div class="control-group">
+                <label>Blur: <span id="blurValue">0</span>px</label>
+                <input type="range" id="blur" min="0" max="20" value="0">
+            </div>
+            
+            <div class="control-group">
+                <label>Glitch Speed: <span id="speedValue">50</span>%</label>
+                <input type="range" id="speed" min="0" max="100" value="50">
+            </div>
+        </div>
 
-      <div class="ui">
-        <button id="startBtn" class="btn primary">Start camera</button>
-        <button id="stopBtn" class="btn" disabled>Stop</button>
-        <span class="spacer"></span>
-        <label>Blur
-          <input id="blurStrength" type="range" min="6" max="40" value="22" />
-        </label>
-        <label><input id="mirror" type="checkbox" checked /> Mirror</label>
-        <label><input id="showBoxes" type="checkbox" /> Show boxes</label>
-        <span class="spacer"></span>
-        <span id="status" class="status">Idle</span>
-      </div>
-
-      <details>
-        <summary>Troubleshooting</summary>
-        <ul>
-          <li>Run from a server (VS Code <b>Live Server</b> is fine) — <code>file://</code> won’t work.</li>
-          <li><b>Fallback:</b> automatically uses MediaPipe Face Detection if <code>FaceDetector</code> is missing.</li>
-          <li>If the preview is black, ensure camera permission is granted and no other app is using the webcam.</li>
-        </ul>
-        <div>Shortcuts: <kbd>Space</kbd> start/stop, <kbd>M</kbd> mirror, <kbd>B</kbd> boxes.</div>
-      </details>
+        <div class="status hidden" id="status">
+            FPS: <span id="fps">0</span> | Effect: <span id="currentEffect">RGB</span>
+        </div>
     </div>
-  </div>
 
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn  = document.getElementById('stopBtn');
-    const blurStrength = document.getElementById('blurStrength');
-    const mirror = document.getElementById('mirror');
-    const showBoxes = document.getElementById('showBoxes');
-    const statusEl = document.getElementById('status');
+    <script>
+        let video, canvas, ctx;
+        let frameCount = 0;
+        let isRunning = false;
+        let lastTime = performance.now();
+        let fps = 0;
+        let settings = {
+            effectType: 'rgb',
+            intensity: 50,
+            blur: 0,
+            speed: 50
+        };
 
-    let stream = null;
-    let rafId = null;
-    let lastDetections = [];      // {x,y,width,height} in pixels
-    let detTimer = 0;
-    const detectIntervalMs = 90;  // ~11 fps
-    const pad = 28;               // extra blur around face
-    let provider = 'none';        // 'shape' or 'mediapipe'
-    let shapeDetector = null;     // FaceDetector
-    let mpDetector = null;        // MediaPipe FaceDetection
-    let mpInFlight = false;
-
-    const blurCanvas = document.createElement('canvas');
-    const blurCtx = blurCanvas.getContext('2d');
-
-    function setStatus(msg) { statusEl.textContent = msg; }
-
-    function fitCanvasToVideo() {
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 720;
-      canvas.width = w; canvas.height = h;
-      blurCanvas.width = w; blurCanvas.height = h;
-    }
-
-    function mirrorX(x, width, totalWidth) {
-      return totalWidth - (x + width);
-    }
-
-    function roundRectPath(c, x, y, w, h, r=22) {
-      if (c.roundRect) { c.beginPath(); c.roundRect(x, y, w, h, r); return; }
-      const rr = Math.min(r, w/2, h/2);
-      c.beginPath();
-      c.moveTo(x+rr, y);
-      c.arcTo(x+w, y, x+w, y+h, rr);
-      c.arcTo(x+w, y+h, x, y+h, rr);
-      c.arcTo(x, y+h, x, y, rr);
-      c.arcTo(x, y, x+w, y, rr);
-      c.closePath();
-    }
-
-    async function initDetector() {
-      if ('FaceDetector' in window) {
-        shapeDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 5 });
-        provider = 'shape';
-        setStatus('Camera running. Detecting (Shape Detection)…');
-        return;
-      }
-      // MediaPipe fallback
-      if (window.FaceDetection && window.FaceDetection.FaceDetection) {
-        mpDetector = new window.FaceDetection.FaceDetection({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/${file}`
-        });
-        mpDetector.setOptions({
-          model: 'short',               // fast, near-range
-          minDetectionConfidence: 0.6
-        });
-        mpDetector.onResults((res) => {
-          const w = canvas.width, h = canvas.height;
-          lastDetections = (res.detections || []).map(d => {
-            const bb = d.locationData.relativeBoundingBox;
-            return {
-              x: Math.max(0, bb.xMin * w),
-              y: Math.max(0, bb.yMin * h),
-              width: Math.min(w, bb.width * w),
-              height: Math.min(h, bb.height * h)
-            };
-          });
-        });
-        provider = 'mediapipe';
-        setStatus('Camera running. Detecting (MediaPipe)…');
-        return;
-      }
-      throw new Error('No face detection available (Shape Detection & MediaPipe missing).');
-    }
-
-    async function start() {
-      try {
-        setStatus('Requesting camera…');
-        startBtn.disabled = true;
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-        video.srcObject = stream;
-
-        await new Promise(res => video.onloadedmetadata = res);
-        await video.play();
-
-        fitCanvasToVideo();
-        window.addEventListener('resize', fitCanvasToVideo);
-
-        await initDetector(); // picks shape or mediapipe
-        stopBtn.disabled = false;
-
-        loop(performance.now());
-      } catch (err) {
-        console.error(err);
-        setStatus('Error: ' + err.message);
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-      }
-    }
-
-    function stop() {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-      if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-      shapeDetector = null; mpDetector = null; provider = 'none';
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      stopBtn.disabled = true; startBtn.disabled = false;
-      setStatus('Stopped');
-    }
-
-    async function loop(now) {
-      if (!stream) return;
-
-      const w = canvas.width, h = canvas.height;
-
-      // Draw current frame
-      ctx.save();
-      if (mirror.checked) { ctx.translate(w, 0); ctx.scale(-1, 1); }
-      ctx.drawImage(video, 0, 0, w, h);
-      ctx.restore();
-
-      // Prepare blurred copy of the frame
-      blurCtx.filter = `blur(${+blurStrength.value}px)`;
-      blurCtx.drawImage(canvas, 0, 0, w, h);
-
-      // Throttled detection
-      if (!detTimer || (now - detTimer) > detectIntervalMs) {
-        detTimer = now;
-        if (provider === 'shape' && shapeDetector) {
-          try {
-            const ds = await shapeDetector.detect(video);
-            // Normalize to pixel boxes
-            lastDetections = (ds || []).map(d => d.boundingBox);
-          } catch (e) { /* ignore transient errors */ }
-        } else if (provider === 'mediapipe' && mpDetector && !mpInFlight) {
-          mpInFlight = true;
-          mpDetector.send({ image: video }).finally(() => { mpInFlight = false; });
+        function applyRGBSplit(imageData, intensity) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const shift = Math.floor(intensity / 5);
+            const tempData = new Uint8ClampedArray(data);
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const pixelIndex = i / 4;
+                const x = pixelIndex % width;
+                
+                // Shift red channel left
+                if (x > shift) {
+                    data[i] = tempData[i - shift * 4];
+                }
+                
+                // Shift blue channel right
+                if (x < width - shift) {
+                    data[i + 2] = tempData[i + shift * 4 + 2];
+                }
+            }
         }
-      }
 
-      // Draw blur over faces
-      for (const box of lastDetections) {
-        let x = box.x, y = box.y, wBox = box.width, hBox = box.height;
-        if (mirror.checked) x = mirrorX(x, wBox, w);
-        x = Math.max(0, Math.floor(x - pad));
-        y = Math.max(0, Math.floor(y - pad));
-        wBox = Math.min(w - x, Math.ceil(wBox + pad * 2));
-        hBox = Math.min(h - y, Math.ceil(hBox + pad * 2));
-
-        ctx.save();
-        roundRectPath(ctx, x, y, wBox, hBox, 22);
-        ctx.clip();
-        ctx.drawImage(blurCanvas, 0, 0);
-        ctx.restore();
-
-        if (showBoxes.checked) {
-          ctx.save();
-          ctx.lineWidth = 2;
-          ctx.strokeStyle = 'rgba(110,168,254,.9)';
-          roundRectPath(ctx, x, y, wBox, hBox, 22);
-          ctx.stroke();
-          ctx.restore();
+        function applyPixelate(imageData, intensity) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const pixelSize = Math.max(2, Math.floor(intensity / 4));
+            
+            for (let y = 0; y < height; y += pixelSize) {
+                for (let x = 0; x < width; x += pixelSize) {
+                    const idx = (y * width + x) * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    
+                    for (let py = 0; py < pixelSize && y + py < height; py++) {
+                        for (let px = 0; px < pixelSize && x + px < width; px++) {
+                            const pidx = ((y + py) * width + (x + px)) * 4;
+                            data[pidx] = r;
+                            data[pidx + 1] = g;
+                            data[pidx + 2] = b;
+                        }
+                    }
+                }
+            }
         }
-      }
 
-      rafId = requestAnimationFrame(loop);
-    }
+        function applyNoise(imageData, intensity) {
+            const data = imageData.data;
+            const noiseLevel = intensity * 2;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                if (Math.random() < intensity / 100) {
+                    const noise = (Math.random() - 0.5) * noiseLevel;
+                    data[i] = Math.min(255, Math.max(0, data[i] + noise));
+                    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+                    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+                }
+            }
+        }
 
-    startBtn.addEventListener('click', start);
-    stopBtn.addEventListener('click', stop);
+        function applyWave(imageData, intensity, frame) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const tempData = new Uint8ClampedArray(data);
+            const amplitude = intensity / 5;
+            const frequency = 0.02;
+            
+            for (let y = 0; y < height; y++) {
+                const offset = Math.sin((y + frame) * frequency) * amplitude;
+                for (let x = 0; x < width; x++) {
+                    const srcX = Math.floor(x + offset);
+                    if (srcX >= 0 && srcX < width) {
+                        const idx = (y * width + x) * 4;
+                        const srcIdx = (y * width + srcX) * 4;
+                        data[idx] = tempData[srcIdx];
+                        data[idx + 1] = tempData[srcIdx + 1];
+                        data[idx + 2] = tempData[srcIdx + 2];
+                        data[idx + 3] = tempData[srcIdx + 3];
+                    }
+                }
+            }
+        }
 
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') { e.preventDefault(); (stream ? stop : start)(); }
-      else if (e.key.toLowerCase() === 'm') { mirror.checked = !mirror.checked; }
-      else if (e.key.toLowerCase() === 'b') { showBoxes.checked = !showBoxes.checked; }
-    });
-  </script>
+        function applyCorruption(imageData, intensity) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const corruptionChance = intensity / 500;
+            
+            for (let y = 0; y < height; y++) {
+                if (Math.random() < corruptionChance) {
+                    const barHeight = Math.floor(Math.random() * 5) + 1;
+                    for (let by = 0; by < barHeight && y + by < height; by++) {
+                        for (let x = 0; x < width; x++) {
+                            const idx = ((y + by) * width + x) * 4;
+                            if (Math.random() < 0.5) {
+                                data[idx] = Math.random() * 255;
+                                data[idx + 1] = Math.random() * 255;
+                                data[idx + 2] = Math.random() * 255;
+                            }
+                        }
+                    }
+                    y += barHeight;
+                }
+            }
+        }
+
+        function applyScanner(imageData, intensity, frame) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const scanSpeed = 0.02 * (settings.speed / 50);
+            const scanPosition = ((Math.sin(frame * scanSpeed) + 1) / 2) * height;
+            const scanThickness = Math.max(2, intensity / 10);
+            
+            for (let y = Math.floor(scanPosition - scanThickness); y < Math.floor(scanPosition + scanThickness); y++) {
+                if (y >= 0 && y < height) {
+                    for (let x = 0; x < width; x++) {
+                        const idx = (y * width + x) * 4;
+                        data[idx] = 255 - data[idx];
+                        data[idx + 1] = 255 - data[idx + 1];
+                        data[idx + 2] = 255 - data[idx + 2];
+                    }
+                }
+            }
+        }
+
+        async function setupCamera() {
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d', { alpha: false });
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }
+                });
+                
+                video.srcObject = stream;
+                
+                return new Promise((resolve, reject) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        console.log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+                        resolve();
+                    };
+                    
+                    video.onerror = reject;
+                });
+            } catch (error) {
+                console.error('Camera error:', error);
+                throw new Error('Camera access denied or not available');
+            }
+        }
+
+        function updateFPS() {
+            const currentTime = performance.now();
+            const delta = currentTime - lastTime;
+            fps = Math.round(1000 / delta);
+            lastTime = currentTime;
+            document.getElementById('fps').textContent = fps;
+        }
+
+        function animate() {
+            if (!isRunning) return;
+            
+            updateFPS();
+            
+            // Draw video to canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Get image data
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Apply effects
+            const speedMultiplier = settings.speed / 50;
+            const adjustedFrame = frameCount * speedMultiplier;
+            
+            switch(settings.effectType) {
+                case 'rgb':
+                    applyRGBSplit(imageData, settings.intensity);
+                    break;
+                case 'pixelate':
+                    applyPixelate(imageData, settings.intensity);
+                    break;
+                case 'noise':
+                    applyNoise(imageData, settings.intensity);
+                    break;
+                case 'wave':
+                    applyWave(imageData, settings.intensity, adjustedFrame);
+                    break;
+                case 'corrupt':
+                    applyCorruption(imageData, settings.intensity);
+                    break;
+                case 'scanner':
+                    applyScanner(imageData, settings.intensity, adjustedFrame);
+                    break;
+                case 'all':
+                    if (Math.random() < 0.3) applyRGBSplit(imageData, settings.intensity / 2);
+                    if (Math.random() < 0.3) applyPixelate(imageData, settings.intensity / 3);
+                    if (Math.random() < 0.5) applyNoise(imageData, settings.intensity / 2);
+                    if (Math.sin(adjustedFrame * 0.05) > 0) applyWave(imageData, settings.intensity / 2, adjustedFrame);
+                    if (Math.random() < 0.1) applyCorruption(imageData, settings.intensity);
+                    applyScanner(imageData, settings.intensity / 3, adjustedFrame);
+                    break;
+            }
+            
+            // Put image data back
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Apply blur if needed
+            if (settings.blur > 0) {
+                ctx.filter = `blur(${settings.blur}px)`;
+                ctx.drawImage(canvas, 0, 0);
+                ctx.filter = 'none';
+            }
+            
+            frameCount++;
+            requestAnimationFrame(animate);
+        }
+
+        async function init() {
+            const initBtn = document.getElementById('initBtn');
+            const startScreen = document.getElementById('startScreen');
+            const controls = document.getElementById('controls');
+            const status = document.getElementById('status');
+            
+            initBtn.addEventListener('click', async () => {
+                initBtn.disabled = true;
+                initBtn.textContent = 'INITIALIZING...';
+                
+                try {
+                    await setupCamera();
+                    
+                    // Hide start screen, show controls
+                    startScreen.classList.add('hidden');
+                    controls.classList.remove('hidden');
+                    status.classList.remove('hidden');
+                    
+                    // Start animation
+                    isRunning = true;
+                    animate();
+                    
+                } catch (error) {
+                    initBtn.textContent = 'CAMERA ERROR - RETRY';
+                    initBtn.disabled = false;
+                    alert('Error: ' + error.message + '\n\nPlease ensure camera permissions are granted.');
+                }
+            });
+            
+            // Set up controls
+            document.getElementById('effectType').addEventListener('change', (e) => {
+                settings.effectType = e.target.value;
+                document.getElementById('currentEffect').textContent = e.target.options[e.target.selectedIndex].text;
+            });
+            
+            document.getElementById('intensity').addEventListener('input', (e) => {
+                settings.intensity = parseInt(e.target.value);
+                document.getElementById('intensityValue').textContent = settings.intensity;
+            });
+            
+            document.getElementById('blur').addEventListener('input', (e) => {
+                settings.blur = parseInt(e.target.value);
+                document.getElementById('blurValue').textContent = settings.blur;
+            });
+            
+            document.getElementById('speed').addEventListener('input', (e) => {
+                settings.speed = parseInt(e.target.value);
+                document.getElementById('speedValue').textContent = settings.speed;
+            });
+        }
+
+        // Start
+        init();
+    </script>
 </body>
 </html>
