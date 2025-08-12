@@ -44,7 +44,7 @@
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-800/50 border-l border-gray-700 flex flex-col custom-scrollbar overflow-y-auto">
       <div class="p-4 border-b border-gray-700">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.4</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.5</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -185,9 +185,21 @@
     const vertSrc = `
       attribute vec2 a_pos;
       varying vec2 v_uv;
+      uniform bool u_mirror_output;
+      uniform bool u_isFeedbackPass;
+
       void main() {
         v_uv = a_pos;
-        gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
+        vec2 clip_pos = a_pos * 2.0 - 1.0;
+        
+        // Only mirror the final output to the screen, not the intermediate feedback texture.
+        // This flips the geometry, and since v_uv is passed separately, the fragment
+        // shader gets the correct texture coordinates for the un-mirrored source.
+        if (u_mirror_output && !u_isFeedbackPass) {
+            clip_pos.x *= -1.0;
+        }
+        
+        gl_Position = vec4(clip_pos, 0.0, 1.0);
       }`;
 
     const fragSrc = `
@@ -200,7 +212,6 @@
 
       uniform vec2  u_resolution;
       uniform float u_time;
-      uniform bool  u_mirror;
       uniform float u_maskFeather;
       uniform bool  u_isFeedbackPass;
 
@@ -236,7 +247,7 @@
         return color / float(samples);
       }
 
-      // NEW: smear that samples ONLY from the masked face region, but can render anywhere
+      // Smear that samples ONLY from the masked face region, but can render anywhere
       vec4 faceSmear(vec2 uv, float intensity, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
         vec4 acc = vec4(0.0);
@@ -246,7 +257,7 @@
           float t = float(i) / float(samples - 1);
           vec2 src = uv - dir * t * intensity;
 
-          // sample mask in *post-mirror* coordinates to match the visual
+          // Sample mask in original camera coordinates
           float m = texture2D(u_maskTex, src).r;
           m = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, m);
 
@@ -258,9 +269,9 @@
       }
 
       void main() {
-        // Post-mirror UV used for all sampling so tracking & mask align visually
+        // All calculations are now done in the original, non-mirrored camera space.
+        // The final output is flipped in the vertex shader if mirroring is enabled.
         vec2 uv = v_uv;
-        if (u_mirror) { uv.x = 1.0 - uv.x; }
 
         // 1) Feedback base
         vec2 feedback_uv = (uv - 0.5) * u_feedbackZoom + 0.5;
@@ -322,7 +333,7 @@
         }
 
         // Screen pass: apply all *non-smear* effects inside the mask, then let smear seep outside
-        float mask = texture2D(u_maskTex, uv).r; // sample in post-mirror space
+        float mask = texture2D(u_maskTex, uv).r; // sample in original camera space
         mask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, mask);
 
         float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
@@ -477,19 +488,21 @@
           minTrackingConfidence: 0.5,
         });
         faceMesh.onResults((res) => {
-          lastFacesMesh = res.multiFaceLandmarks || [];
-          if (lastFacesMesh.length > 0) {
-            const landmarks = lastFacesMesh[0];
-            let sx = 0, sy = 0;
-            landmarks.forEach(p => { sx += p.x; sy += p.y; });
-            const cx = sx / landmarks.length;
-            const cy = sy / landmarks.length;
-            // DO NOT mirror X here — shader handles mirroring so tracking stays correct
-            faceCenter = { x: cx, y: 1.0 - cy, detected: 1.0 };
-          } else {
-            faceCenter.detected = 0.0;
-          }
-          fmBusy = false;
+            lastFacesMesh = res.multiFaceLandmarks || [];
+            if (lastFacesMesh.length > 0) {
+                const landmarks = lastFacesMesh[0];
+                let sx = 0, sy = 0;
+                landmarks.forEach(p => { sx += p.x; sy += p.y; });
+                const cx = sx / landmarks.length;
+                const cy = sy / landmarks.length;
+
+                // The face center is now always in the original video's coordinate space.
+                // The final output flip is handled entirely in the vertex shader.
+                faceCenter = { x: cx, y: 1.0 - cy, detected: 1.0 };
+            } else {
+                faceCenter.detected = 0.0;
+            }
+            fmBusy = false;
         });
         await faceMesh.initialize();
         faceMeshReady = true;
@@ -527,7 +540,7 @@
         const s = gl.createShader(type);
         gl.shaderSource(s, src);
         gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { // Note: ILCOMPILE_STATUS is not a standard WebGL parameter
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
           throw new Error(`Shader compile error: ${gl.getShaderInfoLog(s)}`);
         }
         return s;
@@ -564,10 +577,10 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         return tex;
       }
-      textures.video     = createTexture();
-      textures.feedbackA = createTexture();
-      textures.feedbackB = createTexture();
-      textures.mask      = createTexture();
+      textures.video      = createTexture();
+      textures.feedbackA  = createTexture();
+      textures.feedbackB  = createTexture();
+      textures.mask       = createTexture();
 
       // FBO
       framebuffers.feedback = gl.createFramebuffer();
@@ -617,48 +630,52 @@
     }
 
     function drawMask() {
-      const W = video.videoWidth;
-      const H = video.videoHeight;
-      if (maskCanvas.width !== W || maskCanvas.height !== H) {
-        maskCanvas.width = W;
-        maskCanvas.height = H;
-      }
-
-      maskCtx.fillStyle = 'black';
-      maskCtx.fillRect(0, 0, W, H);
-
-      if (lastFacesMesh.length > 0) {
-        maskCtx.save();
-        maskCtx.fillStyle = 'white';
-        maskCtx.beginPath();
-        const landmarks = lastFacesMesh[0];
-
-        // center for padding scaling
-        let minX = W, minY = H, maxX = 0, maxY = 0;
-        for (const p of landmarks) {
-          minX = Math.min(minX, p.x * W);
-          minY = Math.min(minY, p.y * H);
-          maxX = Math.max(maxX, p.x * W);
-          maxY = Math.max(maxY, p.y * H);
+        const W = video.videoWidth;
+        const H = video.videoHeight;
+        if (maskCanvas.width !== W || maskCanvas.height !== H) {
+            maskCanvas.width = W;
+            maskCanvas.height = H;
         }
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
 
-        const p0 = landmarks[FACE_OVAL[0]];
-        maskCtx.moveTo(centerX + (p0.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p0.y * H - centerY) * (1 + MASK_PADDING/100));
-        for (let i = 1; i < FACE_OVAL.length; i++) {
-          const p = landmarks[FACE_OVAL[i]];
-          maskCtx.lineTo(centerX + (p.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p.y * H - centerY) * (1 + MASK_PADDING/100));
+        maskCtx.fillStyle = 'black';
+        maskCtx.fillRect(0, 0, W, H);
+
+        if (lastFacesMesh.length > 0) {
+            maskCtx.save();
+
+            // The mask is now always drawn in the original video's coordinate space.
+            // No need to flip the canvas context.
+
+            maskCtx.fillStyle = 'white';
+            maskCtx.beginPath();
+            const landmarks = lastFacesMesh[0];
+
+            // center for padding scaling
+            let minX = W, minY = H, maxX = 0, maxY = 0;
+            for (const p of landmarks) {
+                minX = Math.min(minX, p.x * W);
+                minY = Math.min(minY, p.y * H);
+                maxX = Math.max(maxX, p.x * W);
+                maxY = Math.max(maxY, p.y * H);
+            }
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            const p0 = landmarks[FACE_OVAL[0]];
+            maskCtx.moveTo(centerX + (p0.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p0.y * H - centerY) * (1 + MASK_PADDING/100));
+            for (let i = 1; i < FACE_OVAL.length; i++) {
+                const p = landmarks[FACE_OVAL[i]];
+                maskCtx.lineTo(centerX + (p.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p.y * H - centerY) * (1 + MASK_PADDING/100));
+            }
+            maskCtx.closePath();
+            maskCtx.fill();
+            maskCtx.restore();
         }
-        maskCtx.closePath();
-        maskCtx.fill();
-        maskCtx.restore();
-      }
 
-      gl.activeTexture(gl.TEXTURE2);
-      gl.bindTexture(gl.TEXTURE_2D, textures.mask);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // ensure mask aligns vertically with video
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, textures.mask);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // ensure mask aligns vertically with video
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
     }
 
     function updateJitter(t) {
@@ -706,11 +723,11 @@
       gl.useProgram(programs.main);
       gl.uniform2f(gl.getUniformLocation(programs.main, 'u_resolution'), canvas.width, canvas.height);
       gl.uniform1f(gl.getUniformLocation(programs.main, 'u_time'), t);
-      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_mirror'), mirrorChk.checked);
+      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_mirror_output'), mirrorChk.checked);
       gl.uniform3f(gl.getUniformLocation(programs.main, 'u_faceCenter'), faceCenter.x, faceCenter.y, faceCenter.detected);
       gl.uniform1f(gl.getUniformLocation(programs.main, 'u_maskFeather'), MASK_FEATHER);
 
-      // --- UNIFORM UPDATE (FIXED) ---
+      // --- UNIFORM UPDATE ---
       // Effect uniforms (with jitter if active)
       for (const groupKey in ui) {
         const groupIsActive = EFFECT_DEFINITIONS[groupKey].active;
@@ -729,7 +746,6 @@
           gl.uniform1f(gl.getUniformLocation(programs.main, `u_${controlKey}`), val);
         }
       }
-      // --- END OF FIX ---
 
       // Texture bindings
       gl.uniform1i(gl.getUniformLocation(programs.main, 'u_tex'), 0);
@@ -800,8 +816,8 @@
         mirrorChk.checked  = state.checkboxes.mirrorChk ?? true;
       }
     }
-    function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3.4Presets') || '{}'); }
-    function savePresets(p) { localStorage.setItem('faceGlitchV3.4Presets', JSON.stringify(p)); }
+    function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3.5Presets') || '{}'); }
+    function savePresets(p) { localStorage.setItem('faceGlitchV3.5Presets', JSON.stringify(p)); }
     function populatePresetList() {
       const presets = getPresets();
       const currentVal = presetList.value;
