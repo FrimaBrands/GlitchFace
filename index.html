@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>U N K N O W N // Signal Processor</title>
 
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- MediaPipe Face Mesh -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
   <style>
@@ -36,7 +33,6 @@
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
 
   <div class="container w-full max-w-7xl h-[90vh] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
-    <!-- Main Stage: Video and Canvas -->
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
       <video id="video" playsinline muted class="hidden"></video>
       <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
@@ -45,7 +41,6 @@
       </div>
     </div>
 
-    <!-- Controls Panel -->
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-800/50 border-l border-gray-700 flex flex-col custom-scrollbar overflow-y-auto">
       <div class="p-4 border-b border-gray-700">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
@@ -57,7 +52,6 @@
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
-      <!-- Presets Section -->
       <div class="p-4 border-b border-gray-700">
         <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
         <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
@@ -69,10 +63,8 @@
         </div>
       </div>
 
-      <!-- Effects Controls -->
       <div id="effects-controls" class="flex-1 p-4 space-y-4"></div>
 
-      <!-- Global Settings -->
       <div class="p-4 border-t border-gray-700 bg-gray-900/50">
         <h2 class="font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h2>
         <div class="space-y-3">
@@ -134,57 +126,57 @@
     const MASK_FEATHER = 0.15; // Hardcoded feather
     const MASK_PADDING = 10;   // %
 
-    // --- Effect Definitions ---
+    // --- Effect Definitions (FIXED) ---
     const EFFECT_DEFINITIONS = {
       Jitter: {
         title: 'Jitter Animation',
         active: true,
         controls: {
-          jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005 },
-          jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5 },
+          jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 },
+          jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 },
         }
       },
       Smear: {
         title: 'Smearing',
         active: true,
         controls: {
-          faceSmearIntensity: { label: 'Face Intensity', min: 0, max: 100, step: 1, value: 30 },
-          faceSmearAngle: { label: 'Face Angle', min: 0, max: 360, step: 1, value: 0 },
-          spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10 },
-          spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2 },
-          spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20 },
+          faceSmearIntensity: { label: 'Face Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 },
+          faceSmearAngle: { label: 'Face Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 },
+          spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 },
+          spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 },
+          spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 },
         }
       },
       Feedback: {
         title: 'Data Moshing',
         active: true,
         controls: {
-          feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97 },
-          feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001 },
+          feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 },
+          feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 },
         }
       },
       Glitch: {
         title: 'Signal Glitch',
         active: true,
         controls: {
-          glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1 },
-          glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8 },
+          glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 },
+          glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 },
         }
       },
       Color: {
         title: 'Color Distortion',
         active: true,
         controls: {
-          rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01 },
+          rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 },
         }
       },
       Distortion: {
         title: 'Lens Distortion',
         active: true,
         controls: {
-          noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05 },
-          noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1 },
-          vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5 },
+          noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 },
+          noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 },
+          vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 },
         }
       }
     };
@@ -535,7 +527,7 @@
         const s = gl.createShader(type);
         gl.shaderSource(s, src);
         gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.ILCOMPILE_STATUS) && !gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { // Note: ILCOMPILE_STATUS is not a standard WebGL parameter
           throw new Error(`Shader compile error: ${gl.getShaderInfoLog(s)}`);
         }
         return s;
@@ -718,20 +710,26 @@
       gl.uniform3f(gl.getUniformLocation(programs.main, 'u_faceCenter'), faceCenter.x, faceCenter.y, faceCenter.detected);
       gl.uniform1f(gl.getUniformLocation(programs.main, 'u_maskFeather'), MASK_FEATHER);
 
+      // --- UNIFORM UPDATE (FIXED) ---
       // Effect uniforms (with jitter if active)
       for (const groupKey in ui) {
+        const groupIsActive = EFFECT_DEFINITIONS[groupKey].active;
         for (const controlKey in ui[groupKey]) {
-          let val = parseFloat(ui[groupKey][controlKey].value);
-          if (EFFECT_DEFINITIONS.Jitter.active && EFFECT_DEFINITIONS[groupKey].active && jitterState[groupKey] && jitterState[groupKey][controlKey]) {
-            val = jitterState[groupKey][controlKey].current;
-          }
-          if (!EFFECT_DEFINITIONS[groupKey].active) {
-            if (controlKey.toLowerCase().includes('intensity') || controlKey.toLowerCase().includes('amount') || controlKey.toLowerCase().includes('shift')) val = 0.0;
-            if (controlKey.toLowerCase().includes('zoom')) val = 1.0;
+          let val;
+          if (groupIsActive) {
+            val = parseFloat(ui[groupKey][controlKey].value);
+            // Apply jitter if Jitter effect is also active
+            if (EFFECT_DEFINITIONS.Jitter.active && jitterState[groupKey] && jitterState[groupKey][controlKey]) {
+              val = jitterState[groupKey][controlKey].current;
+            }
+          } else {
+            // If group is inactive, use the defined neutral value.
+            val = EFFECT_DEFINITIONS[groupKey].controls[controlKey].neutral;
           }
           gl.uniform1f(gl.getUniformLocation(programs.main, `u_${controlKey}`), val);
         }
       }
+      // --- END OF FIX ---
 
       // Texture bindings
       gl.uniform1i(gl.getUniformLocation(programs.main, 'u_tex'), 0);
