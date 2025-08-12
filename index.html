@@ -1,6 +1,3 @@
-Here’s the full file with both fixes baked in (mirror-safe tracking + face-driven smears that can seep outside). Just drop it in as `index.html` and run:
-
-```html
 <!doctype html>
 <html lang="en" class="dark">
 <head>
@@ -52,7 +49,7 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-800/50 border-l border-gray-700 flex flex-col custom-scrollbar overflow-y-auto">
       <div class="p-4 border-b border-gray-700">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.5</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.4</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -134,7 +131,7 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
     const maskCanvas = document.createElement('canvas');
     const maskCtx = maskCanvas.getContext('2d');
     const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10];
-    const MASK_FEATHER = 0.12; // Hardcoded feather
+    const MASK_FEATHER = 0.15; // Hardcoded feather
     const MASK_PADDING = 10;   // %
 
     // --- Effect Definitions ---
@@ -172,8 +169,6 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         controls: {
           glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1 },
           glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8 },
-          tearAmount: { label: 'Tear Amount', min: 0, max: 0.2, step: 0.002, value: 0.05 },
-          tearChance: { label: 'Tear Chance', min: 0, max: 0.5, step: 0.01, value: 0.15 },
         }
       },
       Color: {
@@ -181,7 +176,6 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         active: true,
         controls: {
           rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01 },
-          chromaAmount: { label: 'Radial Chroma', min: 0, max: 0.03, step: 0.0005, value: 0.008 },
         }
       },
       Distortion: {
@@ -191,11 +185,6 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
           noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05 },
           noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1 },
           vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5 },
-          warpAmount:  { label: 'Warp Amount',  min: 0, max: 0.03, step: 0.0005, value: 0.008 },
-          warpScale:   { label: 'Warp Scale',   min: 1, max: 12, step: 0.1, value: 6 },
-          scanAmount:  { label: 'Scanline Amt', min: 0, max: 0.03, step: 0.0005, value: 0.004 },
-          scanFreq:    { label: 'Scanline Freq',min: 20, max: 400, step: 1, value: 140 },
-          barrelAmount:{ label: 'Barrel Amt',   min: -0.3, max: 0.3, step: 0.005, value: 0.08 },
         }
       }
     };
@@ -233,16 +222,6 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
       uniform float u_noiseSpeed;
       uniform float u_vignette;
 
-      // New distortion controls
-      uniform float u_warpAmount;
-      uniform float u_warpScale;
-      uniform float u_scanAmount;
-      uniform float u_scanFreq;
-      uniform float u_barrelAmount;
-      uniform float u_chromaAmount;
-      uniform float u_tearAmount;
-      uniform float u_tearChance;
-
       // Smear uniforms
       uniform vec3  u_faceCenter; // x, y, detected
       uniform float u_faceSmearIntensity;
@@ -251,43 +230,8 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
       uniform float u_spotSmearDensity;
       uniform float u_spotSmearSize;
 
-      // --- Helpers ---
+      // Helpers
       float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
-
-      // Value noise (smooth) + fbm for organic warp
-      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
-      float valueNoise(vec2 p){
-        vec2 i = floor(p); vec2 f = fract(p);
-        float a = hash(i);
-        float b = hash(i + vec2(1.0, 0.0));
-        float c = hash(i + vec2(0.0, 1.0));
-        float d = hash(i + vec2(1.0, 1.0));
-        vec2 u = f*f*(3.0-2.0*f);
-        return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
-      }
-      float fbm(vec2 p){
-        float v = 0.0; float a = 0.5; vec2 shift = vec2(37.0,17.0);
-        for(int i=0;i<5;i++){ v += a * valueNoise(p); p = p*2.0 + shift; a *= 0.5; }
-        return v;
-      }
-
-      // 3x3 Gaussian blur of mask for very soft edges
-      float sampleMask(vec2 uv){
-        vec2 texel = 1.0 / u_resolution;
-        float m = 0.0;
-        m += texture2D(u_maskTex, uv + texel * vec2(-1.0,-1.0)).r * 1.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 0.0,-1.0)).r * 2.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 1.0,-1.0)).r * 1.0;
-        m += texture2D(u_maskTex, uv + texel * vec2(-1.0, 0.0)).r * 2.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 0.0, 0.0)).r * 4.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 1.0, 0.0)).r * 2.0;
-        m += texture2D(u_maskTex, uv + texel * vec2(-1.0, 1.0)).r * 1.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 0.0, 1.0)).r * 2.0;
-        m += texture2D(u_maskTex, uv + texel * vec2( 1.0, 1.0)).r * 1.0;
-        return m / 16.0;
-      }
-
-      vec2 barrel(vec2 p){ vec2 d = p - 0.5; float r2 = dot(d,d); return d * (1.0 + u_barrelAmount * r2) + 0.5; }
 
       vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
@@ -300,7 +244,7 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         return color / float(samples);
       }
 
-      // Smear that samples ONLY from the masked face region, but can render anywhere
+      // NEW: smear that samples ONLY from the masked face region, but can render anywhere
       vec4 faceSmear(vec2 uv, float intensity, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
         vec4 acc = vec4(0.0);
@@ -309,8 +253,11 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         for (int i = 0; i < samples; i++) {
           float t = float(i) / float(samples - 1);
           vec2 src = uv - dir * t * intensity;
-          float m = sampleMask(src);
+
+          // sample mask in *post-mirror* coordinates to match the visual
+          float m = texture2D(u_maskTex, src).r;
           m = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, m);
+
           vec4 c = texture2D(u_feedbackTex, src);
           acc += c * m;
           wsum += m;
@@ -319,84 +266,56 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
       }
 
       void main() {
-        // Post-mirror UV
-        vec2 uv = v_uv; if (u_mirror) { uv.x = 1.0 - uv.x; }
-
-        // --- Advanced distortion pipeline (before sampling) ---
-        vec2 uv2 = uv;
-        // Organic warp
-        if (u_warpAmount > 0.0) {
-          vec2 w = vec2(
-            fbm(uv * u_warpScale + u_time * 0.20),
-            fbm(uv * (u_warpScale * 1.3) - u_time * 0.17)
-          ) * u_warpAmount;
-          uv2 += w;
-        }
-        // Rolling scanline wobble
-        if (u_scanAmount > 0.0) {
-          float rs = sin((uv.y + u_time * 0.30) * u_scanFreq) * u_scanAmount;
-          uv2.x += rs;
-        }
-        // Horizontal tear bands
-        float glitchTime = floor(u_time * 15.0);
-        float tearGate = step(rand(vec2(glitchTime, 4.0)), u_tearChance);
-        float bandY = rand(vec2(glitchTime, 2.0));
-        float bandH = 0.03 + rand(vec2(glitchTime, 2.7)) * 0.12;
-        float inBand = 1.0 - smoothstep(bandH, bandH + 0.005, abs(uv.y - bandY));
-        uv2.x += tearGate * inBand * (rand(vec2(glitchTime, 3.0)) - 0.5) * u_tearAmount;
-        
-        // Barrel distortion
-        uv2 = barrel(uv2);
+        // Post-mirror UV used for all sampling so tracking & mask align visually
+        vec2 uv = v_uv;
+        if (u_mirror) { uv.x = 1.0 - uv.x; }
 
         // 1) Feedback base
-        vec2 feedback_uv = (uv2 - 0.5) * u_feedbackZoom + 0.5;
+        vec2 feedback_uv = (uv - 0.5) * u_feedbackZoom + 0.5;
         vec4 feedbackColor = texture2D(u_feedbackTex, feedback_uv);
 
         // 2) Video
-        vec4 videoColor = texture2D(u_tex, uv2);
+        vec4 videoColor = texture2D(u_tex, uv);
 
         // 3) Mix with feedback
         vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
 
-        // 4) Blocky glitch
+        // 4) Glitch
+        float glitchTime = floor(u_time * 15.0);
         if (rand(vec2(glitchTime, 0.0)) < u_glitchIntensity) {
           float blockSize = u_glitchBlockSize / u_resolution.y;
-          vec2 block_uv = floor(uv2 / blockSize) * blockSize;
+          vec2 block_uv = floor(uv / blockSize) * blockSize;
           float displacement = (rand(block_uv) - 0.5) * 0.1;
-          effectedColor = texture2D(u_tex, uv2 + vec2(displacement, 0.0));
+          effectedColor = texture2D(u_tex, uv + vec2(displacement, 0.0));
         }
 
-        // 5) Color Distortion (radial chroma + horizontal shift)
-        vec2 center = vec2(0.5);
-        vec2 dir = normalize(uv2 - center + 1e-6);
-        float radius = distance(uv2, center);
-        vec2 radial = dir * u_chromaAmount * radius;
-        float r = texture2D(u_tex, uv2 + radial + vec2(u_rgbShift, 0.0)).r;
-        float b = texture2D(u_tex, uv2 - radial - vec2(u_rgbShift, 0.0)).b;
+        // 5) Color Distortion
+        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
         effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
 
-        // 6) Noise / Vignette
-        float noise = (rand(uv2 + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
+        // 6) Lens Distortion / Noise / Vignette
+        float noise = (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
         effectedColor += noise;
-        float vig = 1.0 - u_vignette * distance(uv2, vec2(0.5));
+        float vig = 1.0 - u_vignette * distance(uv, vec2(0.5));
         effectedColor.rgb *= vig;
 
         // 7) Smearing
         vec4 smearedColor = effectedColor;
 
         // Spot smears (randomized)
-        vec2 grid_uv = floor(uv2 * u_spotSmearSize) / u_spotSmearSize;
+        vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
         float spot_seed = rand(grid_uv + floor(u_time * 5.0));
         if (spot_seed < u_spotSmearDensity) {
           float spot_angle = rand(grid_uv + 10.0) * 6.28318530718;
-          smearedColor = smear(u_feedbackTex, uv2, u_spotSmearIntensity, spot_angle);
+          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, spot_angle);
         }
 
         // Face smear: source == masked face, destination can be anywhere
         if (u_faceCenter.z > 0.5) {
-          float dist_to_face = distance(uv2, u_faceCenter.xy);
+          float dist_to_face = distance(uv, u_faceCenter.xy);
           float face_smear_mix = 1.0 - smoothstep(0.0, 0.30, dist_to_face);
-          vec4 face_smeared = faceSmear(uv2, u_faceSmearIntensity, radians(u_faceSmearAngle));
+          vec4 face_smeared = faceSmear(uv, u_faceSmearIntensity, radians(u_faceSmearAngle));
           smearedColor = mix(smearedColor, face_smeared, face_smear_mix);
         }
 
@@ -405,12 +324,13 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
 
         if (u_isFeedbackPass) {
-          gl_FragColor = effectedGrayscale; // unmasked to allow accumulation/seep
+          // Write unmasked to feedback so smear can accumulate/seep next frame
+          gl_FragColor = effectedGrayscale;
           return;
         }
 
-        // Screen pass: use very soft mask
-        float mask = sampleMask(uv2);
+        // Screen pass: apply all *non-smear* effects inside the mask, then let smear seep outside
+        float mask = texture2D(u_maskTex, uv).r; // sample in post-mirror space
         mask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, mask);
 
         float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
@@ -420,7 +340,7 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         vec4 baseMix = mix(originalGrayscale, effectedGrayscale, mask);
 
         // Smear seep outside the face boundary with radial falloff
-        float dist_to_face2 = distance(uv2, u_faceCenter.xy);
+        float dist_to_face2 = distance(uv, u_faceCenter.xy);
         float smearFalloff = 1.0 - smoothstep(0.0, 0.30, dist_to_face2);
         float seep = (1.0 - mask) * smearFalloff;
 
@@ -615,7 +535,7 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
         const s = gl.createShader(type);
         gl.shaderSource(s, src);
         gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        if (!gl.getShaderParameter(s, gl.ILCOMPILE_STATUS) && !gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
           throw new Error(`Shader compile error: ${gl.getShaderInfoLog(s)}`);
         }
         return s;
@@ -953,4 +873,3 @@ Here’s the full file with both fixes baked in (mirror-safe tracking + face-dri
   </script>
 </body>
 </html>
-```
