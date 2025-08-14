@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; }
@@ -32,19 +32,20 @@
 </head>
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-  <div class="container w-full max-w-7xl h-[90vh] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
+  <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
       <video id="video" playsinline muted class="hidden"></video>
+      <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
       <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
       <div id="statusBar" class="absolute bottom-2 left-2 font-mono text-xs bg-black/50 text-green-400 px-2 py-1 rounded status-indicator">
         STATUS: IDLE
       </div>
     </div>
 
-    <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-800/50 border-l border-gray-700 flex flex-col custom-scrollbar overflow-y-auto">
-      <div class="p-4 border-b border-gray-700">
+    <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col custom-scrollbar overflow-y-auto">
+      <div class="p-4 border-b border-gray-800">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V3.5</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V4.6_BODY</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -52,7 +53,7 @@
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
-      <div class="p-4 border-b border-gray-700">
+      <div class="p-4 border-b border-gray-800">
         <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
         <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
         <div class="grid grid-cols-3 gap-2">
@@ -63,9 +64,30 @@
         </div>
       </div>
 
+      <div id="global-controls" class="p-4 space-y-4 border-b border-gray-800"></div>
+      
       <div id="effects-controls" class="flex-1 p-4 space-y-4"></div>
+      
+      <div class="p-4 border-t border-gray-800 bg-black/50">
+        <h2 class="font-bold text-gray-300 mb-3">BACKGROUND</h2>
+        <div class="space-y-3">
+            <button id="bgUploadBtn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 rounded text-sm transition-colors">Upload Image/Video</button>
+            <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
+            <label class="flex items-center justify-between text-sm">
+                <span class="text-gray-400">Use Custom Background</span>
+                <input type="checkbox" id="useBgChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" disabled>
+            </label>
+            <div class="control-item space-y-2">
+                <div class="flex justify-between items-center">
+                    <label for="maskFeather" class="text-sm font-medium text-gray-300">Mask Feather</label>
+                    <span id="maskFeatherValue" class="text-sm font-mono text-green-400">0.150</span>
+                </div>
+                <input type="range" id="maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
+            </div>
+        </div>
+      </div>
 
-      <div class="p-4 border-t border-gray-700 bg-gray-900/50">
+      <div class="p-4 border-t border-gray-800 bg-black/50">
         <h2 class="font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h2>
         <div class="space-y-3">
           <label class="flex items-center justify-between text-sm">
@@ -83,139 +105,51 @@
 
   <script>
   (() => {
-    // --- DOM Elements ---
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('glcanvas');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const statusBar = document.getElementById('statusBar');
-    const msgEl = document.getElementById('msg');
-
-    // Preset UI
-    const savePresetBtn = document.getElementById('savePresetBtn');
-    const deletePresetBtn = document.getElementById('deletePresetBtn');
-    const presetNameInput = document.getElementById('presetName');
-    const presetList = document.getElementById('presetList');
-    const randomBtn = document.getElementById('randomBtn');
-
-    // Global Checkboxes
-    const animateChk = document.getElementById('animateChk');
-    const mirrorChk = document.getElementById('mirrorChk');
-
-    const controlsContainer = document.getElementById('effects-controls');
-
-    // --- State ---
-    let stream = null, rafId = null, gl = null, faceMesh = null;
-    let programs = {};
-    let textures = {};
-    let framebuffers = {};
-    let lastFacesMesh = [];
-    let faceCenter = {x: 0.5, y: 0.5, detected: 0.0};
-    let faceMeshReady = false;
-    let fmBusy = false;
-    let lastFmTime = 0;
-    const FM_MIN_INTERVAL = 60;
-
-    const ui = {};
-    const jitterState = {};
-
-    // --- MASKING SETUP (NO UI) ---
-    const maskCanvas = document.createElement('canvas');
-    const maskCtx = maskCanvas.getContext('2d');
-    const FACE_OVAL = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10];
-    const MASK_FEATHER = 0.15; // Hardcoded feather
-    const MASK_PADDING = 10;   // %
-
-    // --- Effect Definitions (FIXED) ---
-    const EFFECT_DEFINITIONS = {
-      Jitter: {
-        title: 'Jitter Animation',
-        active: true,
-        controls: {
-          jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 },
-          jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 },
-        }
-      },
-      Smear: {
-        title: 'Smearing',
-        active: true,
-        controls: {
-          faceSmearIntensity: { label: 'Face Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 },
-          faceSmearAngle: { label: 'Face Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 },
-          spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 },
-          spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 },
-          spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 },
-        }
-      },
-      Feedback: {
-        title: 'Data Moshing',
-        active: true,
-        controls: {
-          feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 },
-          feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 },
-        }
-      },
-      Glitch: {
-        title: 'Signal Glitch',
-        active: true,
-        controls: {
-          glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 },
-          glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 },
-        }
-      },
-      Color: {
-        title: 'Color Distortion',
-        active: true,
-        controls: {
-          rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 },
-        }
-      },
-      Distortion: {
-        title: 'Lens Distortion',
-        active: true,
-        controls: {
-          noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 },
-          noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 },
-          vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 },
-        }
-      }
-    };
-
-    // --- GLSL Shaders ---
+    // --- APP ARCHITECTURE ---
+    // This script is organized into several modules, each handling a specific concern.
+    // 1. UI: Manages all DOM elements, control creation, and user feedback.
+    // 2. Renderer: Encapsulates all WebGL logic, including setup, shaders, and the render pipeline.
+    // 3. BodySegmenter: Handles the MediaPipe Selfie Segmentation setup and result processing.
+    // 4. PresetManager: Manages saving, loading, and randomizing effect presets.
+    // 5. App: The main controller that initializes all modules and runs the main loop.
+    
     const vertSrc = `
       attribute vec2 a_pos;
       varying vec2 v_uv;
-      uniform bool u_mirror_output;
-      uniform bool u_isFeedbackPass;
-
       void main() {
         v_uv = a_pos;
-        vec2 clip_pos = a_pos * 2.0 - 1.0;
-        
-        // Only mirror the final output to the screen, not the intermediate feedback texture.
-        // This flips the geometry, and since v_uv is passed separately, the fragment
-        // shader gets the correct texture coordinates for the un-mirrored source.
-        if (u_mirror_output && !u_isFeedbackPass) {
-            clip_pos.x *= -1.0;
-        }
-        
-        gl_Position = vec4(clip_pos, 0.0, 1.0);
+        gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
       }`;
 
     const fragSrc = `
       precision highp float;
       varying vec2 v_uv;
 
+      // Textures
       uniform sampler2D u_tex;
       uniform sampler2D u_feedbackTex;
       uniform sampler2D u_maskTex;
+      uniform sampler2D u_backgroundTex;
 
+      // Global uniforms
       uniform vec2  u_resolution;
       uniform float u_time;
-      uniform float u_maskFeather;
       uniform bool  u_isFeedbackPass;
+      uniform bool  u_useBackground;
+      uniform float u_maskFeather;
 
-      // Effect uniforms
+      // Opacity uniforms (not randomized)
+      uniform float u_overallOpacity;
+      uniform float u_flickerPerSecond;
+      uniform float u_flickerDuration;
+      uniform float u_flickerIntensity;
+      uniform float u_flickerFade;
+
+      // Seep uniforms (not randomized)
+      uniform float u_seepAmount;
+      uniform float u_seepIntensity;
+
+      // Effect uniforms (randomized)
       uniform float u_feedbackAmount;
       uniform float u_feedbackZoom;
       uniform float u_glitchIntensity;
@@ -224,18 +158,19 @@
       uniform float u_noiseAmount;
       uniform float u_noiseSpeed;
       uniform float u_vignette;
-
+      
       // Smear uniforms
-      uniform vec3  u_faceCenter; // x, y, detected
-      uniform float u_faceSmearIntensity;
-      uniform float u_faceSmearAngle;
+      uniform float u_globalSmearIntensity;
+      uniform float u_globalSmearAngle;
       uniform float u_spotSmearIntensity;
       uniform float u_spotSmearDensity;
       uniform float u_spotSmearSize;
 
-      // Helpers
-      float rand(vec2 co){ return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
 
+      // --- Helper Functions ---
+      float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
+
+      // Generic smear effect
       vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
         vec4 color = vec4(0.0);
@@ -246,643 +181,719 @@
         }
         return color / float(samples);
       }
-
-      // Smear that samples ONLY from the masked face region, but can render anywhere
-      vec4 faceSmear(vec2 uv, float intensity, float angle) {
-        vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
-        vec4 acc = vec4(0.0);
-        float wsum = 0.0;
-        const int samples = 16;
-        for (int i = 0; i < samples; i++) {
-          float t = float(i) / float(samples - 1);
-          vec2 src = uv - dir * t * intensity;
-
-          // Sample mask in original camera coordinates
-          float m = texture2D(u_maskTex, src).r;
-          m = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, m);
-
-          vec4 c = texture2D(u_feedbackTex, src);
-          acc += c * m;
-          wsum += m;
-        }
-        return (wsum > 0.0) ? (acc / wsum) : texture2D(u_feedbackTex, uv);
+      
+      // Simple box blur for creating the 'seep' effect
+      vec4 blur(sampler2D tex, vec2 uv, float radius) {
+          vec4 acc = vec4(0.0);
+          vec2 res = u_resolution.xy;
+          float count = 0.0;
+          // A 5x5 kernel for a small, efficient blur
+          for(float x = -2.0; x <= 2.0; x++) {
+              for(float y = -2.0; y <= 2.0; y++) {
+                  vec2 offset = vec2(x, y) * radius / res;
+                  acc += texture2D(tex, uv + offset);
+                  count += 1.0;
+              }
+          }
+          return acc / count;
       }
 
       void main() {
-        // All calculations are now done in the original, non-mirrored camera space.
-        // The final output is flipped in the vertex shader if mirroring is enabled.
         vec2 uv = v_uv;
-
-        // 1) Feedback base
-        vec2 feedback_uv = (uv - 0.5) * u_feedbackZoom + 0.5;
-        vec4 feedbackColor = texture2D(u_feedbackTex, feedback_uv);
-
-        // 2) Video
         vec4 videoColor = texture2D(u_tex, uv);
 
-        // 3) Mix with feedback
+        // --- EFFECT PIPELINE ---
+        vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
         vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
 
-        // 4) Glitch
-        float glitchTime = floor(u_time * 15.0);
-        if (rand(vec2(glitchTime, 0.0)) < u_glitchIntensity) {
-          float blockSize = u_glitchBlockSize / u_resolution.y;
-          vec2 block_uv = floor(uv / blockSize) * blockSize;
-          float displacement = (rand(block_uv) - 0.5) * 0.1;
-          effectedColor = texture2D(u_tex, uv + vec2(displacement, 0.0));
+        if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
+          vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
+          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
         }
 
-        // 5) Color Distortion
         float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
         float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
         effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
 
-        // 6) Lens Distortion / Noise / Vignette
-        float noise = (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
-        effectedColor += noise;
-        float vig = 1.0 - u_vignette * distance(uv, vec2(0.5));
-        effectedColor.rgb *= vig;
+        effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
+        effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
 
-        // 7) Smearing
         vec4 smearedColor = effectedColor;
-
-        // Spot smears (randomized)
+        
         vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
-        float spot_seed = rand(grid_uv + floor(u_time * 5.0));
-        if (spot_seed < u_spotSmearDensity) {
-          float spot_angle = rand(grid_uv + 10.0) * 6.28318530718;
-          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, spot_angle);
+        if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
+          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
         }
 
-        // Face smear: source == masked face, destination can be anywhere
-        if (u_faceCenter.z > 0.5) {
-          float dist_to_face = distance(uv, u_faceCenter.xy);
-          float face_smear_mix = 1.0 - smoothstep(0.0, 0.30, dist_to_face);
-          vec4 face_smeared = faceSmear(uv, u_faceSmearIntensity, radians(u_faceSmearAngle));
-          smearedColor = mix(smearedColor, face_smeared, face_smear_mix);
+        float maskValue = texture2D(u_maskTex, uv).r;
+        if (maskValue > 0.1) {
+            vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
+            smearedColor = mix(smearedColor, globalSmear, 0.5);
         }
 
-        // Convert to grayscale (stylistic)
+
         float effectedGray = dot(smearedColor.rgb, vec3(0.299, 0.587, 0.114));
         vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
 
+        // --- RENDER PASS LOGIC ---
         if (u_isFeedbackPass) {
-          // Write unmasked to feedback so smear can accumulate/seep next frame
           gl_FragColor = effectedGrayscale;
           return;
         }
 
-        // Screen pass: apply all *non-smear* effects inside the mask, then let smear seep outside
-        float mask = texture2D(u_maskTex, uv).r; // sample in original camera space
-        mask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, mask);
-
+        // --- FINAL COMPOSITION (Screen Pass) ---
         float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
         vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
 
-        // Effects confined to the face
-        vec4 baseMix = mix(originalGrayscale, effectedGrayscale, mask);
+        float baseMask = texture2D(u_maskTex, uv).r;
+        float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
+        float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
 
-        // Smear seep outside the face boundary with radial falloff
-        float dist_to_face2 = distance(uv, u_faceCenter.xy);
-        float smearFalloff = 1.0 - smoothstep(0.0, 0.30, dist_to_face2);
-        float seep = (1.0 - mask) * smearFalloff;
+        float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
+        float effectMix = clamp(finalMask + seep, 0.0, 1.0);
 
-        gl_FragColor = mix(baseMix, effectedGrayscale, seep);
+        // Calculate flicker
+        float flickerMultiplier = 1.0;
+        if (u_flickerPerSecond > 0.0) {
+            float flickerCycle = 1.0 / u_flickerPerSecond;
+            float flickerPhase = mod(u_time, flickerCycle);
+            float flickerEdge = flickerCycle * u_flickerDuration;
+            
+            float fadeWidth = flickerCycle * u_flickerFade * 0.5;
+            float isFlickerOff = 1.0 - smoothstep(flickerEdge - fadeWidth, flickerEdge + fadeWidth, flickerPhase);
+            flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
+        }
+
+        // The foreground color is a mix of the effect and the original body, controlled by the flicker.
+        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, flickerMultiplier);
+
+        // The final mask is only modulated by the overall opacity.
+        effectMix *= u_overallOpacity;
+        
+        // Determine the background color
+        vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
+
+        // Mix the background with the new foreground color using the final mask.
+        gl_FragColor = mix(backgroundColor, foregroundColor, effectMix);
       }`;
 
-    // --- UI Initialization ---
-    function createSlider(id, def) {
-      const container = document.createElement('div');
-      container.className = 'control-item space-y-2';
+    const UI = {
+      elements: {},
+      state: { ui: {}, jitter: {} },
+      globalState: { ui: {} }, // State for non-randomized controls
+      definitions: {},
+      globalDefinitions: {},
 
-      const labelContainer = document.createElement('div');
-      labelContainer.className = 'flex justify-between items-center';
+      init(definitions, globalDefinitions) {
+        this.definitions = definitions;
+        this.globalDefinitions = globalDefinitions;
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'effects-controls', 'global-controls', 'backgroundMedia', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue'];
+        ids.forEach(id => this.elements[id] = document.getElementById(id));
+        
+        // Create randomized controls
+        for (const [key, definition] of Object.entries(this.definitions)) {
+          this.createControlGroup(key, definition, this.state, this.elements['effects-controls'], true);
+        }
+        // Create global controls (no toggle, not randomized)
+        for (const [key, definition] of Object.entries(this.globalDefinitions)) {
+            this.createControlGroup(key, definition, this.globalState, this.elements['global-controls'], false);
+        }
 
-      const label = document.createElement('label');
-      label.htmlFor = id;
-      label.className = 'text-sm font-medium text-gray-300';
-      label.textContent = def.label;
+        this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
+        this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
+        
+        // Background controls
+        this.elements.bgUploadBtn.addEventListener('click', () => this.elements.bgUpload.click());
+        this.elements.bgUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+            this.elements.backgroundMedia.src = url;
+            this.elements.backgroundMedia.play();
+            this.elements.useBgChk.disabled = false;
+            this.elements.useBgChk.checked = true;
+            this.setMsg(`Loaded background: ${file.name}`);
+        });
+        this.elements.maskFeather.addEventListener('input', () => {
+            this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3);
+        });
+      },
 
-      const valueSpan = document.createElement('span');
-      valueSpan.id = `${id}Val`;
-      valueSpan.className = 'text-sm font-mono text-green-400 cursor-pointer';
+      createControlGroup(key, definition, stateObject, parentElement, withToggle) {
+        const group = document.createElement('div');
+        group.className = 'control-group bg-black/50 border border-gray-800 rounded-lg p-3';
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between';
+        if(withToggle) header.classList.add('cursor-pointer');
 
-      labelContainer.appendChild(label);
-      labelContainer.appendChild(valueSpan);
+        const title = document.createElement('h3');
+        title.className = 'font-semibold text-gray-200';
+        title.textContent = definition.title;
+        header.appendChild(title);
 
-      const input = document.createElement('input');
-      input.type = 'range';
-      input.id = id;
-      input.min = def.min;
-      input.max = def.max;
-      input.step = def.step;
-      input.value = def.value;
+        const content = document.createElement('div');
+        content.className = 'mt-3 space-y-3';
+        
+        if (withToggle) {
+            const toggle = document.createElement('input');
+            toggle.type = 'checkbox';
+            toggle.checked = definition.active;
+            toggle.className = 'form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0';
+            if (!definition.active) content.classList.add('hidden');
+            
+            toggle.addEventListener('change', () => {
+              definition.active = toggle.checked;
+              content.classList.toggle('hidden', !toggle.checked);
+            });
+            definition.toggleElement = toggle;
+            header.appendChild(toggle);
+        }
 
-      container.appendChild(labelContainer);
-      container.appendChild(input);
+        stateObject.ui[key] = {};
+        if (stateObject.jitter) {
+            stateObject.jitter[key] = {};
+        }
 
-      const updateValue = () => {
-        const val = parseFloat(input.value);
-        valueSpan.textContent = val.toFixed(String(def.step).includes('.') ? 3 : 0);
-      };
-      input.addEventListener('input', updateValue);
+        for (const [controlKey, controlDef] of Object.entries(definition.controls)) {
+          const slider = this.createSlider(controlKey, controlDef);
+          content.appendChild(slider.container);
+          stateObject.ui[key][controlKey] = slider.input;
+          if (stateObject.jitter) {
+              stateObject.jitter[key][controlKey] = { base: controlDef.value, current: controlDef.value };
+              slider.input.addEventListener('input', () => {
+                stateObject.jitter[key][controlKey].base = parseFloat(slider.input.value);
+              });
+          }
+        }
+        
+        group.append(header, content);
+        parentElement.appendChild(group);
+      },
 
-      valueSpan.addEventListener('click', () => {
-        const manualInput = document.createElement('input');
-        manualInput.type = 'number';
-        manualInput.className = 'w-16 bg-gray-900 text-green-400 font-mono text-right p-0 border-0 focus:ring-0';
-        manualInput.value = input.value;
-        manualInput.step = def.step;
-        valueSpan.replaceWith(manualInput);
-        manualInput.focus();
+      createSlider(id, def) {
+        const container = document.createElement('div');
+        container.className = 'control-item space-y-2';
+        const labelContainer = document.createElement('div');
+        labelContainer.className = 'flex justify-between items-center';
+        const label = document.createElement('label');
+        label.className = 'text-sm font-medium text-gray-300';
+        label.textContent = def.label;
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'text-sm font-mono text-green-400';
+        const input = document.createElement('input');
+        input.type = 'range';
+        Object.assign(input, { min: def.min, max: def.max, step: def.step, value: def.value });
+        
+        const updateValue = () => valueSpan.textContent = parseFloat(input.value).toFixed(String(def.step).includes('.') ? 3 : 0);
+        input.addEventListener('input', updateValue);
+        updateValue();
+        
+        labelContainer.append(label, valueSpan);
+        container.append(labelContainer, input);
+        return { container, input };
+      },
 
-        const finishEdit = () => {
-          let newValue = parseFloat(manualInput.value);
-          newValue = Math.max(def.min, Math.min(def.max, newValue));
-          input.value = newValue;
-          updateValue();
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          manualInput.replaceWith(valueSpan);
+      updateJitter(t) {
+        if (!this.definitions.Jitter.active) return;
+        const { jitterAmount, jitterSpeed } = this.state.ui.Jitter;
+        const amount = parseFloat(jitterAmount.value);
+        const speed = parseFloat(jitterSpeed.value);
+        for (const [groupKey, group] of Object.entries(this.state.jitter)) {
+          if (groupKey === 'Jitter' || !this.definitions[groupKey].active) continue;
+          for (const [controlKey, state] of Object.entries(group)) {
+            const slider = this.state.ui[groupKey][controlKey];
+            const range = parseFloat(slider.max) - parseFloat(slider.min);
+            const offset = (Math.sin(t * speed + controlKey.length) * Math.cos(t * speed * 0.7 + groupKey.length)) * amount * range;
+            state.current = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), state.base + offset));
+          }
+        }
+      },
+
+      setStatus(text, isError = false) {
+        this.elements.statusBar.textContent = `STATUS: ${text}`;
+        this.elements.statusBar.classList.toggle('text-red-400', isError);
+        this.elements.statusBar.classList.toggle('text-green-400', !isError);
+      },
+      setMsg(text) { this.elements.msg.textContent = text; }
+    };
+
+    const Renderer = {
+      gl: null,
+      program: null,
+      textures: {},
+      framebuffers: {},
+      uniforms: {},
+      maskCanvas: document.createElement('canvas'),
+
+      init(canvas, vsSrc, fsSrc, uniformKeys) {
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+        if (!this.gl) throw new Error('WebGL not available');
+
+        const compile = (type, src) => {
+          const s = this.gl.createShader(type);
+          this.gl.shaderSource(s, src);
+          this.gl.compileShader(s);
+          if (!this.gl.getShaderParameter(s, this.gl.COMPILE_STATUS)) throw new Error(`Shader compile error: ${this.gl.getShaderInfoLog(s)}`);
+          return s;
         };
+        this.program = this.gl.createProgram();
+        this.gl.attachShader(this.program, compile(this.gl.VERTEX_SHADER, vsSrc));
+        this.gl.attachShader(this.program, compile(this.gl.FRAGMENT_SHADER, fsSrc));
+        this.gl.linkProgram(this.program);
+        if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) throw new Error(`Program link error: ${this.gl.getProgramInfoLog(this.program)}`);
+        
+        const buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), this.gl.STATIC_DRAW);
+        const posLoc = this.gl.getAttribLocation(this.program, 'a_pos');
+        this.gl.enableVertexAttribArray(posLoc);
+        this.gl.vertexAttribPointer(posLoc, 2, this.gl.FLOAT, false, 0, 0);
 
-        manualInput.addEventListener('blur', finishEdit);
-        manualInput.addEventListener('keydown', e => {
-          if (e.key === 'Enter') finishEdit();
-          if (e.key === 'Escape') manualInput.replaceWith(valueSpan);
-        });
-      });
+        const createTex = () => {
+          const tex = this.gl.createTexture();
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+          return tex;
+        };
+        this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
+        this.framebuffers.feedback = this.gl.createFramebuffer();
+        
+        this.gl.useProgram(this.program);
+        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
+      },
 
-      updateValue();
-      return { container, input, valueSpan };
-    }
-
-    function createControlGroup(key, definition) {
-      const group = document.createElement('div');
-      group.className = 'control-group bg-gray-900/70 border border-gray-700 rounded-lg p-3';
-
-      const header = document.createElement('div');
-      header.className = 'flex items-center justify-between cursor-pointer';
-
-      const title = document.createElement('h3');
-      title.className = 'font-semibold text-gray-200';
-      title.textContent = definition.title;
-
-      const toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.checked = definition.active;
-      toggle.className = 'form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0';
-      toggle.id = `${key}Toggle`;
-
-      header.appendChild(title);
-      header.appendChild(toggle);
-
-      const content = document.createElement('div');
-      content.className = 'mt-3 space-y-3';
-      if (!definition.active) content.classList.add('hidden');
-
-      toggle.addEventListener('change', () => {
-        definition.active = toggle.checked;
-        content.classList.toggle('hidden', !toggle.checked);
-      });
-
-      ui[key] = {};
-      jitterState[key] = {};
-
-      for (const controlKey in definition.controls) {
-        const controlDef = definition.controls[controlKey];
-        const slider = createSlider(`${controlKey}`, controlDef);
-        content.appendChild(slider.container);
-        ui[key][controlKey] = slider.input;
-        jitterState[key][controlKey] = { base: controlDef.value, current: controlDef.value };
-
-        slider.input.addEventListener('input', () => {
-          jitterState[key][controlKey].base = parseFloat(slider.input.value);
-        });
-      }
-
-      group.appendChild(header);
-      group.appendChild(content);
-      controlsContainer.appendChild(group);
-    }
-
-    Object.keys(EFFECT_DEFINITIONS).forEach(key => createControlGroup(key, EFFECT_DEFINITIONS[key]));
-
-    // --- Core ---
-    function setStatus(text, isError = false) {
-      statusBar.textContent = `STATUS: ${text}`;
-      statusBar.classList.toggle('text-red-400', isError);
-      statusBar.classList.toggle('text-green-400', !isError);
-    }
-    function setMsg(text) { msgEl.textContent = text; }
-
-    async function initFaceMesh() {
-      if (faceMeshReady) return true;
-      try {
-        faceMesh = new window.FaceMesh({
-          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-        });
-        faceMesh.setOptions({
-          maxNumFaces: 1,
-          refineLandmarks: true,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        });
-        faceMesh.onResults((res) => {
-            lastFacesMesh = res.multiFaceLandmarks || [];
-            if (lastFacesMesh.length > 0) {
-                const landmarks = lastFacesMesh[0];
-                let sx = 0, sy = 0;
-                landmarks.forEach(p => { sx += p.x; sy += p.y; });
-                const cx = sx / landmarks.length;
-                const cy = sy / landmarks.length;
-
-                // The face center is now always in the original video's coordinate space.
-                // The final output flip is handled entirely in the vertex shader.
-                faceCenter = { x: cx, y: 1.0 - cy, detected: 1.0 };
-            } else {
-                faceCenter.detected = 0.0;
-            }
-            fmBusy = false;
-        });
-        await faceMesh.initialize();
-        faceMeshReady = true;
-        return true;
-      } catch (err) {
-        console.error("Face Mesh initialization failed:", err);
-        setStatus('Face Mesh Failed', true);
-        return false;
-      }
-    }
-
-    function fit() {
-      if (!video.videoWidth) return;
-      const w = video.videoWidth;
-      const h = video.videoHeight;
-
-      if (canvas.width !== w || canvas.height !== h) {
+      fit(video) {
+        if (!video.videoWidth) return;
+        const { videoWidth: w, videoHeight: h } = video;
+        const canvas = this.gl.canvas;
+        if (canvas.width === w && canvas.height === h) return;
         canvas.width = w;
         canvas.height = h;
-
-        // Resize textures
-        for (const texName in textures) {
-          gl.bindTexture(gl.TEXTURE_2D, textures[texName]);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        // Don't resize background texture here, it has its own dimensions
+        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        for (const tex of resizableTextures) {
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
         }
-      }
-      if (gl) gl.viewport(0, 0, w, h);
-    }
+        this.gl.viewport(0, 0, w, h);
+      },
 
-    function createGL() {
-      gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
-      if (!gl) throw new Error('WebGL not available');
-
-      function compileShader(type, src) {
-        const s = gl.createShader(type);
-        gl.shaderSource(s, src);
-        gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-          throw new Error(`Shader compile error: ${gl.getShaderInfoLog(s)}`);
+      drawMask(video, segmentationMask) {
+        const { videoWidth: W, videoHeight: H } = video;
+        const ctx = this.maskCanvas.getContext('2d');
+        if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) {
+          this.maskCanvas.width = W;
+          this.maskCanvas.height = H;
         }
-        return s;
-      }
-      function createProgram(vsSrc, fsSrc) {
-        const program = gl.createProgram();
-        gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vsSrc));
-        gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fsSrc));
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-          throw new Error(`Program link error: ${gl.getProgramInfoLog(program)}`);
-        }
-        return program;
-      }
-
-      programs.main = createProgram(vertSrc, fragSrc);
-
-      // Fullscreen quad
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), gl.STATIC_DRAW);
-
-      const posLoc = gl.getAttribLocation(programs.main, 'a_pos');
-      gl.enableVertexAttribArray(posLoc);
-      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-      // Textures
-      function createTexture() {
-        const tex = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        return tex;
-      }
-      textures.video      = createTexture();
-      textures.feedbackA  = createTexture();
-      textures.feedbackB  = createTexture();
-      textures.mask       = createTexture();
-
-      // FBO
-      framebuffers.feedback = gl.createFramebuffer();
-    }
-
-    async function start() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setMsg('getUserMedia not supported.');
-        return;
-      }
-      try {
-        setStatus('Requesting camera...');
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
-        video.srcObject = stream;
-        await video.play();
-        await new Promise(res => { video.onloadedmetadata = res; });
-
-        setStatus('Initializing GL...');
-        createGL();
-        fit();
-
-        setStatus('Initializing Face Mesh...');
-        if (!(await initFaceMesh())) return;
-
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        setMsg('');
-        setStatus('Running');
-
-        loop();
-      } catch (err) {
-        console.error(err);
-        let hint = (err.name === 'NotAllowedError') ? 'Permission denied.' : '';
-        setMsg(`Camera error: ${err.message} ${hint}`);
-        setStatus('Error', true);
-      }
-    }
-
-    function stop() {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      stream = null;
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      setStatus('Terminated');
-    }
-
-    function drawMask() {
-        const W = video.videoWidth;
-        const H = video.videoHeight;
-        if (maskCanvas.width !== W || maskCanvas.height !== H) {
-            maskCanvas.width = W;
-            maskCanvas.height = H;
+        
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, W, H);
+        if (segmentationMask) {
+          ctx.drawImage(segmentationMask, 0, 0, W, H);
         }
 
-        maskCtx.fillStyle = 'black';
-        maskCtx.fillRect(0, 0, W, H);
+        this.gl.activeTexture(this.gl.TEXTURE2);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.mask);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.maskCanvas);
+      },
 
-        if (lastFacesMesh.length > 0) {
-            maskCtx.save();
+      render(appState) {
+        const { video, t, uiState, globalUiState, backgroundMedia, useBg, maskFeather } = appState;
+        this.gl.useProgram(this.program);
+        
+        // Main video texture
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
+        
+        // Background texture
+        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth)) {
+            this.gl.activeTexture(this.gl.TEXTURE3);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
+            this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
+        }
 
-            // The mask is now always drawn in the original video's coordinate space.
-            // No need to flip the canvas context.
+        this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.uniform1f(this.uniforms.u_time, t);
 
-            maskCtx.fillStyle = 'white';
-            maskCtx.beginPath();
-            const landmarks = lastFacesMesh[0];
-
-            // center for padding scaling
-            let minX = W, minY = H, maxX = 0, maxY = 0;
-            for (const p of landmarks) {
-                minX = Math.min(minX, p.x * W);
-                minY = Math.min(minY, p.y * H);
-                maxX = Math.max(maxX, p.x * W);
-                maxY = Math.max(maxY, p.y * H);
+        // Set randomized effect uniforms
+        for (const [groupKey, group] of Object.entries(uiState.ui)) {
+          const groupIsActive = UI.definitions[groupKey].active;
+          for (const [controlKey, control] of Object.entries(group)) {
+            let val = groupIsActive ? parseFloat(control.value) : UI.definitions[groupKey].controls[controlKey].neutral;
+            if (groupIsActive && UI.definitions.Jitter.active && uiState.jitter[groupKey]?.[controlKey]) {
+              val = uiState.jitter[groupKey][controlKey].current;
             }
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-
-            const p0 = landmarks[FACE_OVAL[0]];
-            maskCtx.moveTo(centerX + (p0.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p0.y * H - centerY) * (1 + MASK_PADDING/100));
-            for (let i = 1; i < FACE_OVAL.length; i++) {
-                const p = landmarks[FACE_OVAL[i]];
-                maskCtx.lineTo(centerX + (p.x * W - centerX) * (1 + MASK_PADDING/100), centerY + (p.y * H - centerY) * (1 + MASK_PADDING/100));
-            }
-            maskCtx.closePath();
-            maskCtx.fill();
-            maskCtx.restore();
-        }
-
-        gl.activeTexture(gl.TEXTURE2);
-        gl.bindTexture(gl.TEXTURE_2D, textures.mask);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // ensure mask aligns vertically with video
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskCanvas);
-    }
-
-    function updateJitter(t) {
-      if (!EFFECT_DEFINITIONS.Jitter.active) return;
-      const amount = parseFloat(ui.Jitter.jitterAmount.value);
-      const speed = parseFloat(ui.Jitter.jitterSpeed.value);
-
-      for (const groupKey in jitterState) {
-        if (groupKey === 'Jitter' || !EFFECT_DEFINITIONS[groupKey].active) continue;
-        for (const controlKey in jitterState[groupKey]) {
-          const state = jitterState[groupKey][controlKey];
-          const slider = ui[groupKey][controlKey];
-          const range = parseFloat(slider.max) - parseFloat(slider.min);
-          const offset = (Math.sin(t * speed + controlKey.length) * Math.cos(t * speed * 0.7 + groupKey.length)) * amount * range;
-          state.current = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), state.base + offset));
-        }
-      }
-    }
-
-    function loop(time) {
-      rafId = requestAnimationFrame(loop);
-      if (!video.videoWidth || !gl) return;
-
-      fit();
-
-      const now = performance.now();
-      if (faceMeshReady && !fmBusy && (now - lastFmTime) > FM_MIN_INTERVAL) {
-        fmBusy = true;
-        lastFmTime = now;
-        faceMesh.send({ image: video });
-      }
-
-      drawMask();
-
-      // Upload current video frame (Y flipped to match UV)
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, textures.video);
-      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-
-      const t = animateChk.checked ? time / 1000 : 0;
-      updateJitter(t);
-
-      // Common uniforms
-      gl.useProgram(programs.main);
-      gl.uniform2f(gl.getUniformLocation(programs.main, 'u_resolution'), canvas.width, canvas.height);
-      gl.uniform1f(gl.getUniformLocation(programs.main, 'u_time'), t);
-      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_mirror_output'), mirrorChk.checked);
-      gl.uniform3f(gl.getUniformLocation(programs.main, 'u_faceCenter'), faceCenter.x, faceCenter.y, faceCenter.detected);
-      gl.uniform1f(gl.getUniformLocation(programs.main, 'u_maskFeather'), MASK_FEATHER);
-
-      // --- UNIFORM UPDATE ---
-      // Effect uniforms (with jitter if active)
-      for (const groupKey in ui) {
-        const groupIsActive = EFFECT_DEFINITIONS[groupKey].active;
-        for (const controlKey in ui[groupKey]) {
-          let val;
-          if (groupIsActive) {
-            val = parseFloat(ui[groupKey][controlKey].value);
-            // Apply jitter if Jitter effect is also active
-            if (EFFECT_DEFINITIONS.Jitter.active && jitterState[groupKey] && jitterState[groupKey][controlKey]) {
-              val = jitterState[groupKey][controlKey].current;
-            }
-          } else {
-            // If group is inactive, use the defined neutral value.
-            val = EFFECT_DEFINITIONS[groupKey].controls[controlKey].neutral;
+            this.gl.uniform1f(this.uniforms[`u_${controlKey}`], val);
           }
-          gl.uniform1f(gl.getUniformLocation(programs.main, `u_${controlKey}`), val);
+        }
+
+        // Set global (non-randomized) uniforms
+        for (const [groupKey, group] of Object.entries(globalUiState.ui)) {
+            for (const [controlKey, control] of Object.entries(group)) {
+                const val = parseFloat(control.value);
+                this.gl.uniform1f(this.uniforms[`u_${controlKey}`], val);
+            }
+        }
+        
+        // Set background-specific uniforms
+        this.gl.uniform1i(this.uniforms.u_useBackground, useBg);
+        this.gl.uniform1f(this.uniforms.u_maskFeather, maskFeather);
+
+        this.gl.uniform1i(this.uniforms.u_tex, 0);
+        this.gl.uniform1i(this.uniforms.u_feedbackTex, 1);
+        this.gl.uniform1i(this.uniforms.u_maskTex, 2);
+        this.gl.uniform1i(this.uniforms.u_backgroundTex, 3);
+        
+        this.gl.activeTexture(this.gl.TEXTURE1);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.feedbackA);
+
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 1);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffers.feedback);
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.textures.feedbackB, 0);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 0);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+
+        [this.textures.feedbackA, this.textures.feedbackB] = [this.textures.feedbackB, this.textures.feedbackA];
+      }
+    };
+
+    const BodySegmenter = {
+      segmenter: null,
+      lastResult: null,
+      isReady: false,
+      isBusy: false,
+      lastUpdateTime: 0,
+      minInterval: 60,
+
+      async init() {
+        if (this.isReady) return true;
+        try {
+          this.segmenter = new window.SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+          this.segmenter.setOptions({ modelSelection: 1 });
+          this.segmenter.onResults(res => {
+            this.lastResult = res.segmentationMask;
+            this.isBusy = false;
+          });
+          await this.segmenter.initialize();
+          this.isReady = true;
+          return true;
+        } catch (err) {
+          console.error("Selfie Segmentation initialization failed:", err);
+          return false;
+        }
+      },
+
+      update(video) {
+        const now = performance.now();
+        if (this.isReady && !this.isBusy && (now - this.lastUpdateTime) > this.minInterval) {
+          this.isBusy = true;
+          this.lastUpdateTime = now;
+          this.segmenter.send({ image: video });
         }
       }
+    };
 
-      // Texture bindings
-      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_tex'), 0);
-      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_feedbackTex'), 1);
-      gl.uniform1i(gl.getUniformLocation(programs.main, 'u_maskTex'), 2);
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, textures.feedbackA);
+    const PresetManager = {
+      init() {
+        this.populateList();
+        UI.elements.savePresetBtn.addEventListener('click', () => this.save());
+        UI.elements.deletePresetBtn.addEventListener('click', () => this.delete());
+        UI.elements.presetList.addEventListener('change', () => this.load());
+        UI.elements.randomBtn.addEventListener('click', () => this.randomize());
+      },
+      
+      getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV4.6Presets') || '{}'),
+      savePresets: (p) => localStorage.setItem('bodyGlitchV4.6Presets', JSON.stringify(p)),
 
-      // --- Pass 1: Feedback target (unmasked) ---
-      const isFeedbackPassLoc = gl.getUniformLocation(programs.main, 'u_isFeedbackPass');
-      gl.uniform1i(isFeedbackPassLoc, 1);
-
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers.feedback);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textures.feedbackB, 0);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-      // --- Pass 2: Screen (masked + smear seep) ---
-      gl.uniform1i(isFeedbackPassLoc, 0);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-      // Swap feedback
-      [textures.feedbackA, textures.feedbackB] = [textures.feedbackB, textures.feedbackA];
-
-      if (faceCenter.detected > 0.5) setStatus(`FACE DETECTED [${canvas.width}x${canvas.height}]`);
-      else setStatus(`NO SIGNAL...`);
-    }
-
-    // --- Presets ---
-    function getAppState() {
-      const state = { controls: {}, toggles: {} };
-      for (const groupKey in ui) {
-        state.controls[groupKey] = {};
-        state.toggles[`${groupKey}Toggle`] = document.getElementById(`${groupKey}Toggle`).checked;
-        for (const controlKey in ui[groupKey]) {
-          state.controls[groupKey][controlKey] = ui[groupKey][controlKey].value;
+      getAppState() {
+        const state = { controls: {}, toggles: {}, checkboxes: {}, globalControls: {}, misc: {} };
+        for (const [groupKey, group] of Object.entries(UI.state.ui)) {
+          state.controls[groupKey] = {};
+          state.toggles[groupKey] = UI.definitions[groupKey].active;
+          for (const [controlKey, control] of Object.entries(group)) {
+            state.controls[groupKey][controlKey] = control.value;
+          }
         }
-      }
-      state.checkboxes = { animateChk: animateChk.checked, mirrorChk: mirrorChk.checked };
-      return state;
-    }
-    function setAppState(state) {
-      if (!state) return;
-      if (state.controls) {
-        for (const groupKey in state.controls) {
-          if (ui[groupKey]) {
-            for (const controlKey in state.controls[groupKey]) {
-              if (ui[groupKey][controlKey]) {
-                const el = ui[groupKey][controlKey];
-                el.value = state.controls[groupKey][controlKey];
-                el.dispatchEvent(new Event('input'));
-                if (jitterState[groupKey] && jitterState[groupKey][controlKey]) {
-                  jitterState[groupKey][controlKey].base = parseFloat(el.value);
+        for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
+            state.globalControls[groupKey] = {};
+            for (const [controlKey, control] of Object.entries(group)) {
+                state.globalControls[groupKey][controlKey] = control.value;
+            }
+        }
+        state.checkboxes = { 
+            animateChk: UI.elements.animateChk.checked, 
+            mirrorChk: UI.elements.mirrorChk.checked,
+            useBgChk: UI.elements.useBgChk.checked
+        };
+        state.misc = {
+            maskFeather: UI.elements.maskFeather.value
+        };
+        return state;
+      },
+
+      setAppState(state) {
+        if (!state) return;
+        if (state.controls) {
+          for (const [groupKey, group] of Object.entries(state.controls)) {
+            if (UI.state.ui[groupKey]) {
+              for (const [controlKey, value] of Object.entries(group)) {
+                const el = UI.state.ui[groupKey][controlKey];
+                if (el) {
+                  el.value = value;
+                  el.dispatchEvent(new Event('input'));
+                  if (UI.state.jitter[groupKey]?.[controlKey]) UI.state.jitter[groupKey][controlKey].base = parseFloat(el.value);
                 }
               }
             }
           }
         }
-      }
-      if (state.toggles) {
-        for (const toggleId in state.toggles) {
-          const el = document.getElementById(toggleId);
-          if (el) { el.checked = state.toggles[toggleId]; el.dispatchEvent(new Event('change')); }
+        if (state.toggles) {
+          for (const [groupKey, isChecked] of Object.entries(state.toggles)) {
+            const def = UI.definitions[groupKey];
+            if (def && def.toggleElement) {
+              def.toggleElement.checked = isChecked;
+              def.toggleElement.dispatchEvent(new Event('change'));
+            }
+          }
         }
-      }
-      if (state.checkboxes) {
-        animateChk.checked = state.checkboxes.animateChk ?? true;
-        mirrorChk.checked  = state.checkboxes.mirrorChk ?? true;
-      }
-    }
-    function getPresets() { return JSON.parse(localStorage.getItem('faceGlitchV3.5Presets') || '{}'); }
-    function savePresets(p) { localStorage.setItem('faceGlitchV3.5Presets', JSON.stringify(p)); }
-    function populatePresetList() {
-      const presets = getPresets();
-      const currentVal = presetList.value;
-      presetList.innerHTML = '<option value="">-- LOAD PRESET --</option>';
-      for (const name in presets) {
-        const opt = document.createElement('option');
-        opt.value = name; opt.textContent = name; presetList.appendChild(opt);
-      }
-      presetList.value = currentVal;
-    }
-
-    savePresetBtn.addEventListener('click', () => {
-      const name = presetNameInput.value.trim();
-      if (!name) { setMsg('Enter a preset name.'); return; }
-      const presets = getPresets();
-      presets[name] = getAppState();
-      savePresets(presets);
-      populatePresetList();
-      presetList.value = name;
-      setMsg(`Preset '${name}' saved.`);
-    });
-
-    deletePresetBtn.addEventListener('click', () => {
-      const name = presetList.value;
-      if (!name) { setMsg('Select a preset to delete.'); return; }
-      const presets = getPresets();
-      delete presets[name];
-      savePresets(presets);
-      populatePresetList();
-      presetNameInput.value = '';
-      setMsg(`Preset '${name}' deleted.`);
-    });
-
-    presetList.addEventListener('change', () => {
-      const name = presetList.value;
-      if (!name) return;
-      const presets = getPresets();
-      if (presets[name]) {
-        setAppState(presets[name]);
-        presetNameInput.value = name;
-        setMsg(`Preset '${name}' loaded.`);
-      }
-    });
-
-    randomBtn.addEventListener('click', () => {
-      for (const groupKey in ui) {
-        document.getElementById(`${groupKey}Toggle`).checked = Math.random() > 0.3;
-        document.getElementById(`${groupKey}Toggle`).dispatchEvent(new Event('change'));
-        for (const controlKey in ui[groupKey]) {
-          const el = ui[groupKey][controlKey];
-          const min = parseFloat(el.min);
-          const max = parseFloat(el.max);
-          const step = parseFloat(el.step);
-          const val = min + Math.random() * (max - min);
-          el.value = Math.round(val / step) * step;
-          el.dispatchEvent(new Event('input'));
+        if (state.globalControls) {
+            for (const [groupKey, group] of Object.entries(state.globalControls)) {
+                if (UI.globalState.ui[groupKey]) {
+                    for (const [controlKey, value] of Object.entries(group)) {
+                        const el = UI.globalState.ui[groupKey][controlKey];
+                        if (el) {
+                            el.value = value;
+                            el.dispatchEvent(new Event('input'));
+                        }
+                    }
+                }
+            }
         }
-      }
-      setMsg('Parameters randomized!');
-    });
+        if (state.checkboxes) {
+          UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true;
+          UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true;
+          UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false;
+        }
+        if (state.misc) {
+            const featherSlider = UI.elements.maskFeather;
+            if (featherSlider) {
+                featherSlider.value = state.misc.maskFeather ?? '0.15';
+                featherSlider.dispatchEvent(new Event('input'));
+            }
+        }
+      },
 
-    // --- Init ---
-    startBtn.addEventListener('click', start);
-    stopBtn.addEventListener('click', stop);
-    populatePresetList();
+      populateList() {
+        const presets = this.getPresets();
+        const { presetList } = UI.elements;
+        const currentVal = presetList.value;
+        presetList.innerHTML = '<option value="">-- LOAD PRESET --</option>';
+        for (const name in presets) {
+          const opt = document.createElement('option');
+          opt.value = name; opt.textContent = name; presetList.appendChild(opt);
+        }
+        presetList.value = currentVal;
+      },
+
+      save() {
+        const { presetName } = UI.elements;
+        const name = presetName.value.trim();
+        if (!name) return UI.setMsg('Enter a preset name.');
+        const presets = this.getPresets();
+        presets[name] = this.getAppState();
+        this.savePresets(presets);
+        this.populateList();
+        UI.elements.presetList.value = name;
+        UI.setMsg(`Preset '${name}' saved.`);
+      },
+
+      delete() {
+        const { presetList, presetName } = UI.elements;
+        const name = presetList.value;
+        if (!name) return UI.setMsg('Select a preset to delete.');
+        const presets = this.getPresets();
+        delete presets[name];
+        this.savePresets(presets);
+        this.populateList();
+        presetName.value = '';
+        UI.setMsg(`Preset '${name}' deleted.`);
+      },
+
+      load() {
+        const { presetList, presetName } = UI.elements;
+        const name = presetList.value;
+        if (!name) return;
+        const presets = this.getPresets();
+        if (presets[name]) {
+          this.setAppState(presets[name]);
+          presetName.value = name;
+          UI.setMsg(`Preset '${name}' loaded.`);
+        }
+      },
+
+      randomize() {
+        for (const groupKey in UI.state.ui) {
+          const def = UI.definitions[groupKey];
+          if(def && def.toggleElement){
+            def.toggleElement.checked = Math.random() > 0.3;
+            def.toggleElement.dispatchEvent(new Event('change'));
+          }
+          for (const controlKey in UI.state.ui[groupKey]) {
+            const el = UI.state.ui[groupKey][controlKey];
+            const min = parseFloat(el.min), max = parseFloat(el.max), step = parseFloat(el.step);
+            el.value = Math.round((min + Math.random() * (max - min)) / step) * step;
+            el.dispatchEvent(new Event('input'));
+          }
+        }
+        UI.setMsg('Parameters randomized!');
+      }
+    };
+
+    const App = {
+      stream: null,
+      rafId: null,
+      shaders: {},
+      definitions: {},
+      globalDefinitions: {},
+
+      async start() {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          return UI.setMsg('getUserMedia not supported.');
+        }
+        try {
+          UI.setStatus('Requesting camera...');
+          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
+          UI.elements.video.srcObject = this.stream;
+          await UI.elements.video.play();
+          await new Promise(res => { UI.elements.video.onloadedmetadata = res; });
+
+          UI.setStatus('Initializing GL...');
+          const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather'];
+          Object.values(this.definitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
+          Object.values(this.globalDefinitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
+          Renderer.init(UI.elements.glcanvas, this.shaders.vert, this.shaders.frag, uniformKeys);
+          Renderer.fit(UI.elements.video);
+
+          UI.setStatus('Initializing Body Segmentation...');
+          if (!(await BodySegmenter.init())) return UI.setStatus('Segmentation Failed', true);
+
+          UI.elements.startBtn.disabled = true;
+          UI.elements.stopBtn.disabled = false;
+          UI.setMsg('');
+          UI.setStatus('Running');
+          this.loop();
+        } catch (err) {
+          console.error(err);
+          UI.setMsg(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
+          UI.setStatus('Error', true);
+        }
+      },
+
+      stop() {
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+        if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+        this.stream = null;
+        UI.elements.startBtn.disabled = false;
+        UI.elements.stopBtn.disabled = true;
+        UI.setStatus('Terminated');
+      },
+
+      loop(time) {
+        this.rafId = requestAnimationFrame(t => this.loop(t));
+        const video = UI.elements.video;
+        if (!video.videoWidth || !Renderer.gl) return;
+        
+        Renderer.fit(video);
+        BodySegmenter.update(video);
+        Renderer.drawMask(video, BodySegmenter.lastResult);
+        
+        const t = UI.elements.animateChk.checked ? time / 1000 : 0;
+        UI.updateJitter(t);
+
+        Renderer.render({
+          video: video,
+          t: t,
+          uiState: UI.state,
+          globalUiState: UI.globalState,
+          backgroundMedia: UI.elements.backgroundMedia,
+          useBg: UI.elements.useBgChk.checked,
+          maskFeather: parseFloat(UI.elements.maskFeather.value)
+        });
+        
+        const statusText = BodySegmenter.lastResult
+          ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` 
+          : `NO SIGNAL...`;
+        UI.setStatus(statusText);
+      },
+
+      init(definitions, globalDefinitions, shaders) {
+        this.shaders = shaders;
+        this.definitions = definitions;
+        this.globalDefinitions = globalDefinitions;
+        UI.init(definitions, globalDefinitions);
+        PresetManager.init();
+        UI.elements.startBtn.addEventListener('click', () => this.start());
+        UI.elements.stopBtn.addEventListener('click', () => this.stop());
+      }
+    };
+    
+    // --- Entry Point ---
+    // Definitions for effects that can be randomized
+    const definitions = {
+      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
+      Smear: { 
+        title: 'Smearing', 
+        active: true, 
+        controls: { 
+          globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, 
+          globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, 
+          spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, 
+          spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, 
+          spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } 
+        } 
+      },
+      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
+      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
+      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
+      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
+    };
+
+    // Definitions for global controls that are NOT randomized
+    const globalDefinitions = {
+        Opacity: {
+            title: 'Global Opacity',
+            active: true,
+            controls: {
+                overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 },
+                flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 },
+                flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 },
+                flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 },
+                flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }
+            }
+        },
+        Seep: {
+            title: 'Effect Seep',
+            active: true,
+            controls: {
+              seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0, neutral: 0.0 },
+              seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20, neutral: 0.0 }
+            }
+        }
+    };
+
+    App.init(definitions, globalDefinitions, { vert: vertSrc, frag: fragSrc });
+
   })();
   </script>
 </body>
