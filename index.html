@@ -28,6 +28,12 @@
 
     .status-indicator::after { content:'_'; animation: blink 1s step-end infinite; }
     @keyframes blink { 50% { opacity: 0; } }
+    
+    .tab-button.active {
+        border-color: #34d399;
+        color: #e5e7eb;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
   </style>
 </head>
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
@@ -35,17 +41,18 @@
   <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
       <video id="video" playsinline muted class="hidden"></video>
-      <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
+      <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
+      <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
       <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
       <div id="statusBar" class="absolute bottom-2 left-2 font-mono text-xs bg-black/50 text-green-400 px-2 py-1 rounded status-indicator">
         STATUS: IDLE
       </div>
     </div>
 
-    <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col custom-scrollbar overflow-y-auto">
-      <div class="p-4 border-b border-gray-800">
+    <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col">
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V4.6_BODY</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.2_BODY</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -53,7 +60,7 @@
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
-      <div class="p-4 border-b border-gray-800">
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
         <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
         <div class="grid grid-cols-3 gap-2">
@@ -63,41 +70,68 @@
           <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
         </div>
       </div>
-
-      <div id="global-controls" class="p-4 space-y-4 border-b border-gray-800"></div>
       
-      <div id="effects-controls" class="flex-1 p-4 space-y-4"></div>
-      
-      <div class="p-4 border-t border-gray-800 bg-black/50">
-        <h2 class="font-bold text-gray-300 mb-3">BACKGROUND</h2>
-        <div class="space-y-3">
-            <button id="bgUploadBtn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 rounded text-sm transition-colors">Upload Image/Video</button>
-            <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
-            <label class="flex items-center justify-between text-sm">
-                <span class="text-gray-400">Use Custom Background</span>
-                <input type="checkbox" id="useBgChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" disabled>
-            </label>
-            <div class="control-item space-y-2">
-                <div class="flex justify-between items-center">
-                    <label for="maskFeather" class="text-sm font-medium text-gray-300">Mask Feather</label>
-                    <span id="maskFeatherValue" class="text-sm font-mono text-green-400">0.150</span>
-                </div>
-                <input type="range" id="maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
-            </div>
-        </div>
+      <!-- TABS -->
+      <div class="flex border-b border-gray-800 flex-shrink-0">
+        <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-200 transition-colors duration-200">Effects</button>
+        <button id="globalsTabBtn" class="tab-button active flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 transition-colors duration-200">Globals</button>
       </div>
 
-      <div class="p-4 border-t border-gray-800 bg-black/50">
-        <h2 class="font-bold text-gray-300 mb-3">GLOBAL SETTINGS</h2>
-        <div class="space-y-3">
-          <label class="flex items-center justify-between text-sm">
-            <span class="text-gray-400">Animate Effects</span>
-            <input type="checkbox" id="animateChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
-          </label>
-          <label class="flex items-center justify-between text-sm">
-            <span class="text-gray-400">Mirror Camera</span>
-            <input type="checkbox" id="mirrorChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
-          </label>
+      <!-- TAB CONTENT -->
+      <div class="flex-grow custom-scrollbar overflow-y-auto">
+        <div id="effects-tab-content" class="hidden p-4 space-y-4">
+          <!-- Randomized effects will be generated here by JS -->
+        </div>
+        <div id="globals-tab-content" class="p-4 space-y-4">
+          <!-- Global controls will be generated and moved here -->
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">BACKGROUND</h3>
+            <div class="space-y-3">
+                <button id="bgUploadBtn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 rounded text-sm transition-colors">Upload Image/Video</button>
+                <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
+                <label class="flex items-center justify-between text-sm">
+                    <span class="text-gray-400">Use Custom Background</span>
+                    <input type="checkbox" id="useBgChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" disabled>
+                </label>
+                <div class="control-item space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label for="maskFeather" class="text-sm font-medium text-gray-300">Mask Feather</label>
+                        <span id="maskFeatherValue" class="text-sm font-mono text-green-400">0.150</span>
+                    </div>
+                    <input type="range" id="maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
+                </div>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">SETTINGS</h3>
+            <div class="space-y-3">
+              <label class="flex items-center justify-between text-sm">
+                <span class="text-gray-400">Animate Effects</span>
+                <input type="checkbox" id="animateChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
+              </label>
+              <label class="flex items-center justify-between text-sm">
+                <span class="text-gray-400">Mirror Camera</span>
+                <input type="checkbox" id="mirrorChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
+              </label>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">AUTOMATION</h3>
+            <div class="control-item space-y-2">
+              <div class="flex justify-between items-center">
+                <label for="autoRandomizeSlider" class="text-sm font-medium text-gray-300">Auto-Randomize</label>
+                <span id="autoRandomizeValue" class="text-sm font-mono text-green-400">Off</span>
+              </div>
+              <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="0">
+            </div>
+            <div class="control-item space-y-2 mt-3">
+              <div class="flex justify-between items-center">
+                <label for="presetIterationSlider" class="text-sm font-medium text-gray-300">Preset Iteration</label>
+                <span id="presetIterationValue" class="text-sm font-mono text-green-400">Off</span>
+              </div>
+              <input type="range" id="presetIterationSlider" min="0" max="30" step="0.5" value="0">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -250,7 +284,7 @@
         float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
 
         float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
-        float effectMix = clamp(finalMask + seep, 0.0, 1.0);
+        float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
 
         // Calculate flicker
         float flickerMultiplier = 1.0;
@@ -264,17 +298,17 @@
             flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
         }
 
-        // The foreground color is a mix of the effect and the original body, controlled by the flicker.
-        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, flickerMultiplier);
+        // 'effectAmount' now combines opacity and flicker. This controls HOW MUCH effect is applied.
+        float effectAmount = u_overallOpacity * flickerMultiplier;
 
-        // The final mask is only modulated by the overall opacity.
-        effectMix *= u_overallOpacity;
+        // The foreground color is a mix of the original body and the fully effected body.
+        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, effectAmount);
         
         // Determine the background color
         vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
 
-        // Mix the background with the new foreground color using the final mask.
-        gl_FragColor = mix(backgroundColor, foregroundColor, effectMix);
+        // Mix the background with the calculated foreground color using the silhouette mask.
+        gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
       }`;
 
     const UI = {
@@ -287,29 +321,47 @@
       init(definitions, globalDefinitions) {
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
-        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'effects-controls', 'global-controls', 'backgroundMedia', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue'];
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
-        // Create randomized controls
+        // Create randomized controls in the 'Effects' tab
         for (const [key, definition] of Object.entries(this.definitions)) {
-          this.createControlGroup(key, definition, this.state, this.elements['effects-controls'], true);
+          this.createControlGroup(key, definition, this.state, this.elements['effects-tab-content'], true);
         }
-        // Create global controls (no toggle, not randomized)
+        // Create global controls in the 'Globals' tab
         for (const [key, definition] of Object.entries(this.globalDefinitions)) {
-            this.createControlGroup(key, definition, this.globalState, this.elements['global-controls'], false);
+            this.createControlGroup(key, definition, this.globalState, this.elements['globals-tab-content'], false);
         }
 
+        // --- Event Listeners ---
         this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
         this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
         
+        // Tab switching logic
+        this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
+        this.elements.globalsTabBtn.addEventListener('click', () => this.switchTab('globals'));
+
         // Background controls
         this.elements.bgUploadBtn.addEventListener('click', () => this.elements.bgUpload.click());
         this.elements.bgUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const url = URL.createObjectURL(file);
-            this.elements.backgroundMedia.src = url;
-            this.elements.backgroundMedia.play();
+
+            if (file.type.startsWith('image/')) {
+                this.elements.backgroundImage.src = url;
+                this.elements.backgroundImage.classList.remove('hidden');
+                this.elements.backgroundMedia.classList.add('hidden');
+                this.elements.backgroundMedia.pause();
+                this.elements.backgroundMedia.src = '';
+            } else if (file.type.startsWith('video/')) {
+                this.elements.backgroundMedia.src = url;
+                this.elements.backgroundMedia.play();
+                this.elements.backgroundMedia.classList.remove('hidden');
+                this.elements.backgroundImage.classList.add('hidden');
+                this.elements.backgroundImage.src = '';
+            }
+
             this.elements.useBgChk.disabled = false;
             this.elements.useBgChk.checked = true;
             this.setMsg(`Loaded background: ${file.name}`);
@@ -317,6 +369,30 @@
         this.elements.maskFeather.addEventListener('input', () => {
             this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3);
         });
+        
+        // Automation controls
+        this.elements.autoRandomizeSlider.addEventListener('input', () => {
+            const val = parseFloat(this.elements.autoRandomizeSlider.value);
+            this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
+        });
+        this.elements.presetIterationSlider.addEventListener('input', () => {
+            const val = parseFloat(this.elements.presetIterationSlider.value);
+            this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
+        });
+      },
+
+      switchTab(tabName) {
+        if (tabName === 'effects') {
+            this.elements.effectsTabBtn.classList.add('active');
+            this.elements.globalsTabBtn.classList.remove('active');
+            this.elements['effects-tab-content'].classList.remove('hidden');
+            this.elements['globals-tab-content'].classList.add('hidden');
+        } else {
+            this.elements.effectsTabBtn.classList.remove('active');
+            this.elements.globalsTabBtn.classList.add('active');
+            this.elements['effects-tab-content'].classList.add('hidden');
+            this.elements['globals-tab-content'].classList.remove('hidden');
+        }
       },
 
       createControlGroup(key, definition, stateObject, parentElement, withToggle) {
@@ -324,8 +400,7 @@
         group.className = 'control-group bg-black/50 border border-gray-800 rounded-lg p-3';
         const header = document.createElement('div');
         header.className = 'flex items-center justify-between';
-        if(withToggle) header.classList.add('cursor-pointer');
-
+        
         const title = document.createElement('h3');
         title.className = 'font-semibold text-gray-200';
         title.textContent = definition.title;
@@ -335,6 +410,7 @@
         content.className = 'mt-3 space-y-3';
         
         if (withToggle) {
+            header.classList.add('cursor-pointer');
             const toggle = document.createElement('input');
             toggle.type = 'checkbox';
             toggle.checked = definition.active;
@@ -343,7 +419,13 @@
             
             toggle.addEventListener('change', () => {
               definition.active = toggle.checked;
-              content.classList.toggle('hidden', !toggle.checked);
+            });
+            header.addEventListener('click', (e) => {
+                if(e.target !== toggle) {
+                    toggle.checked = !toggle.checked;
+                    toggle.dispatchEvent(new Event('change'));
+                }
+                content.classList.toggle('hidden', !toggle.checked);
             });
             definition.toggleElement = toggle;
             header.appendChild(toggle);
@@ -512,7 +594,7 @@
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
         
         // Background texture
-        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth)) {
+        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth || backgroundMedia.width)) {
             this.gl.activeTexture(this.gl.TEXTURE3);
             this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
             this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -612,8 +694,8 @@
         UI.elements.randomBtn.addEventListener('click', () => this.randomize());
       },
       
-      getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV4.6Presets') || '{}'),
-      savePresets: (p) => localStorage.setItem('bodyGlitchV4.6Presets', JSON.stringify(p)),
+      getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV5.0Presets') || '{}'),
+      savePresets: (p) => localStorage.setItem('bodyGlitchV5.0Presets', JSON.stringify(p)),
 
       getAppState() {
         const state = { controls: {}, toggles: {}, checkboxes: {}, globalControls: {}, misc: {} };
@@ -636,7 +718,7 @@
             useBgChk: UI.elements.useBgChk.checked
         };
         state.misc = {
-            maskFeather: UI.elements.maskFeather.value
+            maskFeather: UI.elements.maskFeather.value,
         };
         return state;
       },
@@ -729,15 +811,16 @@
         UI.setMsg(`Preset '${name}' deleted.`);
       },
 
-      load() {
+      load(name) {
         const { presetList, presetName } = UI.elements;
-        const name = presetList.value;
-        if (!name) return;
+        const presetToLoad = name || presetList.value;
+        if (!presetToLoad) return;
         const presets = this.getPresets();
-        if (presets[name]) {
-          this.setAppState(presets[name]);
-          presetName.value = name;
-          UI.setMsg(`Preset '${name}' loaded.`);
+        if (presets[presetToLoad]) {
+          this.setAppState(presets[presetToLoad]);
+          presetName.value = presetToLoad;
+          presetList.value = presetToLoad;
+          UI.setMsg(`Preset '${presetToLoad}' loaded.`);
         }
       },
 
@@ -765,6 +848,9 @@
       shaders: {},
       definitions: {},
       globalDefinitions: {},
+      lastRandomizeTime: 0,
+      lastPresetIterateTime: 0,
+      currentPresetIndex: 0,
 
       async start() {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -821,12 +907,46 @@
         const t = UI.elements.animateChk.checked ? time / 1000 : 0;
         UI.updateJitter(t);
 
+        // Auto-Randomize Logic
+        const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
+        if (autoRandomizeInterval > 0) {
+            if (this.lastRandomizeTime === 0) this.lastRandomizeTime = time;
+            if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) {
+                PresetManager.randomize();
+                this.lastRandomizeTime = time;
+            }
+        } else {
+            this.lastRandomizeTime = 0; // Reset timer if disabled
+        }
+        
+        // Preset Iteration Logic
+        const presetIterationInterval = parseFloat(UI.elements.presetIterationSlider.value);
+        if (presetIterationInterval > 0) {
+            if (this.lastPresetIterateTime === 0) this.lastPresetIterateTime = time;
+            if ((time - this.lastPresetIterateTime) > presetIterationInterval * 1000) {
+                const presets = PresetManager.getPresets();
+                const presetNames = Object.keys(presets);
+                if (presetNames.length > 0) {
+                    this.currentPresetIndex = (this.currentPresetIndex + 1) % presetNames.length;
+                    const nextPresetName = presetNames[this.currentPresetIndex];
+                    PresetManager.load(nextPresetName);
+                }
+                this.lastPresetIterateTime = time;
+            }
+        } else {
+            this.lastPresetIterateTime = 0; // Reset timer if disabled
+        }
+
+        const backgroundEl = !UI.elements.backgroundImage.classList.contains('hidden')
+            ? UI.elements.backgroundImage
+            : UI.elements.backgroundMedia;
+
         Renderer.render({
           video: video,
           t: t,
           uiState: UI.state,
           globalUiState: UI.globalState,
-          backgroundMedia: UI.elements.backgroundMedia,
+          backgroundMedia: backgroundEl,
           useBg: UI.elements.useBgChk.checked,
           maskFeather: parseFloat(UI.elements.maskFeather.value)
         });
