@@ -11,11 +11,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
+  <!-- Main app dependency -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   
-  <!-- Libraries for QR Code and Peer-to-Peer connection -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.js"></script>
+  <!-- New dependencies for remote recording -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 
   <style>
@@ -39,22 +40,16 @@
         color: #e5e7eb;
         background-color: rgba(255, 255, 255, 0.05);
     }
-
-    /* Styles for the QR Code Modal */
-    #qrModal {
-        transition: opacity 0.3s ease-in-out;
-    }
-    #qrCodeContainer canvas, #qrCodeContainer img {
-        width: 100% !important;
-        height: auto !important;
-        image-rendering: pixelated; /* Keeps QR code sharp */
-    }
+    /* Styles for the new pages */
+    #qrCodePage, #controllerPage { display: none; }
   </style>
 </head>
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-  <!-- Main Container -->
-  <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
+  <!-- ======================================================================= -->
+  <!-- MAIN INSTALLATION UI (Visible by default)                             -->
+  <!-- ======================================================================= -->
+  <div id="mainApp" class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
@@ -68,31 +63,19 @@
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col">
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.2_BODY</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V6.0_REMOTE</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
         </div>
-        <!-- Button to show QR Code -->
-        <button id="remoteBtn" class="w-full mt-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded transition-all duration-200">Remote Control</button>
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
-      <div class="p-4 border-b border-gray-800 flex-shrink-0">
-        <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
-        <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
-        <div class="grid grid-cols-3 gap-2">
-          <input type="text" id="presetName" placeholder="Preset Name..." class="col-span-3 bg-gray-900 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
-          <button id="savePresetBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 rounded text-sm transition-colors">Save</button>
-          <button id="deletePresetBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 rounded text-sm transition-colors">Delete</button>
-          <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
-        </div>
-      </div>
-      
       <!-- TABS -->
       <div class="flex border-b border-gray-800 flex-shrink-0">
         <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-200 transition-colors duration-200">Effects</button>
         <button id="globalsTabBtn" class="tab-button active flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 transition-colors duration-200">Globals</button>
+        <button id="remoteTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-200 transition-colors duration-200">Remote</button>
       </div>
 
       <!-- TAB CONTENT -->
@@ -102,6 +85,16 @@
         </div>
         <div id="globals-tab-content" class="p-4 space-y-4">
           <!-- Global controls will be generated and moved here -->
+           <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">PRESET MANAGER</h2>
+            <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
+            <div class="grid grid-cols-3 gap-2">
+              <input type="text" id="presetName" placeholder="Preset Name..." class="col-span-3 bg-gray-900 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
+              <button id="savePresetBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 rounded text-sm transition-colors">Save</button>
+              <button id="deletePresetBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 rounded text-sm transition-colors">Delete</button>
+              <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
+            </div>
+          </div>
           <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
             <h3 class="font-semibold text-gray-200 mb-3">BACKGROUND</h3>
             <div class="space-y-3">
@@ -151,32 +144,66 @@
             </div>
           </div>
         </div>
+        <div id="remote-tab-content" class="hidden p-4 space-y-4">
+            <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+                <h3 class="font-semibold text-gray-200 mb-3">REMOTE CONTROL</h3>
+                <p class="text-sm text-gray-400 mb-2">Use this to allow visitors to record clips.</p>
+                <a href="#qrcode" target="_blank" class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 rounded text-sm transition-colors">
+                    Open QR Code Display
+                </a>
+                <div class="mt-4">
+                    <h4 class="font-mono text-sm text-gray-300">CONNECTION STATUS</h4>
+                    <p id="remoteStatus" class="font-mono text-sm text-yellow-400 mt-1">Initializing...</p>
+                </div>
+                 <div class="mt-4">
+                    <h4 class="font-mono text-sm text-gray-300">YOUR ID</h4>
+                    <p id="peerIdDisplay" class="font-mono text-xs text-green-400 mt-1 break-all">Waiting for PeerJS network...</p>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- QR Code Modal -->
-  <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
-    <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full text-center shadow-2xl shadow-indigo-500/20">
-      <h2 class="text-2xl font-bold text-white mb-2">Scan to Connect</h2>
-      <p class="text-gray-400 mb-4">Scan this QR code with your phone to start the remote recording experience.</p>
-      <div id="qrCodeContainer" class="bg-white p-4 rounded-md w-full aspect-square mx-auto">
-        <!-- QR Code will be generated here -->
-      </div>
-      <p id="qrStatus" class="font-mono text-sm text-indigo-400 mt-4">Initializing connection...</p>
-      <button id="closeQrModalBtn" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full">Close</button>
+  <!-- ======================================================================= -->
+  <!-- QR CODE PAGE (hidden by default)                                        -->
+  <!-- ======================================================================= -->
+  <div id="qrCodePage" class="w-full max-w-md text-center">
+    <h1 class="text-3xl font-bold text-white mb-4">Scan to Record</h1>
+    <p class="text-gray-400 mb-8">Scan this code with your phone to open the recording controller.</p>
+    <div id="qrcode-container" class="p-4 bg-white rounded-lg inline-block">
+        <div id="qrcode"></div>
     </div>
+    <p id="qrStatus" class="text-yellow-400 font-mono mt-4">Waiting for connection ID from main application...</p>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- CONTROLLER PAGE (hidden by default)                                     -->
+  <!-- ======================================================================= -->
+  <div id="controllerPage" class="w-full max-w-sm text-center">
+      <div id="controller-ui">
+        <h1 class="text-3xl font-bold text-white mb-4">Signal Recorder</h1>
+        <p id="controllerStatus" class="text-yellow-400 font-mono mb-6">Connecting to installation...</p>
+        <button id="startRecordingBtn" class="bg-green-500 hover:bg-green-600 text-black font-bold py-4 px-8 rounded-lg text-xl transition-all duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>
+            Start 5s Recording
+        </button>
+      </div>
+      <div id="video-container" class="hidden mt-6">
+        <h2 class="text-2xl font-bold text-white mb-4">Your Recording</h2>
+        <video id="receivedVideo" controls class="w-full rounded-lg border-2 border-gray-700"></video>
+        <a id="downloadLink" class="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Download Video</a>
+        <button id="recordAgainBtn" class="mt-4 ml-2 inline-block bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">Record Another</button>
+      </div>
   </div>
 
 
   <script>
   (() => {
     // --- APP ARCHITECTURE ---
-    // 1. UI: Manages DOM elements and control creation.
-    // 2. Renderer: Encapsulates WebGL logic.
-    // 3. BodySegmenter: Handles MediaPipe Selfie Segmentation.
-    // 4. PresetManager: Manages saving, loading, and randomizing presets.
-    // 5. App: The main controller that initializes modules and runs the main loop.
+    // This script now contains logic for three "pages" controlled by the URL hash.
+    // 1. Main App (no hash): The original signal processor application. It acts as the WebRTC "receiver".
+    // 2. QR Code Page (#qrcode): Displays a QR code for phones to scan.
+    // 3. Controller Page (#controller): The UI for the visitor's phone. It acts as the WebRTC "sender".
     
     const vertSrc = `
       attribute vec2 a_pos;
@@ -189,22 +216,32 @@
     const fragSrc = `
       precision highp float;
       varying vec2 v_uv;
+
+      // Textures
       uniform sampler2D u_tex;
       uniform sampler2D u_feedbackTex;
       uniform sampler2D u_maskTex;
       uniform sampler2D u_backgroundTex;
+
+      // Global uniforms
       uniform vec2  u_resolution;
       uniform float u_time;
       uniform bool  u_isFeedbackPass;
       uniform bool  u_useBackground;
       uniform float u_maskFeather;
+
+      // Opacity uniforms (not randomized)
       uniform float u_overallOpacity;
       uniform float u_flickerPerSecond;
       uniform float u_flickerDuration;
       uniform float u_flickerIntensity;
       uniform float u_flickerFade;
+
+      // Seep uniforms (not randomized)
       uniform float u_seepAmount;
       uniform float u_seepIntensity;
+
+      // Effect uniforms (randomized)
       uniform float u_feedbackAmount;
       uniform float u_feedbackZoom;
       uniform float u_glitchIntensity;
@@ -213,14 +250,19 @@
       uniform float u_noiseAmount;
       uniform float u_noiseSpeed;
       uniform float u_vignette;
+      
+      // Smear uniforms
       uniform float u_globalSmearIntensity;
       uniform float u_globalSmearAngle;
       uniform float u_spotSmearIntensity;
       uniform float u_spotSmearDensity;
       uniform float u_spotSmearSize;
 
+
+      // --- Helper Functions ---
       float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
 
+      // Generic smear effect
       vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
         vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
         vec4 color = vec4(0.0);
@@ -232,10 +274,12 @@
         return color / float(samples);
       }
       
+      // Simple box blur for creating the 'seep' effect
       vec4 blur(sampler2D tex, vec2 uv, float radius) {
           vec4 acc = vec4(0.0);
           vec2 res = u_resolution.xy;
           float count = 0.0;
+          // A 5x5 kernel for a small, efficient blur
           for(float x = -2.0; x <= 2.0; x++) {
               for(float y = -2.0; y <= 2.0; y++) {
                   vec2 offset = vec2(x, y) * radius / res;
@@ -249,97 +293,133 @@
       void main() {
         vec2 uv = v_uv;
         vec4 videoColor = texture2D(u_tex, uv);
+
+        // --- EFFECT PIPELINE ---
         vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
         vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
+
         if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
           vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
           effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
         }
+
         float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
         float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
         effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
+
         effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
         effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
+
         vec4 smearedColor = effectedColor;
+        
         vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
         if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
           smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
         }
+
         float maskValue = texture2D(u_maskTex, uv).r;
         if (maskValue > 0.1) {
             vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
             smearedColor = mix(smearedColor, globalSmear, 0.5);
         }
+
+
         float effectedGray = dot(smearedColor.rgb, vec3(0.299, 0.587, 0.114));
         vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
+
+        // --- RENDER PASS LOGIC ---
         if (u_isFeedbackPass) {
           gl_FragColor = effectedGrayscale;
           return;
         }
+
+        // --- FINAL COMPOSITION (Screen Pass) ---
         float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
         vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
+
         float baseMask = texture2D(u_maskTex, uv).r;
         float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
         float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
+
         float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
         float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
+
+        // Calculate flicker
         float flickerMultiplier = 1.0;
         if (u_flickerPerSecond > 0.0) {
             float flickerCycle = 1.0 / u_flickerPerSecond;
             float flickerPhase = mod(u_time, flickerCycle);
             float flickerEdge = flickerCycle * u_flickerDuration;
+            
             float fadeWidth = flickerCycle * u_flickerFade * 0.5;
             float isFlickerOff = 1.0 - smoothstep(flickerEdge - fadeWidth, flickerEdge + fadeWidth, flickerPhase);
             flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
         }
+
+        // 'effectAmount' now combines opacity and flicker. This controls HOW MUCH effect is applied.
         float effectAmount = u_overallOpacity * flickerMultiplier;
+
+        // The foreground color is a mix of the original body and the fully effected body.
         vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, effectAmount);
+        
+        // Determine the background color
         vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
+
+        // Mix the background with the calculated foreground color using the silhouette mask.
         gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
       }`;
 
-    // --- MODULE 1: UI ---
     const UI = {
       elements: {},
       state: { ui: {}, jitter: {} },
-      globalState: { ui: {} },
+      globalState: { ui: {} }, // State for non-randomized controls
       definitions: {},
       globalDefinitions: {},
 
       init(definitions, globalDefinitions) {
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
-        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'remoteBtn'];
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'remoteTabBtn', 'effects-tab-content', 'globals-tab-content', 'remote-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'remoteStatus', 'peerIdDisplay'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
+        // Create randomized controls in the 'Effects' tab
         for (const [key, definition] of Object.entries(this.definitions)) {
           this.createControlGroup(key, definition, this.state, this.elements['effects-tab-content'], true);
         }
+        // Create global controls in the 'Globals' tab
         for (const [key, definition] of Object.entries(this.globalDefinitions)) {
             this.createControlGroup(key, definition, this.globalState, this.elements['globals-tab-content'], false);
         }
 
+        // --- Event Listeners ---
         this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
         this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
         
+        // Tab switching logic
         this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
         this.elements.globalsTabBtn.addEventListener('click', () => this.switchTab('globals'));
+        this.elements.remoteTabBtn.addEventListener('click', () => this.switchTab('remote'));
 
+        // Background controls
         this.elements.bgUploadBtn.addEventListener('click', () => this.elements.bgUpload.click());
         this.elements.bgUpload.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const url = URL.createObjectURL(file);
-            const mediaEl = file.type.startsWith('image/') ? this.elements.backgroundImage : this.elements.backgroundMedia;
-            const otherMediaEl = file.type.startsWith('image/') ? this.elements.backgroundMedia : this.elements.backgroundImage;
-            
-            mediaEl.src = url;
-            mediaEl.classList.remove('hidden');
-            if (file.type.startsWith('video/')) mediaEl.play();
 
-            otherMediaEl.classList.add('hidden');
-            otherMediaEl.pause();
-            otherMediaEl.src = '';
+            if (file.type.startsWith('image/')) {
+                this.elements.backgroundImage.src = url;
+                this.elements.backgroundImage.classList.remove('hidden');
+                this.elements.backgroundMedia.classList.add('hidden');
+                this.elements.backgroundMedia.pause();
+                this.elements.backgroundMedia.src = '';
+            } else if (file.type.startsWith('video/')) {
+                this.elements.backgroundMedia.src = url;
+                this.elements.backgroundMedia.play();
+                this.elements.backgroundMedia.classList.remove('hidden');
+                this.elements.backgroundImage.classList.add('hidden');
+                this.elements.backgroundImage.src = '';
+            }
 
             this.elements.useBgChk.disabled = false;
             this.elements.useBgChk.checked = true;
@@ -349,6 +429,7 @@
             this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3);
         });
         
+        // Automation controls
         this.elements.autoRandomizeSlider.addEventListener('input', () => {
             const val = parseFloat(this.elements.autoRandomizeSlider.value);
             this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
@@ -359,300 +440,858 @@
         });
       },
 
-      createControlGroup(key, definition, stateObj, parentEl, isRandomized) {
-          // This function creates the UI controls based on definitions
-          // (Implementation is assumed to be complete from original user code)
+      switchTab(tabName) {
+        const tabs = ['effects', 'globals', 'remote'];
+        tabs.forEach(tab => {
+            const btn = this.elements[`${tab}TabBtn`];
+            const content = this.elements[`${tab}-tab-content`];
+            if (tab === tabName) {
+                btn.classList.add('active');
+                content.classList.remove('hidden');
+            } else {
+                btn.classList.remove('active');
+                content.classList.add('hidden');
+            }
+        });
       },
 
-      switchTab(tabName) {
-        if (tabName === 'effects') {
-            this.elements.effectsTabBtn.classList.add('active');
-            this.elements.globalsTabBtn.classList.remove('active');
-            this.elements['effects-tab-content'].classList.remove('hidden');
-            this.elements['globals-tab-content'].classList.add('hidden');
-        } else {
-            this.elements.effectsTabBtn.classList.remove('active');
-            this.elements.globalsTabBtn.classList.add('active');
-            this.elements['effects-tab-content'].classList.add('hidden');
-            this.elements['globals-tab-content'].classList.remove('hidden');
+      createControlGroup(key, definition, stateObject, parentElement, withToggle) {
+        const group = document.createElement('div');
+        group.className = 'control-group bg-black/50 border border-gray-800 rounded-lg p-3';
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between';
+        
+        const title = document.createElement('h3');
+        title.className = 'font-semibold text-gray-200';
+        title.textContent = definition.title;
+        header.appendChild(title);
+
+        const content = document.createElement('div');
+        content.className = 'mt-3 space-y-3';
+        
+        if (withToggle) {
+            header.classList.add('cursor-pointer');
+            const toggle = document.createElement('input');
+            toggle.type = 'checkbox';
+            toggle.checked = definition.active;
+            toggle.className = 'form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0';
+            if (!definition.active) content.classList.add('hidden');
+            
+            toggle.addEventListener('change', () => {
+              definition.active = toggle.checked;
+            });
+            header.addEventListener('click', (e) => {
+                if(e.target !== toggle) {
+                    toggle.checked = !toggle.checked;
+                    toggle.dispatchEvent(new Event('change'));
+                }
+                content.classList.toggle('hidden', !toggle.checked);
+            });
+            definition.toggleElement = toggle;
+            header.appendChild(toggle);
+        }
+
+        stateObject.ui[key] = {};
+        if (stateObject.jitter) {
+            stateObject.jitter[key] = {};
+        }
+
+        for (const [controlKey, controlDef] of Object.entries(definition.controls)) {
+          const slider = this.createSlider(controlKey, controlDef);
+          content.appendChild(slider.container);
+          stateObject.ui[key][controlKey] = slider.input;
+          if (stateObject.jitter) {
+              stateObject.jitter[key][controlKey] = { base: controlDef.value, current: controlDef.value };
+              slider.input.addEventListener('input', () => {
+                stateObject.jitter[key][controlKey].base = parseFloat(slider.input.value);
+              });
+          }
+        }
+        
+        group.append(header, content);
+        parentElement.appendChild(group);
+      },
+
+      createSlider(id, def) {
+        const container = document.createElement('div');
+        container.className = 'control-item space-y-2';
+        const labelContainer = document.createElement('div');
+        labelContainer.className = 'flex justify-between items-center';
+        const label = document.createElement('label');
+        label.className = 'text-sm font-medium text-gray-300';
+        label.textContent = def.label;
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'text-sm font-mono text-green-400';
+        const input = document.createElement('input');
+        input.type = 'range';
+        Object.assign(input, { min: def.min, max: def.max, step: def.step, value: def.value });
+        
+        const updateValue = () => valueSpan.textContent = parseFloat(input.value).toFixed(String(def.step).includes('.') ? 3 : 0);
+        input.addEventListener('input', updateValue);
+        updateValue();
+        
+        labelContainer.append(label, valueSpan);
+        container.append(labelContainer, input);
+        return { container, input };
+      },
+
+      updateJitter(t) {
+        if (!this.definitions.Jitter.active) return;
+        const { jitterAmount, jitterSpeed } = this.state.ui.Jitter;
+        const amount = parseFloat(jitterAmount.value);
+        const speed = parseFloat(jitterSpeed.value);
+        for (const [groupKey, group] of Object.entries(this.state.jitter)) {
+          if (groupKey === 'Jitter' || !this.definitions[groupKey].active) continue;
+          for (const [controlKey, state] of Object.entries(group)) {
+            const slider = this.state.ui[groupKey][controlKey];
+            const range = parseFloat(slider.max) - parseFloat(slider.min);
+            const offset = (Math.sin(t * speed + controlKey.length) * Math.cos(t * speed * 0.7 + groupKey.length)) * amount * range;
+            state.current = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), state.base + offset));
+          }
         }
       },
 
-      setMsg(text, isError = false) {
-        this.elements.msg.textContent = text;
-        this.elements.msg.style.color = isError ? '#f87171' : '#34d399';
-        setTimeout(() => this.elements.msg.textContent = '', 3000);
+      setStatus(text, isError = false) {
+        this.elements.statusBar.textContent = `STATUS: ${text}`;
+        this.elements.statusBar.classList.toggle('text-red-400', isError);
+        this.elements.statusBar.classList.toggle('text-green-400', !isError);
+      },
+      setMsg(text) { this.elements.msg.textContent = text; }
+    };
+
+    const Renderer = {
+      gl: null,
+      program: null,
+      textures: {},
+      framebuffers: {},
+      uniforms: {},
+      maskCanvas: document.createElement('canvas'),
+
+      init(canvas, vsSrc, fsSrc, uniformKeys) {
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+        if (!this.gl) throw new Error('WebGL not available');
+
+        const compile = (type, src) => {
+          const s = this.gl.createShader(type);
+          this.gl.shaderSource(s, src);
+          this.gl.compileShader(s);
+          if (!this.gl.getShaderParameter(s, this.gl.COMPILE_STATUS)) throw new Error(`Shader compile error: ${this.gl.getShaderInfoLog(s)}`);
+          return s;
+        };
+        this.program = this.gl.createProgram();
+        this.gl.attachShader(this.program, compile(this.gl.VERTEX_SHADER, vsSrc));
+        this.gl.attachShader(this.program, compile(this.gl.FRAGMENT_SHADER, fsSrc));
+        this.gl.linkProgram(this.program);
+        if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) throw new Error(`Program link error: ${this.gl.getProgramInfoLog(this.program)}`);
+        
+        const buffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), this.gl.STATIC_DRAW);
+        const posLoc = this.gl.getAttribLocation(this.program, 'a_pos');
+        this.gl.enableVertexAttribArray(posLoc);
+        this.gl.vertexAttribPointer(posLoc, 2, this.gl.FLOAT, false, 0, 0);
+
+        const createTex = () => {
+          const tex = this.gl.createTexture();
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+          return tex;
+        };
+        this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
+        this.framebuffers.feedback = this.gl.createFramebuffer();
+        
+        this.gl.useProgram(this.program);
+        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
       },
 
-      updateStatus(text) {
-        this.elements.statusBar.textContent = `STATUS: ${text}`;
+      fit(video) {
+        if (!video.videoWidth) return;
+        const { videoWidth: w, videoHeight: h } = video;
+        const canvas = this.gl.canvas;
+        if (canvas.width === w && canvas.height === h) return;
+        canvas.width = w;
+        canvas.height = h;
+        // Don't resize background texture here, it has its own dimensions
+        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        for (const tex of resizableTextures) {
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+        }
+        this.gl.viewport(0, 0, w, h);
+      },
+
+      drawMask(video, segmentationMask) {
+        const { videoWidth: W, videoHeight: H } = video;
+        const ctx = this.maskCanvas.getContext('2d');
+        if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) {
+          this.maskCanvas.width = W;
+          this.maskCanvas.height = H;
+        }
+        
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, W, H);
+        if (segmentationMask) {
+          ctx.drawImage(segmentationMask, 0, 0, W, H);
+        }
+
+        this.gl.activeTexture(this.gl.TEXTURE2);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.mask);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.maskCanvas);
+      },
+
+      render(appState) {
+        const { video, t, uiState, globalUiState, backgroundMedia, useBg, maskFeather } = appState;
+        this.gl.useProgram(this.program);
+        
+        // Main video texture
+        this.gl.activeTexture(this.gl.TEXTURE0);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
+        
+        // Background texture
+        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth || backgroundMedia.width)) {
+            this.gl.activeTexture(this.gl.TEXTURE3);
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
+            this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
+        }
+
+        this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.uniform1f(this.uniforms.u_time, t);
+
+        // Set randomized effect uniforms
+        for (const [groupKey, group] of Object.entries(uiState.ui)) {
+          const groupIsActive = UI.definitions[groupKey].active;
+          for (const [controlKey, control] of Object.entries(group)) {
+            let val = groupIsActive ? parseFloat(control.value) : UI.definitions[groupKey].controls[controlKey].neutral;
+            if (groupIsActive && UI.definitions.Jitter.active && uiState.jitter[groupKey]?.[controlKey]) {
+              val = uiState.jitter[groupKey][controlKey].current;
+            }
+            this.gl.uniform1f(this.uniforms[`u_${controlKey}`], val);
+          }
+        }
+
+        // Set global (non-randomized) uniforms
+        for (const [groupKey, group] of Object.entries(globalUiState.ui)) {
+            for (const [controlKey, control] of Object.entries(group)) {
+                const val = parseFloat(control.value);
+                this.gl.uniform1f(this.uniforms[`u_${controlKey}`], val);
+            }
+        }
+        
+        // Set background-specific uniforms
+        this.gl.uniform1i(this.uniforms.u_useBackground, useBg);
+        this.gl.uniform1f(this.uniforms.u_maskFeather, maskFeather);
+
+        this.gl.uniform1i(this.uniforms.u_tex, 0);
+        this.gl.uniform1i(this.uniforms.u_feedbackTex, 1);
+        this.gl.uniform1i(this.uniforms.u_maskTex, 2);
+        this.gl.uniform1i(this.uniforms.u_backgroundTex, 3);
+        
+        this.gl.activeTexture(this.gl.TEXTURE1);
+        this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.feedbackA);
+
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 1);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffers.feedback);
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.textures.feedbackB, 0);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 0);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+
+        [this.textures.feedbackA, this.textures.feedbackB] = [this.textures.feedbackB, this.textures.feedbackA];
       }
     };
 
-    // --- MODULE 2: RENDERER (WebGL) ---
-    const Renderer = {
-        // (Implementation is assumed to be complete from original user code)
-    };
-
-    // --- MODULE 3: BODY SEGMENTER (MediaPipe) ---
     const BodySegmenter = {
-        // (Implementation is assumed to be complete from original user code)
-    };
+      segmenter: null,
+      lastResult: null,
+      isReady: false,
+      isBusy: false,
+      lastUpdateTime: 0,
+      minInterval: 60,
 
-    // --- MODULE 4: PRESET MANAGER ---
-    const PresetManager = {
-        // (Implementation is assumed to be complete from original user code)
-    };
-
-    // --- MODULE 5: APP CONTROLLER ---
-    const App = {
-      isRunning: false,
-      animationFrameId: null,
-
-      init() {
-        // Define all the parameters for the shaders
-        const definitions = { /* ... effect definitions ... */ };
-        const globalDefinitions = { /* ... global definitions ... */ };
-        
-        UI.init(definitions, globalDefinitions);
-        // Renderer.init(UI.elements.glcanvas, vertSrc, fragSrc);
-        // PresetManager.init(UI, definitions);
-
-        // Attach main event listeners
-        UI.elements.startBtn.addEventListener('click', () => this.start());
-        UI.elements.stopBtn.addEventListener('click', () => this.stop());
+      async init() {
+        if (this.isReady) return true;
+        try {
+          this.segmenter = new window.SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+          this.segmenter.setOptions({ modelSelection: 1 });
+          this.segmenter.onResults(res => {
+            this.lastResult = res.segmentationMask;
+            this.isBusy = false;
+          });
+          await this.segmenter.initialize();
+          this.isReady = true;
+          return true;
+        } catch (err) {
+          console.error("Selfie Segmentation initialization failed:", err);
+          return false;
+        }
       },
 
-      async start() {
-        if (this.isRunning) return;
-        UI.updateStatus('INITIALIZING...');
-        try {
-          // 1. Get camera stream
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-          UI.elements.video.srcObject = stream;
-          await UI.elements.video.play();
+      update(video) {
+        const now = performance.now();
+        if (this.isReady && !this.isBusy && (now - this.lastUpdateTime) > this.minInterval) {
+          this.isBusy = true;
+          this.lastUpdateTime = now;
+          this.segmenter.send({ image: video });
+        }
+      }
+    };
 
-          // 2. Initialize Body Segmenter
-          // await BodySegmenter.init(UI.elements.video);
-          
-          this.isRunning = true;
+    const PresetManager = {
+      init() {
+        this.populateList();
+        UI.elements.savePresetBtn.addEventListener('click', () => this.save());
+        UI.elements.deletePresetBtn.addEventListener('click', () => this.delete());
+        UI.elements.presetList.addEventListener('change', () => this.load());
+        UI.elements.randomBtn.addEventListener('click', () => this.randomize());
+      },
+      
+      getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV6.0Presets') || '{}'),
+      savePresets: (p) => localStorage.setItem('bodyGlitchV6.0Presets', JSON.stringify(p)),
+
+      getAppState() {
+        const state = { controls: {}, toggles: {}, checkboxes: {}, globalControls: {}, misc: {} };
+        for (const [groupKey, group] of Object.entries(UI.state.ui)) {
+          state.controls[groupKey] = {};
+          state.toggles[groupKey] = UI.definitions[groupKey].active;
+          for (const [controlKey, control] of Object.entries(group)) {
+            state.controls[groupKey][controlKey] = control.value;
+          }
+        }
+        for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
+            state.globalControls[groupKey] = {};
+            for (const [controlKey, control] of Object.entries(group)) {
+                state.globalControls[groupKey][controlKey] = control.value;
+            }
+        }
+        state.checkboxes = { 
+            animateChk: UI.elements.animateChk.checked, 
+            mirrorChk: UI.elements.mirrorChk.checked,
+            useBgChk: UI.elements.useBgChk.checked
+        };
+        state.misc = {
+            maskFeather: UI.elements.maskFeather.value,
+        };
+        return state;
+      },
+
+      setAppState(state) {
+        if (!state) return;
+        if (state.controls) {
+          for (const [groupKey, group] of Object.entries(state.controls)) {
+            if (UI.state.ui[groupKey]) {
+              for (const [controlKey, value] of Object.entries(group)) {
+                const el = UI.state.ui[groupKey][controlKey];
+                if (el) {
+                  el.value = value;
+                  el.dispatchEvent(new Event('input'));
+                  if (UI.state.jitter[groupKey]?.[controlKey]) UI.state.jitter[groupKey][controlKey].base = parseFloat(el.value);
+                }
+              }
+            }
+          }
+        }
+        if (state.toggles) {
+          for (const [groupKey, isChecked] of Object.entries(state.toggles)) {
+            const def = UI.definitions[groupKey];
+            if (def && def.toggleElement) {
+              def.toggleElement.checked = isChecked;
+              def.toggleElement.dispatchEvent(new Event('change'));
+            }
+          }
+        }
+        if (state.globalControls) {
+            for (const [groupKey, group] of Object.entries(state.globalControls)) {
+                if (UI.globalState.ui[groupKey]) {
+                    for (const [controlKey, value] of Object.entries(group)) {
+                        const el = UI.globalState.ui[groupKey][controlKey];
+                        if (el) {
+                            el.value = value;
+                            el.dispatchEvent(new Event('input'));
+                        }
+                    }
+                }
+            }
+        }
+        if (state.checkboxes) {
+          UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true;
+          UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true;
+          UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false;
+        }
+        if (state.misc) {
+            const featherSlider = UI.elements.maskFeather;
+            if (featherSlider) {
+                featherSlider.value = state.misc.maskFeather ?? '0.15';
+                featherSlider.dispatchEvent(new Event('input'));
+            }
+        }
+      },
+
+      populateList() {
+        const presets = this.getPresets();
+        const { presetList } = UI.elements;
+        const currentVal = presetList.value;
+        presetList.innerHTML = '<option value="">-- LOAD PRESET --</option>';
+        for (const name in presets) {
+          const opt = document.createElement('option');
+          opt.value = name; opt.textContent = name; presetList.appendChild(opt);
+        }
+        presetList.value = currentVal;
+      },
+
+      save() {
+        const { presetName } = UI.elements;
+        const name = presetName.value.trim();
+        if (!name) return UI.setMsg('Enter a preset name.');
+        const presets = this.getPresets();
+        presets[name] = this.getAppState();
+        this.savePresets(presets);
+        this.populateList();
+        UI.elements.presetList.value = name;
+        UI.setMsg(`Preset '${name}' saved.`);
+      },
+
+      delete() {
+        const { presetList, presetName } = UI.elements;
+        const name = presetList.value;
+        if (!name) return UI.setMsg('Select a preset to delete.');
+        const presets = this.getPresets();
+        delete presets[name];
+        this.savePresets(presets);
+        this.populateList();
+        presetName.value = '';
+        UI.setMsg(`Preset '${name}' deleted.`);
+      },
+
+      load(name) {
+        const { presetList, presetName } = UI.elements;
+        const presetToLoad = name || presetList.value;
+        if (!presetToLoad) return;
+        const presets = this.getPresets();
+        if (presets[presetToLoad]) {
+          this.setAppState(presets[presetToLoad]);
+          presetName.value = presetToLoad;
+          presetList.value = presetToLoad;
+          UI.setMsg(`Preset '${presetToLoad}' loaded.`);
+        }
+      },
+
+      randomize() {
+        for (const groupKey in UI.state.ui) {
+          const def = UI.definitions[groupKey];
+          if(def && def.toggleElement){
+            def.toggleElement.checked = Math.random() > 0.3;
+            def.toggleElement.dispatchEvent(new Event('change'));
+          }
+          for (const controlKey in UI.state.ui[groupKey]) {
+            const el = UI.state.ui[groupKey][controlKey];
+            const min = parseFloat(el.min), max = parseFloat(el.max), step = parseFloat(el.step);
+            el.value = Math.round((min + Math.random() * (max - min)) / step) * step;
+            el.dispatchEvent(new Event('input'));
+          }
+        }
+        UI.setMsg('Parameters randomized!');
+      }
+    };
+
+    const App = {
+      stream: null,
+      rafId: null,
+      shaders: {},
+      definitions: {},
+      globalDefinitions: {},
+      lastRandomizeTime: 0,
+      lastPresetIterateTime: 0,
+      currentPresetIndex: 0,
+      peer: null,
+      remoteConnection: null,
+      mediaRecorder: null,
+      recordedChunks: [],
+
+      async start() {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          return UI.setMsg('getUserMedia not supported.');
+        }
+        try {
+          UI.setStatus('Requesting camera...');
+          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
+          UI.elements.video.srcObject = this.stream;
+          await UI.elements.video.play();
+          await new Promise(res => { UI.elements.video.onloadedmetadata = res; });
+
+          UI.setStatus('Initializing GL...');
+          const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather'];
+          Object.values(this.definitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
+          Object.values(this.globalDefinitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
+          Renderer.init(UI.elements.glcanvas, this.shaders.vert, this.shaders.frag, uniformKeys);
+          Renderer.fit(UI.elements.video);
+
+          UI.setStatus('Initializing Body Segmentation...');
+          if (!(await BodySegmenter.init())) return UI.setStatus('Segmentation Failed', true);
+
+          this.initRemoteControl(); // Initialize PeerJS
+
           UI.elements.startBtn.disabled = true;
           UI.elements.stopBtn.disabled = false;
-          UI.updateStatus('RUNNING');
-          
+          UI.setMsg('');
+          UI.setStatus('Running');
           this.loop();
-
         } catch (err) {
-          console.error("Error starting camera:", err);
-          UI.setMsg('Could not access camera.', true);
-          UI.updateStatus('ERROR');
+          console.error(err);
+          UI.setMsg(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
+          UI.setStatus('Error', true);
         }
       },
 
       stop() {
-        if (!this.isRunning) return;
-        
-        // Stop the camera stream
-        const stream = UI.elements.video.srcObject;
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-        UI.elements.video.srcObject = null;
-
-        // Stop the animation loop
-        if (this.animationFrameId) {
-            cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-
-        this.isRunning = false;
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+        if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+        this.stream = null;
+        if (this.peer) this.peer.destroy();
         UI.elements.startBtn.disabled = false;
         UI.elements.stopBtn.disabled = true;
-        UI.updateStatus('IDLE');
+        UI.setStatus('Terminated');
+      },
+      
+      initRemoteControl() {
+        const remoteStatusEl = document.getElementById('remoteStatus');
+        const peerIdDisplayEl = document.getElementById('peerIdDisplay');
+        
+        this.peer = new Peer();
+        
+        this.peer.on('open', id => {
+            remoteStatusEl.textContent = 'Awaiting connection...';
+            remoteStatusEl.className = 'font-mono text-sm text-green-400 mt-1';
+            peerIdDisplayEl.textContent = id;
+            // Store the ID for the QR code page to pick up
+            localStorage.setItem('peerIdForQrCode', id);
+        });
+
+        this.peer.on('connection', conn => {
+            this.remoteConnection = conn;
+            remoteStatusEl.textContent = `Connected to: ${conn.peer}`;
+            
+            conn.on('data', data => {
+                if (data === 'start-recording') {
+                    this.startRecording();
+                }
+            });
+
+            conn.on('close', () => {
+                remoteStatusEl.textContent = 'Awaiting connection...';
+                this.remoteConnection = null;
+            });
+        });
+
+        this.peer.on('error', err => {
+            console.error('PeerJS error:', err);
+            remoteStatusEl.textContent = `Error: ${err.type}`;
+            remoteStatusEl.className = 'font-mono text-sm text-red-400 mt-1';
+        });
       },
 
-      loop() {
-        if (!this.isRunning) return;
+      async startRecording() {
+        if (!this.remoteConnection) {
+            UI.setMsg('No remote client connected.');
+            return;
+        }
+        
+        UI.setMsg('Starting recording...');
+        this.remoteConnection.send('recording-starting');
 
-        // This is the main render loop
-        // 1. Get segmentation mask from BodySegmenter
-        // const segmentation = BodySegmenter.getSegmentation();
+        try {
+            // IMPORTANT: This requires user interaction to select the screen/tab to record.
+            // The operator must be present to do this.
+            const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                video: { mediaSource: "screen" }
+            });
 
-        // 2. Update uniforms in Renderer
-        // Renderer.updateUniforms({ ...UI.state.ui, ...UI.globalState.ui });
+            this.recordedChunks = [];
+            this.mediaRecorder = new MediaRecorder(displayStream, { mimeType: 'video/webm' });
 
-        // 3. Render the scene
-        // Renderer.render(UI.elements.video, segmentation, ...);
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.recordedChunks.push(event.data);
+                }
+            };
 
-        this.animationFrameId = requestAnimationFrame(() => this.loop());
+            this.mediaRecorder.onstop = () => {
+                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+                this.sendVideoToRemote(blob);
+                // Stop the screen sharing track
+                displayStream.getTracks().forEach(track => track.stop());
+            };
+
+            this.mediaRecorder.start();
+            UI.setMsg('Recording for 5 seconds...');
+
+            setTimeout(() => {
+                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                    this.mediaRecorder.stop();
+                    UI.setMsg('Recording finished. Sending...');
+                }
+            }, 5000);
+
+        } catch (err) {
+            console.error("Error starting recording:", err);
+            UI.setMsg('Could not start recording.');
+            this.remoteConnection.send({ type: 'error', message: 'Recording failed to start.' });
+        }
+      },
+
+      async sendVideoToRemote(blob) {
+        if (!this.remoteConnection) return;
+        
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            // For simplicity, sending the whole buffer. For very large files, chunking is needed.
+            // PeerJS handles chunking for ArrayBuffers automatically!
+            this.remoteConnection.send(arrayBuffer);
+            UI.setMsg('Video sent to remote user.');
+        } catch (err) {
+            console.error("Error sending video:", err);
+            UI.setMsg('Failed to send video.');
+        }
+      },
+
+      loop(time) {
+        this.rafId = requestAnimationFrame(t => this.loop(t));
+        const video = UI.elements.video;
+        if (!video.videoWidth || !Renderer.gl) return;
+        
+        Renderer.fit(video);
+        BodySegmenter.update(video);
+        Renderer.drawMask(video, BodySegmenter.lastResult);
+        
+        const t = UI.elements.animateChk.checked ? time / 1000 : 0;
+        UI.updateJitter(t);
+
+        // Auto-Randomize Logic
+        const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
+        if (autoRandomizeInterval > 0) {
+            if (this.lastRandomizeTime === 0) this.lastRandomizeTime = time;
+            if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) {
+                PresetManager.randomize();
+                this.lastRandomizeTime = time;
+            }
+        } else {
+            this.lastRandomizeTime = 0; // Reset timer if disabled
+        }
+        
+        // Preset Iteration Logic
+        const presetIterationInterval = parseFloat(UI.elements.presetIterationSlider.value);
+        if (presetIterationInterval > 0) {
+            if (this.lastPresetIterateTime === 0) this.lastPresetIterateTime = time;
+            if ((time - this.lastPresetIterateTime) > presetIterationInterval * 1000) {
+                const presets = PresetManager.getPresets();
+                const presetNames = Object.keys(presets);
+                if (presetNames.length > 0) {
+                    this.currentPresetIndex = (this.currentPresetIndex + 1) % presetNames.length;
+                    const nextPresetName = presetNames[this.currentPresetIndex];
+                    PresetManager.load(nextPresetName);
+                }
+                this.lastPresetIterateTime = time;
+            }
+        } else {
+            this.lastPresetIterateTime = 0; // Reset timer if disabled
+        }
+
+        const backgroundEl = !UI.elements.backgroundImage.classList.contains('hidden')
+            ? UI.elements.backgroundImage
+            : UI.elements.backgroundMedia;
+
+        Renderer.render({
+          video: video,
+          t: t,
+          uiState: UI.state,
+          globalUiState: UI.globalState,
+          backgroundMedia: backgroundEl,
+          useBg: UI.elements.useBgChk.checked,
+          maskFeather: parseFloat(UI.elements.maskFeather.value)
+        });
+        
+        const statusText = BodySegmenter.lastResult
+          ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` 
+          : `NO SIGNAL...`;
+        UI.setStatus(statusText);
+      },
+
+      init(definitions, globalDefinitions, shaders) {
+        this.shaders = shaders;
+        this.definitions = definitions;
+        this.globalDefinitions = globalDefinitions;
+        UI.init(definitions, globalDefinitions);
+        PresetManager.init();
+        UI.elements.startBtn.addEventListener('click', () => this.start());
+        UI.elements.stopBtn.addEventListener('click', () => this.stop());
       }
     };
+    
+    // --- Definitions ---
+    const definitions = {
+      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
+      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
+      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
+      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
+      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
+      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
+    };
+    const globalDefinitions = {
+        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 } } },
+        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0, neutral: 0.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20, neutral: 0.0 } } }
+    };
 
-    // Initialize the main application
-    App.init();
+
+    // --- PAGE ROUTER ---
+    // This part decides which "page" to show based on the URL hash.
+    
+    function initMainApp() {
+        document.getElementById('mainApp').style.display = 'flex';
+        App.init(definitions, globalDefinitions, { vert: vertSrc, frag: fragSrc });
+    }
+
+    function initQrCodePage() {
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('qrCodePage').style.display = 'block';
+        
+        const qrStatus = document.getElementById('qrStatus');
+        const qrcodeContainer = document.getElementById('qrcode');
+
+        const generateQrCode = (id) => {
+            qrcodeContainer.innerHTML = ''; // Clear previous QR code
+            const url = new URL(window.location.href);
+            url.hash = 'controller';
+            url.search = `?id=${id}`;
+            new QRCode(qrcodeContainer, {
+                text: url.href,
+                width: 256,
+                height: 256,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            qrStatus.textContent = 'QR Code generated. Ready to scan.';
+            qrStatus.className = 'text-green-400 font-mono mt-4';
+        };
+
+        // Check localStorage immediately and then set up a listener for changes.
+        const checkPeerId = () => {
+            const peerId = localStorage.getItem('peerIdForQrCode');
+            if (peerId) {
+                generateQrCode(peerId);
+            }
+        };
+        
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'peerIdForQrCode') {
+                checkPeerId();
+            }
+        });
+
+        checkPeerId(); // Initial check
+    }
+
+    function initControllerPage() {
+        document.getElementById('mainApp').style.display = 'none';
+        document.getElementById('controllerPage').style.display = 'block';
+
+        const statusEl = document.getElementById('controllerStatus');
+        const startBtn = document.getElementById('startRecordingBtn');
+        const videoContainer = document.getElementById('video-container');
+        const receivedVideo = document.getElementById('receivedVideo');
+        const downloadLink = document.getElementById('downloadLink');
+        const recordAgainBtn = document.getElementById('recordAgainBtn');
+        const controllerUi = document.getElementById('controller-ui');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const receiverId = urlParams.get('id');
+
+        if (!receiverId) {
+            statusEl.textContent = 'Error: No installation ID found in URL.';
+            statusEl.className = 'text-red-400 font-mono mb-6';
+            return;
+        }
+
+        const peer = new Peer();
+        let conn;
+
+        peer.on('open', id => {
+            statusEl.textContent = 'Connecting to installation...';
+            conn = peer.connect(receiverId);
+
+            conn.on('open', () => {
+                statusEl.textContent = 'Connected! Ready to record.';
+                statusEl.className = 'text-green-400 font-mono mb-6';
+                startBtn.disabled = false;
+            });
+
+            conn.on('data', data => {
+                if (typeof data === 'string' && data === 'recording-starting') {
+                    statusEl.textContent = 'Recording has started on the main screen...';
+                    startBtn.disabled = true;
+                } else if (data instanceof ArrayBuffer) {
+                    statusEl.textContent = 'Video received!';
+                    const blob = new Blob([data], { type: 'video/webm' });
+                    const videoUrl = URL.createObjectURL(blob);
+                    receivedVideo.src = videoUrl;
+                    downloadLink.href = videoUrl;
+                    downloadLink.download = `signal-recording-${Date.now()}.webm`;
+                    
+                    controllerUi.classList.add('hidden');
+                    videoContainer.classList.remove('hidden');
+                }
+            });
+            
+            conn.on('close', () => {
+                statusEl.textContent = 'Connection lost. Please re-scan QR code.';
+                statusEl.className = 'text-red-400 font-mono mb-6';
+                startBtn.disabled = true;
+            });
+        });
+        
+        peer.on('error', err => {
+            console.error('PeerJS error on controller:', err);
+            statusEl.textContent = `Error: ${err.type}. Please try again.`;
+            statusEl.className = 'text-red-400 font-mono mb-6';
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (conn) {
+                conn.send('start-recording');
+                statusEl.textContent = 'Recording command sent...';
+                startBtn.disabled = true;
+            }
+        });
+        
+        recordAgainBtn.addEventListener('click', () => {
+            videoContainer.classList.add('hidden');
+            controllerUi.classList.remove('hidden');
+            statusEl.textContent = 'Connected! Ready to record.';
+            startBtn.disabled = false;
+        });
+    }
+
+    // --- Entry Point ---
+    // Run the correct initialization function based on the URL hash.
+    const hash = window.location.hash;
+    if (hash === '#qrcode') {
+        initQrCodePage();
+    } else if (hash === '#controller') {
+        initControllerPage();
+    } else {
+        initMainApp();
+    }
 
   })();
-  </script>
-
-  <!-- SCRIPT FOR REMOTE CONTROL FUNCTIONALITY -->
-  <script type="module">
-    const RemoteControl = {
-      peer: null,
-      conn: null,
-      mediaRecorder: null,
-      recordedChunks: [],
-      
-      elements: {
-        modal: document.getElementById('qrModal'),
-        openBtn: document.getElementById('remoteBtn'),
-        closeBtn: document.getElementById('closeQrModalBtn'),
-        qrContainer: document.getElementById('qrCodeContainer'),
-        qrStatus: document.getElementById('qrStatus'),
-        canvas: document.getElementById('glcanvas'),
-        statusBar: document.getElementById('statusBar'),
-      },
-
-      init() {
-        this.elements.openBtn.addEventListener('click', () => this.showModal());
-        this.elements.closeBtn.addEventListener('click', () => this.hideModal());
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !this.elements.modal.classList.contains('hidden')) {
-                this.hideModal();
-            }
-        });
-      },
-
-      showModal() {
-        this.elements.modal.classList.remove('hidden');
-        requestAnimationFrame(() => {
-            this.elements.modal.classList.remove('opacity-0');
-        });
-        if (!this.peer || this.peer.disconnected) {
-            this.initializePeer();
-        }
-      },
-
-      hideModal() {
-        this.elements.modal.classList.add('opacity-0');
-        setTimeout(() => {
-            this.elements.modal.classList.add('hidden');
-        }, 300);
-      },
-
-      updateStatus(text, isError = false) {
-          console.log(text);
-          this.elements.statusBar.textContent = `STATUS: ${text}`;
-          this.elements.statusBar.classList.toggle('text-red-400', isError);
-          this.elements.statusBar.classList.toggle('text-green-400', !isError);
-      },
-
-      initializePeer() {
-        this.updateStatus('INITIALIZING PEER...');
-        this.elements.qrStatus.textContent = 'Initializing connection...';
-        this.elements.qrContainer.innerHTML = '';
-        if (this.peer) this.peer.destroy();
-
-        this.peer = new Peer();
-
-        this.peer.on('open', (id) => {
-          this.updateStatus('AWAITING CONNECTION');
-          // IMPORTANT: This URL must point to your hosted remote.html file
-          const remoteUrl = `${window.location.href.replace(/index\.html$|\/$/,'')}/remote.html?id=${id}`;
-          
-          this.elements.qrStatus.textContent = `ID: ${id}`;
-          this.generateQRCode(remoteUrl);
-          console.log('My peer ID is: ' + id);
-          console.log('Remote URL: ' + remoteUrl);
-        });
-
-        this.peer.on('connection', (connection) => {
-          this.conn = connection;
-          this.updateStatus('REMOTE CONNECTED');
-          this.hideModal(); // Hide modal on successful connection
-          
-          this.conn.on('open', () => {
-            console.log('Connection established with ' + this.conn.peer);
-            this.conn.send('host-ready');
-          });
-
-          this.conn.on('data', (data) => {
-            if (data === 'start-recording') this.startRecording();
-          });
-        });
-
-        this.peer.on('disconnected', () => {
-            this.updateStatus('CONNECTION LOST', true);
-            setTimeout(() => this.peer.reconnect(), 3000);
-        });
-
-        this.peer.on('error', (err) => {
-            this.updateStatus(`PEER ERROR: ${err.type}`, true);
-            console.error('PeerJS error:', err);
-        });
-      },
-
-      generateQRCode(url) {
-        try {
-            this.elements.qrContainer.innerHTML = '';
-            const qr = qrcode(0, 'L');
-            qr.addData(url);
-            qr.make();
-            this.elements.qrContainer.innerHTML = qr.createImgTag(8, 8);
-        } catch (e) {
-            console.error("Could not generate QR code.", e);
-            this.elements.qrContainer.innerHTML = 'Error generating QR code.';
-        }
-      },
-
-      startRecording() {
-        if (!this.elements.canvas) {
-            this.updateStatus('CANVAS NOT FOUND', true);
-            return;
-        }
-        this.updateStatus('RECORDING...');
-        this.conn.send('recording-started');
-
-        const stream = this.elements.canvas.captureStream(30);
-        
-        if (typeof MediaRecorder === 'undefined') {
-            this.updateStatus('RECORDER NOT SUPPORTED', true);
-            this.conn.send('error:recorder-not-supported');
-            return;
-        }
-
-        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
-        this.recordedChunks = [];
-
-        this.mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) this.recordedChunks.push(event.data);
-        };
-
-        this.mediaRecorder.onstop = () => {
-            this.updateStatus('SENDING VIDEO...');
-            const videoBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
-            
-            if (this.conn && this.conn.open) {
-                this.conn.send(videoBlob);
-                this.updateStatus('VIDEO SENT');
-            } else {
-                this.updateStatus('CANNOT SEND: NO CONNECTION', true);
-            }
-            this.recordedChunks = [];
-            this.mediaRecorder = null;
-        };
-
-        this.mediaRecorder.start();
-        setTimeout(() => {
-            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                this.mediaRecorder.stop();
-            }
-        }, 5000);
-      }
-    };
-
-    window.addEventListener('DOMContentLoaded', () => {
-        RemoteControl.init();
-    });
   </script>
 </body>
 </html>
