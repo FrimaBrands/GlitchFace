@@ -52,7 +52,7 @@
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col">
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.5_BODY</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.4_BODY</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -1167,13 +1167,14 @@
     const stream = canvas.captureStream(30);
     const chunks = [];
     
-    // MODIFIED: The optionsList is reordered to prioritize the universally compatible MP4 format.
+    // MODIFICATION START: Prioritize MP4 format for better compatibility with phone galleries (iOS/Android).
     const optionsList = [
-      { mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2000000 },
-      { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2000000 },
-      { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2000000 },
-      { mimeType: 'video/webm', videoBitsPerSecond: 2000000 },
+      { mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2_000_000 },
+      { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
+      { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
+      { mimeType: 'video/webm', videoBitsPerSecond: 2_000_000 },
     ];
+    // MODIFICATION END
 
     let rec = null;
     var mime = '';
@@ -1225,11 +1226,9 @@
         isRecording = true;
         updateStatus();
         
-        // This 'preferMp4' flag is now used implicitly by the reordered list in `recordCanvasFiveSeconds`.
         const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
         let recording;
         try {
-          // The function will now prefer MP4 automatically.
           recording = await recordCanvasFiveSeconds(preferMp4);
         } catch (e) {
           conn.send(JSON.stringify({ type:'error', message: String(e) }));
