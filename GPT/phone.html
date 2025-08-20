@@ -3,231 +3,131 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- A more permissive CSP to rule out connection blocking as the root cause -->
-  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https: wss:;">
-  <title>Start Recording — Unknown Remote</title>
+  <title>Get Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
     body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
     .wrap { max-width: 560px; margin: 0 auto; padding: 24px; }
     .card { background:#11141a; border:1px solid #1f2430; border-radius:16px; padding:20px; }
-    button { width:100%; padding:14px 16px; font-weight:700; border:none; border-radius:12px; background:#34d399; color:#0b0d11; transition: background-color 0.2s; }
-    button:disabled { opacity:0.5; background-color: #555; }
+    form { margin: 12px 0; display: flex; flex-direction: column; gap: 12px; }
+    input[type="email"] {
+        padding: 12px 14px;
+        background: #0b0d11;
+        border: 1px solid #333946;
+        border-radius: 10px;
+        color: #e5e7eb;
+        font-size: 16px;
+    }
+    button {
+        padding: 14px 16px;
+        font-weight: 700;
+        border: none;
+        border-radius: 12px;
+        background: #34d399;
+        color: #0b0d11;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    button:disabled { opacity:0.5; cursor: not-allowed; }
     .muted { color:#9aa0aa; font-size:14px; }
     .row { display:flex; gap:12px; align-items:center; }
-    progress { width:100%; height:14px; }
-    a.dl { display:inline-block; margin-top:12px; padding:10px 12px; background:#1f2430; border-radius:10px; color:#e5e7eb; text-decoration:none; }
-    video { width:100%; border-radius:12px; display:none; }
     .ok { color:#34d399; } .bad { color:#f87171; }
-    #log-container {
-        background: #000;
-        border: 1px solid #1f2430;
-        border-radius: 8px;
-        margin-top: 20px;
-        padding: 12px;
-        max-height: 200px;
-        overflow-y: auto;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11px;
-        line-height: 1.6;
-        color: #9aa0aa;
-    }
-    #log-container p { margin: 0; padding: 0; }
   </style>
-  <!-- Moved PeerJS script to the head to ensure it's loaded before our script runs -->
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
   <div class="wrap">
     <h1>Unknown Remote</h1>
     <div class="card" id="card">
-      <p class="muted">Tap to request a 5‑second capture from the installation. Nothing is recorded on your phone.</p>
-      <div class="row"><span>Connection:</span> <span id="connState" class="muted">initializing…</span></div>
-      <div class="row" style="margin:12px 0">
-        <button id="startBtn" disabled>Start Recording</button>
-      </div>
-      <div class="row"><span>Status:</span> <span id="status" class="muted">—</span></div>
-      <div class="row" style="margin-top:8px"><progress id="progress" value="0" max="100"></progress></div>
-      <a id="download" class="dl" href="#" download style="display:none">Download video</a>
-      <video id="preview" controls playsinline></video>
+      <p class="muted">Enter your email to receive a 5-second capture from the installation.</p>
+      <form id="emailForm">
+          <input type="email" id="emailInput" placeholder="your.email@example.com" required>
+          <button id="submitBtn" type="submit" disabled>Send Me The Clip</button>
+      </form>
+      <div class="row"><span>Connection:</span> <span id="connState" class="muted">connecting…</span></div>
+      <div class="row" style="margin-top: 8px"><span>Status:</span> <span id="status" class="muted">—</span></div>
     </div>
-    <div id="log-container"></div>
   </div>
 
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-  // Wrapped entire script in DOMContentLoaded to ensure the page is fully ready
-  document.addEventListener('DOMContentLoaded', () => {
+  (function(){
     function qs(k){ return new URLSearchParams(location.search).get(k); }
     const hostId = qs('host'); const token = qs('token');
     const els = {
-      btn: document.getElementById('startBtn'),
+      form: document.getElementById('emailForm'),
+      input: document.getElementById('emailInput'),
+      btn: document.getElementById('submitBtn'),
       conn: document.getElementById('connState'),
       status: document.getElementById('status'),
-      progress: document.getElementById('progress'),
-      dl: document.getElementById('download'),
-      video: document.getElementById('preview'),
-      log: document.getElementById('log-container')
     };
-
-    function log(message) {
-        console.log(message);
-        const p = document.createElement('p');
-        const time = new Date().toLocaleTimeString([], { hour12: false });
-        p.textContent = `[${time}] ${message}`;
-        els.log.appendChild(p);
-        els.log.scrollTop = els.log.scrollHeight;
-    }
-
-    log('DOM ready. Script started.');
 
     if (!hostId || !token) {
-      els.status.textContent = 'Missing host or token'; els.status.className='bad';
-      log('Error: Missing host ID or token in URL.');
+      els.status.textContent = 'Missing host or token from URL.';
+      els.status.className = 'bad';
       return;
     }
-    log(`Host ID: ${hostId.substring(0,10)}... Token: ${token.substring(0,10)}...`);
 
-    function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
-    function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
-    
-    if (typeof Peer === 'undefined') {
-        log('Error: PeerJS library not loaded.');
-        setConn('Library Error', false);
-        return;
-    } else {
-        log('PeerJS library is loaded.');
-    }
+    function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok ? 'ok' : 'muted'; }
+    function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok ? 'ok' : 'bad'; }
 
-    const PEERJS_CONFIG = {
-      debug: 3,
-      config: {
-        'iceServers': [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
-      },
-    };
-    log('PeerJS config created.');
-
-    const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-    log(`WebM support: ${supportsWebM}`);
-    
-    let peer = null;
-    const chunks = [];
-    let expectedBytes = 0;
-    let received = 0;
-    let mime = 'video/webm';
-    let filename = 'capture.webm';
+    const peer = new Peer(undefined, { debug: 1 });
     let conn = null;
-    let peerInitTimeout = null;
-
-    try {
-        peer = new Peer(undefined, PEERJS_CONFIG);
-        log('Peer object created. Waiting for "open" event...');
-    } catch (e) {
-        log(`Error creating Peer object: ${e.message}`);
-        setConn('Initialization failed', false);
-        setStatus('Could not create Peer connection.', false);
-        return;
-    }
-    
-    peerInitTimeout = setTimeout(() => {
-        if (!peer.open) {
-            log('Peer connection timed out after 15s.');
-            setConn('connection timed out', false);
-            setStatus('Could not connect to the network. Please check your connection and try again.', false);
-            if (peer && !peer.destroyed) peer.destroy();
-        }
-    }, 15000);
 
     peer.on('open', (id) => {
-      clearTimeout(peerInitTimeout);
-      log(`Peer connection open. Client ID: ${id.substring(0,10)}...`);
-      setConn('connecting to host…');
       conn = peer.connect(hostId, { reliable: true });
-      log(`Attempting to connect to host: ${hostId.substring(0,10)}...`);
-      
       conn.on('open', () => {
-        log('DataConnection to host is open.');
         setConn('connected', true);
-        const helloMsg = JSON.stringify({ type:'hello', token, supportsWebM });
-        conn.send(helloMsg);
-        log('Sent "hello" message to host.');
-        els.btn.disabled = false;
+        conn.send(JSON.stringify({ type:'hello', token }));
       });
 
       conn.on('data', (msg) => {
         if (typeof msg === 'string') {
           try {
             const data = JSON.parse(msg);
-            log(`Received message: ${data.type}`);
-            if (data.type === 'helloAck') { setStatus('ready'); }
-            if (data.type === 'recordingMeta') {
-              mime = data.mime || 'video/webm';
-              expectedBytes = data.totalBytes || 0;
-              filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
-              chunks.length = 0; received = 0;
-              els.progress.value = 0;
-              setStatus('receiving…');
-              log(`Receiving file: ${filename} (${(expectedBytes/1024/1024).toFixed(2)} MB)`);
-            } else if (data.type === 'progress') {
-              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
-            } else if (data.type === 'recordingEnd') {
-              const blob = new Blob(chunks, { type: mime });
-              const url = URL.createObjectURL(blob);
-              els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
-              els.video.src = url; els.video.style.display='block';
-              els.progress.value = 100;
-              setStatus('done ✔', true);
-              log('File transfer complete.');
+            if (data.type === 'helloAck') {
+                setStatus('Ready to send request.');
+                els.btn.disabled = false;
+            } else if (data.type === 'recordingStarted') {
+                setStatus('Host is recording your clip...');
+            } else if (data.type === 'sendSuccess') {
+                setStatus('Success! Check your email in a few minutes.', true);
+                els.input.value = ''; // Clear input on success
+                setTimeout(() => { els.btn.disabled = false; setStatus('Ready for another request.'); }, 8000);
             } else if (data.type === 'error') {
-              setStatus(data.message || 'error', false);
-              log(`Host reported error: ${data.message}`);
+                setStatus(data.message || 'An unknown error occurred.', false);
+                els.btn.disabled = false;
             }
           } catch(e) {
-            log(`Error parsing message: ${e.message}`);
+            console.error("Error parsing message:", e);
           }
-        } else {
-          chunks.push(new Uint8Array(msg));
-          received += msg.byteLength;
-          if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
         }
       });
-      conn.on('close', () => { 
-        log('Connection to host closed.');
-        setConn('disconnected'); els.btn.disabled = true; 
-      });
-      conn.on('error', (err) => { 
-        log(`Connection error: ${err}`);
-        setConn('error'); console.error('Connection error:', err); els.btn.disabled = true; 
-      });
+
+      conn.on('close', () => { setConn('disconnected'); setStatus('Connection lost.', false); els.btn.disabled = true; });
+      conn.on('error', (err) => { setConn('error'); setStatus('Connection error.', false); els.btn.disabled = true; console.error(err); });
     });
 
-    peer.on('error', (err) => {
-        clearTimeout(peerInitTimeout);
-        log(`PeerJS error: ${err.type} - ${err.message || err}`);
-        setConn(`error: ${err.type}`, false);
-        els.btn.disabled = true;
-    });
+    els.form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!conn || !conn.open) {
+        setStatus('Not connected to host.', false);
+        return;
+      }
+      const email = els.input.value;
+      if (!email) {
+        setStatus('Please enter an email address.', false);
+        return;
+      }
 
-    peer.on('disconnected', () => {
-        clearTimeout(peerInitTimeout);
-        log('Peer disconnected from signaling server.');
-        setConn('network disconnected', false);
-        els.btn.disabled = true;
-    });
-
-    els.btn.addEventListener('click', () => {
       els.btn.disabled = true;
-      setStatus('asking host…');
-      log('Sent "startRecording" request.');
-      conn && conn.send(JSON.stringify({ type:'startRecording' }));
-      setTimeout(() => { els.btn.disabled = false; }, 8000);
+      setStatus('Sending request to host…');
+      conn.send(JSON.stringify({ type: 'requestRecording', email: email }));
     });
-  });
+
+  })();
   </script>
 </body>
 </html>
