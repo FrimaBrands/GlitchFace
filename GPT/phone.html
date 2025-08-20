@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Add CSP meta tag to allow connections to the PeerJS server -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com:*/*;">
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -88,10 +90,23 @@
 
     function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
     function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
+    
+    // Check if PeerJS library is loaded
+    if (typeof Peer === 'undefined') {
+        log('Error: PeerJS library not loaded.');
+        setConn('Library Error', false);
+        return;
+    } else {
+        log('PeerJS library is loaded.');
+    }
 
     // Stun servers for better NAT traversal, crucial for iOS reliability
     const PEERJS_CONFIG = {
-      debug: 2, // Increased debug level for more verbose console logs
+      host: '0.peerjs.com', // Explicitly set the host
+      port: 443,             // Standard HTTPS port
+      path: '/peerjs',       // Standard path
+      secure: true,          // Use WSS
+      debug: 3,              // Max debug level for verbose logs
       config: {
         'iceServers': [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -99,6 +114,7 @@
         ],
       },
     };
+    log('PeerJS config created.');
 
     // Detect WebM support
     const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
@@ -107,7 +123,7 @@
     let peer = null;
     try {
         peer = new Peer(undefined, PEERJS_CONFIG);
-        log('Peer object created.');
+        log('Peer object created. Waiting for "open" event...');
     } catch (e) {
         log(`Error creating Peer object: ${e.message}`);
         setConn('Initialization failed', false);
