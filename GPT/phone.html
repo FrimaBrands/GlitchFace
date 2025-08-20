@@ -1,13 +1,15 @@
-<!doctype html>
+
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Start Recording — Unknown Remote</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<title>Start Recording — Unknown Remote</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<style>
     :root { color-scheme: dark; }
     body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
     .wrap { max-width: 560px; margin: 0 auto; padding: 24px; }
@@ -23,23 +25,22 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Unknown Remote</h1>
-    <div class="card" id="card">
-      <p class="muted">Tap to request a 5‑second capture from the installation. Nothing is recorded on your phone.</p>
-      <div class="row"><span>Connection:</span> <span id="connState" class="muted">connecting…</span></div>
-      <div class="row" style="margin:12px 0">
-        <button id="startBtn" disabled>Start Recording</button>
-      </div>
-      <div class="row"><span>Status:</span> <span id="status" class="muted">—</span></div>
-      <div class="row" style="margin-top:8px"><progress id="progress" value="0" max="100"></progress></div>
-      <a id="download" class="dl" href="#" download style="display:none">Download video</a>
-      <video id="preview" controls playsinline></video>
-    </div>
-  </div>
-
-  <script src="https://unpkg.com/peerjs@latest/dist/peerjs.min.js"></script>
-  <script>
+<div class="wrap">
+<h1>Unknown Remote</h1>
+<div class="card" id="card">
+<p class="muted">Tap to request a 5‑second capture from the installation. Nothing is recorded on your phone.</p>
+<div class="row"><span>Connection:</span> <span class="muted" id="connState">connecting…</span></div>
+<div class="row" style="margin:12px 0">
+<button disabled="" id="startBtn">Start Recording</button>
+</div>
+<div class="row"><span>Status:</span> <span class="muted" id="status">—</span></div>
+<div class="row" style="margin-top:8px"><progress id="progress" max="100" value="0"></progress></div>
+<a class="dl" download="" href="#" id="download" style="display:none">Download video</a>
+<video controls="" id="preview" playsinline=""></video>
+</div>
+</div>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
   (function(){
     function qs(k){ return new URLSearchParams(location.search).get(k); }
     const hostId = qs('host'); const token = qs('token');
@@ -60,29 +61,7 @@
 
     // Detect WebM support
     const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-
-    // *** MODIFICATION START ***
-    // Added a robust set of STUN/TURN servers to the client-side Peer configuration.
-    const iceServers = [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        {
-          urls: "turn:global.turn.twilio.com:3478",
-          username: "79f0ac484b7b325982071a8a2cac3598a72b53531b798b04001f3f33ba68a42f",
-          credential: "i/4Bbz/t+scnpZ4iMZDAA5kex3kX82U/DE8sZgOEXpQ="
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-    ];
-    const peer = new Peer(undefined, {
-        debug: 1,
-        config: { 'iceServers': iceServers }
-    });
-    // *** MODIFICATION END ***
-
+    const peer = new Peer(undefined, { debug: 1 });
     const chunks = [];
     let expectedBytes = 0;
     let received = 0;
@@ -139,6 +118,55 @@
       setTimeout(() => { els.btn.disabled = false; }, 8000);
     });
   })();
-  </script>
-</body>
+  
+
+// === iOS/safari robustness patch START ===
+(function(){
+  // Utility to set status if the page implements setStatus; otherwise console.
+  function setStatus(msg, ok){
+    try {
+      if (typeof window.setStatus === 'function') window.setStatus(msg, ok);
+      else console.log('[status]', msg);
+    } catch(e){ console.log('[status]', msg); }
+  }
+  // Add Open in Safari hint for in-app browsers
+  try {
+    var ua = navigator.userAgent || '';
+    var inApp = /(FBAN|FBAV|Instagram|Twitter|TikTok|Line|Pinterest)/i.test(ua);
+    if (inApp) {
+      var a = document.createElement('a');
+      a.textContent = 'Open in Safari';
+      a.href = location.href;
+      a.rel = 'noopener';
+      a.style.cssText = 'display:inline-block;margin:8px 0;padding:8px 12px;border:1px solid #999;border-radius:8px;text-decoration:none;';
+      (document.body || document.documentElement).appendChild(a);
+      setStatus('Open in Safari for this to work', false);
+    }
+  } catch(e){}
+})();
+</script>
+<script>
+// Connection timeout helper: after 12s, if still "connecting", show a hint
+(function(){
+  try{
+    var fired=false;
+    setTimeout(function(){
+      if (fired) return;
+      fired=true;
+      try{
+        if (typeof window.setConn === 'function') {
+          window.setConn('timeout');
+        }
+      }catch(e){}
+      try{
+        if (typeof window.setStatus === 'function') {
+          window.setStatus('Network is blocking P2P. Open in Safari and/or try different Wi‑Fi', false);
+        } else {
+          console.warn('Network is blocking P2P. Open in Safari and/or try different Wi‑Fi');
+        }
+      }catch(e){}
+    }, 12000);
+  }catch(e){}
+})();
+</script></body>
 </html>
