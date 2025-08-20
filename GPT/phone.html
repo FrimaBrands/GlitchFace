@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- Refined CSP to be compatible with both iOS and Android -->
-  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' *.peerjs.com:* wss:;">
+  <!-- A more specific CSP for better iOS compatibility -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https://*.peerjs.com wss://*.peerjs.com;">
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,16 +117,6 @@
     log(`WebM support: ${supportsWebM}`);
     
     let peer = null;
-    try {
-        peer = new Peer(undefined, PEERJS_CONFIG);
-        log('Peer object created. Waiting for "open" event...');
-    } catch (e) {
-        log(`Error creating Peer object: ${e.message}`);
-        setConn('Initialization failed', false);
-        setStatus('Could not create Peer connection.', false);
-        return;
-    }
-    
     const chunks = [];
     let expectedBytes = 0;
     let received = 0;
@@ -135,96 +125,109 @@
     let conn = null;
     let peerInitTimeout = null;
 
-    // Add a timeout for peer initialization to prevent getting stuck
-    peerInitTimeout = setTimeout(() => {
-        if (!peer.open) {
-            log('Peer connection timed out after 15s.');
-            setConn('connection timed out', false);
-            setStatus('Could not connect to the network. Please check your connection and try again.', false);
-            if (peer && !peer.destroyed) peer.destroy();
+    // Use a small timeout to avoid potential race conditions on Safari
+    setTimeout(() => {
+        try {
+            peer = new Peer(undefined, PEERJS_CONFIG);
+            log('Peer object created. Waiting for "open" event...');
+        } catch (e) {
+            log(`Error creating Peer object: ${e.message}`);
+            setConn('Initialization failed', false);
+            setStatus('Could not create Peer connection.', false);
+            return;
         }
-    }, 15000); // 15 seconds timeout
-
-    // Wait for the peer to be ready before attempting to connect.
-    peer.on('open', (id) => {
-      clearTimeout(peerInitTimeout); // Success, clear the timeout
-      log(`Peer connection open. Client ID: ${id.substring(0,10)}...`);
-      setConn('connecting to host…');
-      // Use default 'binary' serialization for better compatibility
-      conn = peer.connect(hostId, { reliable: true });
-      log(`Attempting to connect to host: ${hostId.substring(0,10)}...`);
-      
-      conn.on('open', () => {
-        log('DataConnection to host is open.');
-        setConn('connected', true);
-        // Identify + capabilities
-        const helloMsg = JSON.stringify({ type:'hello', token, supportsWebM });
-        conn.send(helloMsg);
-        log('Sent "hello" message to host.');
-        els.btn.disabled = false;
-      });
-
-      conn.on('data', (msg) => {
-        if (typeof msg === 'string') {
-          try {
-            const data = JSON.parse(msg);
-            log(`Received message: ${data.type}`);
-            if (data.type === 'helloAck') { setStatus('ready'); }
-            if (data.type === 'recordingMeta') {
-              mime = data.mime || 'video/webm';
-              expectedBytes = data.totalBytes || 0;
-              filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
-              chunks.length = 0; received = 0;
-              els.progress.value = 0;
-              setStatus('receiving…');
-              log(`Receiving file: ${filename} (${(expectedBytes/1024/1024).toFixed(2)} MB)`);
-            } else if (data.type === 'progress') {
-              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
-            } else if (data.type === 'recordingEnd') {
-              const blob = new Blob(chunks, { type: mime });
-              const url = URL.createObjectURL(blob);
-              els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
-              els.video.src = url; els.video.style.display='block';
-              els.progress.value = 100;
-              setStatus('done ✔', true);
-              log('File transfer complete.');
-            } else if (data.type === 'error') {
-              setStatus(data.message || 'error', false);
-              log(`Host reported error: ${data.message}`);
+        
+        // Add a timeout for peer initialization to prevent getting stuck
+        peerInitTimeout = setTimeout(() => {
+            if (!peer.open) {
+                log('Peer connection timed out after 15s.');
+                setConn('connection timed out', false);
+                setStatus('Could not connect to the network. Please check your connection and try again.', false);
+                if (peer && !peer.destroyed) peer.destroy();
             }
-          } catch(e) {
-            log(`Error parsing message: ${e.message}`);
-          }
-        } else {
-          // ArrayBuffer chunk
-          chunks.push(new Uint8Array(msg));
-          received += msg.byteLength;
-          if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
-        }
-      });
-      conn.on('close', () => { 
-        log('Connection to host closed.');
-        setConn('disconnected'); els.btn.disabled = true; 
-      });
-      conn.on('error', (err) => { 
-        log(`Connection error: ${err}`);
-        setConn('error'); console.error('Connection error:', err); els.btn.disabled = true; 
-      });
-    });
+        }, 15000); // 15 seconds timeout
 
-    peer.on('error', (err) => {
-        clearTimeout(peerInitTimeout); // An error occurred, clear timeout
-        log(`PeerJS error: ${err.type} - ${err.message || err}`);
-        setConn(`error: ${err.type}`, false);
-        els.btn.disabled = true;
-    });
+        // Wait for the peer to be ready before attempting to connect.
+        peer.on('open', (id) => {
+          clearTimeout(peerInitTimeout); // Success, clear the timeout
+          log(`Peer connection open. Client ID: ${id.substring(0,10)}...`);
+          setConn('connecting to host…');
+          // Use default 'binary' serialization for better compatibility
+          conn = peer.connect(hostId, { reliable: true });
+          log(`Attempting to connect to host: ${hostId.substring(0,10)}...`);
+          
+          conn.on('open', () => {
+            log('DataConnection to host is open.');
+            setConn('connected', true);
+            // Identify + capabilities
+            const helloMsg = JSON.stringify({ type:'hello', token, supportsWebM });
+            conn.send(helloMsg);
+            log('Sent "hello" message to host.');
+            els.btn.disabled = false;
+          });
 
-    peer.on('disconnected', () => {
-        clearTimeout(peerInitTimeout);
-        log('Peer disconnected from signaling server.');
-        setConn('network disconnected', false);
-        els.btn.disabled = true;
-    });
+          conn.on('data', (msg) => {
+            if (typeof msg === 'string') {
+              try {
+                const data = JSON.parse(msg);
+                log(`Received message: ${data.type}`);
+                if (data.type === 'helloAck') { setStatus('ready'); }
+                if (data.type === 'recordingMeta') {
+                  mime = data.mime || 'video/webm';
+                  expectedBytes = data.totalBytes || 0;
+                  filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
+                  chunks.length = 0; received = 0;
+                  els.progress.value = 0;
+                  setStatus('receiving…');
+                  log(`Receiving file: ${filename} (${(expectedBytes/1024/1024).toFixed(2)} MB)`);
+                } else if (data.type === 'progress') {
+                  if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
+                } else if (data.type === 'recordingEnd') {
+                  const blob = new Blob(chunks, { type: mime });
+                  const url = URL.createObjectURL(blob);
+                  els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
+                  els.video.src = url; els.video.style.display='block';
+                  els.progress.value = 100;
+                  setStatus('done ✔', true);
+                  log('File transfer complete.');
+                } else if (data.type === 'error') {
+                  setStatus(data.message || 'error', false);
+                  log(`Host reported error: ${data.message}`);
+                }
+              } catch(e) {
+                log(`Error parsing message: ${e.message}`);
+              }
+            } else {
+              // ArrayBuffer chunk
+              chunks.push(new Uint8Array(msg));
+              received += msg.byteLength;
+              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
+            }
+          });
+          conn.on('close', () => { 
+            log('Connection to host closed.');
+            setConn('disconnected'); els.btn.disabled = true; 
+          });
+          conn.on('error', (err) => { 
+            log(`Connection error: ${err}`);
+            setConn('error'); console.error('Connection error:', err); els.btn.disabled = true; 
+          });
+        });
+
+        peer.on('error', (err) => {
+            clearTimeout(peerInitTimeout); // An error occurred, clear timeout
+            log(`PeerJS error: ${err.type} - ${err.message || err}`);
+            setConn(`error: ${err.type}`, false);
+            els.btn.disabled = true;
+        });
+
+        peer.on('disconnected', () => {
+            clearTimeout(peerInitTimeout);
+            log('Peer disconnected from signaling server.');
+            setConn('network disconnected', false);
+            els.btn.disabled = true;
+        });
+    }, 100); // 100ms delay to prevent race condition
 
     els.btn.addEventListener('click', () => {
       els.btn.disabled = true;
