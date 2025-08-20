@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- A more specific CSP for better iOS compatibility -->
-  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https://*.peerjs.com wss://*.peerjs.com;">
+  <!-- A more permissive CSP to rule out connection blocking as the root cause -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https: wss:;">
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,6 +37,8 @@
     }
     #log-container p { margin: 0; padding: 0; }
   </style>
+  <!-- Moved PeerJS script to the head to ensure it's loaded before our script runs -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
   <div class="wrap">
@@ -55,9 +57,9 @@
     <div id="log-container"></div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script>
-  (function(){
+  // Wrapped entire script in DOMContentLoaded to ensure the page is fully ready
+  document.addEventListener('DOMContentLoaded', () => {
     function qs(k){ return new URLSearchParams(location.search).get(k); }
     const hostId = qs('host'); const token = qs('token');
     const els = {
@@ -79,7 +81,7 @@
         els.log.scrollTop = els.log.scrollHeight;
     }
 
-    log('Script started.');
+    log('DOM ready. Script started.');
 
     if (!hostId || !token) {
       els.status.textContent = 'Missing host or token'; els.status.className='bad';
@@ -91,7 +93,6 @@
     function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
     function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
     
-    // Check if PeerJS library is loaded
     if (typeof Peer === 'undefined') {
         log('Error: PeerJS library not loaded.');
         setConn('Library Error', false);
@@ -100,7 +101,6 @@
         log('PeerJS library is loaded.');
     }
 
-    // Simplified PeerJS config to let the library use its defaults, which is more robust across platforms.
     const PEERJS_CONFIG = {
       debug: 3,
       config: {
@@ -112,7 +112,6 @@
     };
     log('PeerJS config created.');
 
-    // Detect WebM support
     const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
     log(`WebM support: ${supportsWebM}`);
     
@@ -135,7 +134,6 @@
         return;
     }
     
-    // Add a timeout for peer initialization to prevent getting stuck
     peerInitTimeout = setTimeout(() => {
         if (!peer.open) {
             log('Peer connection timed out after 15s.');
@@ -143,21 +141,18 @@
             setStatus('Could not connect to the network. Please check your connection and try again.', false);
             if (peer && !peer.destroyed) peer.destroy();
         }
-    }, 15000); // 15 seconds timeout
+    }, 15000);
 
-    // Wait for the peer to be ready before attempting to connect.
     peer.on('open', (id) => {
-      clearTimeout(peerInitTimeout); // Success, clear the timeout
+      clearTimeout(peerInitTimeout);
       log(`Peer connection open. Client ID: ${id.substring(0,10)}...`);
       setConn('connecting to host…');
-      // Use default 'binary' serialization for better compatibility
       conn = peer.connect(hostId, { reliable: true });
       log(`Attempting to connect to host: ${hostId.substring(0,10)}...`);
       
       conn.on('open', () => {
         log('DataConnection to host is open.');
         setConn('connected', true);
-        // Identify + capabilities
         const helloMsg = JSON.stringify({ type:'hello', token, supportsWebM });
         conn.send(helloMsg);
         log('Sent "hello" message to host.');
@@ -196,7 +191,6 @@
             log(`Error parsing message: ${e.message}`);
           }
         } else {
-          // ArrayBuffer chunk
           chunks.push(new Uint8Array(msg));
           received += msg.byteLength;
           if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
@@ -213,7 +207,7 @@
     });
 
     peer.on('error', (err) => {
-        clearTimeout(peerInitTimeout); // An error occurred, clear timeout
+        clearTimeout(peerInitTimeout);
         log(`PeerJS error: ${err.type} - ${err.message || err}`);
         setConn(`error: ${err.type}`, false);
         els.btn.disabled = true;
@@ -233,7 +227,7 @@
       conn && conn.send(JSON.stringify({ type:'startRecording' }));
       setTimeout(() => { els.btn.disabled = false; }, 8000);
     });
-  })();
+  });
   </script>
 </body>
 </html>
