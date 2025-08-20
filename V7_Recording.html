@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U N K N O W N // Signal Processor</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+  
+  <!-- New libraries for QR Code and Peer-to-Peer connection -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.js"></script>
+
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+    input[type="range"] { -webkit-appearance:none; appearance:none; width:100%; height:4px; background:#374151; border-radius:2px; outline:none; transition:background .3s; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; background:#34d399; cursor:pointer; border-radius:50%; border:2px solid #111827; }
+    input[type="range"]::-moz-range-thumb { width:16px; height:16px; background:#34d399; cursor:pointer; border-radius:50%; border:2px solid #111827; }
+
+    .status-indicator::after { content:'_'; animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    
+    .tab-button.active {
+        border-color: #34d399;
+        color: #e5e7eb;
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Styles for the new QR Code Modal */
+    #qrModal {
+        transition: opacity 0.3s ease-in-out;
+    }
+    #qrCodeContainer canvas {
+        width: 100% !important;
+        height: auto !important;
+        image-rendering: pixelated; /* Keeps QR code sharp */
+    }
+  </style>
+</head>
+<body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
+
+  <!-- Main Container -->
+  <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
+    <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
+      <video id="video" playsinline muted class="hidden"></video>
+      <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
+      <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
+      <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
+      <div id="statusBar" class="absolute bottom-2 left-2 font-mono text-xs bg-black/50 text-green-400 px-2 py-1 rounded status-indicator">
+        STATUS: IDLE
+      </div>
+    </div>
+
+    <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col">
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.2_BODY</p>
+        <div class="flex space-x-2 mt-4">
+          <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
+          <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
+        </div>
+        <!-- New Button to show QR Code -->
+        <button id="remoteBtn" class="w-full mt-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded transition-all duration-200">Remote Control</button>
+        <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
+      </div>
+
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
+        <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="text" id="presetName" placeholder="Preset Name..." class="col-span-3 bg-gray-900 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
+          <button id="savePresetBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 rounded text-sm transition-colors">Save</button>
+          <button id="deletePresetBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 rounded text-sm transition-colors">Delete</button>
+          <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
+        </div>
+      </div>
+      
+      <!-- TABS -->
+      <div class="flex border-b border-gray-800 flex-shrink-0">
+        <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-200 transition-colors duration-200">Effects</button>
+        <button id="globalsTabBtn" class="tab-button active flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 transition-colors duration-200">Globals</button>
+      </div>
+
+      <!-- TAB CONTENT -->
+      <div class="flex-grow custom-scrollbar overflow-y-auto">
+        <div id="effects-tab-content" class="hidden p-4 space-y-4">
+          <!-- Randomized effects will be generated here by JS -->
+        </div>
+        <div id="globals-tab-content" class="p-4 space-y-4">
+          <!-- Global controls will be generated and moved here -->
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">BACKGROUND</h3>
+            <div class="space-y-3">
+                <button id="bgUploadBtn" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 rounded text-sm transition-colors">Upload Image/Video</button>
+                <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
+                <label class="flex items-center justify-between text-sm">
+                    <span class="text-gray-400">Use Custom Background</span>
+                    <input type="checkbox" id="useBgChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" disabled>
+                </label>
+                <div class="control-item space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label for="maskFeather" class="text-sm font-medium text-gray-300">Mask Feather</label>
+                        <span id="maskFeatherValue" class="text-sm font-mono text-green-400">0.150</span>
+                    </div>
+                    <input type="range" id="maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
+                </div>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">SETTINGS</h3>
+            <div class="space-y-3">
+              <label class="flex items-center justify-between text-sm">
+                <span class="text-gray-400">Animate Effects</span>
+                <input type="checkbox" id="animateChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
+              </label>
+              <label class="flex items-center justify-between text-sm">
+                <span class="text-gray-400">Mirror Camera</span>
+                <input type="checkbox" id="mirrorChk" class="form-checkbox h-4 w-4 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-0" checked>
+              </label>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">AUTOMATION</h3>
+            <div class="control-item space-y-2">
+              <div class="flex justify-between items-center">
+                <label for="autoRandomizeSlider" class="text-sm font-medium text-gray-300">Auto-Randomize</label>
+                <span id="autoRandomizeValue" class="text-sm font-mono text-green-400">Off</span>
+              </div>
+              <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="0">
+            </div>
+            <div class="control-item space-y-2 mt-3">
+              <div class="flex justify-between items-center">
+                <label for="presetIterationSlider" class="text-sm font-medium text-gray-300">Preset Iteration</label>
+                <span id="presetIterationValue" class="text-sm font-mono text-green-400">Off</span>
+              </div>
+              <input type="range" id="presetIterationSlider" min="0" max="30" step="0.5" value="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New QR Code Modal -->
+  <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50 hidden opacity-0">
+    <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full text-center shadow-2xl shadow-indigo-500/20">
+      <h2 class="text-2xl font-bold text-white mb-2">Scan to Connect</h2>
+      <p class="text-gray-400 mb-4">Scan this QR code with your phone to start the remote recording experience.</p>
+      <div id="qrCodeContainer" class="bg-white p-4 rounded-md w-full aspect-square mx-auto">
+        <!-- QR Code will be generated here -->
+      </div>
+      <p id="qrStatus" class="font-mono text-sm text-indigo-400 mt-4">Initializing connection...</p>
+      <button id="closeQrModalBtn" class="mt-6 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full">Close</button>
+    </div>
+  </div>
+
+
+  <script>
+  // --- EXISTING SCRIPT (UNTIL LINE 290) ---
+  (() => {
+    // --- APP ARCHITECTURE ---
+    // This script is organized into several modules, each handling a specific concern.
+    // 1. UI: Manages all DOM elements, control creation, and user feedback.
+    // 2. Renderer: Encapsulates all WebGL logic, including setup, shaders, and the render pipeline.
+    // 3. BodySegmenter: Handles the MediaPipe Selfie Segmentation setup and result processing.
+    // 4. PresetManager: Manages saving, loading, and randomizing effect presets.
+    // 5. App: The main controller that initializes all modules and runs the main loop.
+    
+    const vertSrc = `
+      attribute vec2 a_pos;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_pos;
+        gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
+      }`;
+
+    const fragSrc = `
+      precision highp float;
+      varying vec2 v_uv;
+
+      // Textures
+      uniform sampler2D u_tex;
+      uniform sampler2D u_feedbackTex;
+      uniform sampler2D u_maskTex;
+      uniform sampler2D u_backgroundTex;
+
+      // Global uniforms
+      uniform vec2  u_resolution;
+      uniform float u_time;
+      uniform bool  u_isFeedbackPass;
+      uniform bool  u_useBackground;
+      uniform float u_maskFeather;
+
+      // Opacity uniforms (not randomized)
+      uniform float u_overallOpacity;
+      uniform float u_flickerPerSecond;
+      uniform float u_flickerDuration;
+      uniform float u_flickerIntensity;
+      uniform float u_flickerFade;
+
+      // Seep uniforms (not randomized)
+      uniform float u_seepAmount;
+      uniform float u_seepIntensity;
+
+      // Effect uniforms (randomized)
+      uniform float u_feedbackAmount;
+      uniform float u_feedbackZoom;
+      uniform float u_glitchIntensity;
+      uniform float u_glitchBlockSize;
+      uniform float u_rgbShift;
+      uniform float u_noiseAmount;
+      uniform float u_noiseSpeed;
+      uniform float u_vignette;
+      
+      // Smear uniforms
+      uniform float u_globalSmearIntensity;
+      uniform float u_globalSmearAngle;
+      uniform float u_spotSmearIntensity;
+      uniform float u_spotSmearDensity;
+      uniform float u_spotSmearSize;
+
+
+      // --- Helper Functions ---
+      float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
+
+      // Generic smear effect
+      vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
+        vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
+        vec4 color = vec4(0.0);
+        const int samples = 16;
+        for (int i = 0; i < samples; i++) {
+          float t = float(i) / float(samples - 1);
+          color += texture2D(tex, uv - dir * t * intensity);
+        }
+        return color / float(samples);
+      }
+      
+      // Simple box blur for creating the 'seep' effect
+      vec4 blur(sampler2D tex, vec2 uv, float radius) {
+          vec4 acc = vec4(0.0);
+          vec2 res = u_resolution.xy;
+          float count = 0.0;
+          // A 5x5 kernel for a small, efficient blur
+          for(float x = -2.0; x <= 2.0; x++) {
+              for(float y = -2.0; y <= 2.0; y++) {
+                  vec2 offset = vec2(x, y) * radius / res;
+                  acc += texture2D(tex, uv + offset);
+                  count += 1.0;
+              }
+          }
+          return acc / count;
+      }
+
+      void main() {
+        vec2 uv = v_uv;
+        vec4 videoColor = texture2D(u_tex, uv);
+
+        // --- EFFECT PIPELINE ---
+        vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
+        vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
+
+        if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
+          vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
+          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
+        }
+
+        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+        effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
+
+        effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
+        effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
+
+        vec4 smearedColor = effectedColor;
+        
+        vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
+        if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
+          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
+        }
+
+        float maskValue = texture2D(u_maskTex, uv).r;
+        if (maskValue > 0.1) {
+            vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
+            smearedColor = mix(smearedColor, globalSmear, 0.5);
+        }
+
+
+        float effectedGray = dot(smearedColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
+
+        // --- RENDER PASS LOGIC ---
+        if (u_isFeedbackPass) {
+          gl_FragColor = effectedGrayscale;
+          return;
+        }
+
+        // --- FINAL COMPOSITION (Screen Pass) ---
+        float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
+
+        float baseMask = texture2D(u_maskTex, uv).r;
+        float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
+        float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
+
+        float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
+        float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
+
+        // Calculate flicker
+        float flickerMultiplier = 1.0;
+        if (u_flickerPerSecond > 0.0) {
+            float flickerCycle = 1.0 / u_flickerPerSecond;
+            float flickerPhase = mod(u_time, flickerCycle);
+            float flickerEdge = flickerCycle * u_flickerDuration;
+            
+            float fadeWidth = flickerCycle * u_flickerFade * 0.5;
+            float isFlickerOff = 1.0 - smoothstep(flickerEdge - fadeWidth, flickerEdge + fadeWidth, flickerPhase);
+            flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
+        }
+
+        // 'effectAmount' now combines opacity and flicker. This controls HOW MUCH effect is applied.
+        float effectAmount = u_overallOpacity * flickerMultiplier;
+
+        // The foreground color is a mix of the original body and the fully effected body.
+        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, effectAmount);
+        
+        // Determine the background color
+        vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
+
+        // Mix the background with the calculated foreground color using the silhouette mask.
+        gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
+      }`;
+
+    const UI = {
+      elements: {},
+      state: { ui: {}, jitter: {} },
+      globalState: { ui: {} }, // State for non-randomized controls
+      definitions: {},
+      globalDefinitions: {},
+
+      init(definitions, globalDefinitions) {
+        this.definitions = definitions;
+        this.globalDefinitions = globalDefinitions;
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'remoteBtn'];
+        ids.forEach(id => this.elements[id] = document.getElementById(id));
+        
+        // Create randomized controls in the 'Effects' tab
+        for (const [key, definition] of Object.entries(this.definitions)) {
+          this.createControlGroup(key, definition, this.state, this.elements['effects-tab-content'], true);
+        }
+        // Create global controls in the 'Globals' tab
+        for (const [key, definition] of Object.entries(this.globalDefinitions)) {
+            this.createControlGroup(key, definition, this.globalState, this.elements['globals-tab-content'], false);
+        }
+
+        // --- Event Listeners ---
+        this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
+        this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
+        
+        // Tab switching logic
+        this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
+        this.elements.globalsTabBtn.addEventListener('click', () => this.switchTab('globals'));
+
+        // Background controls
+        this.elements.bgUploadBtn.addEventListener('click', () => this.elements.bgUpload.click());
+        this.elements.bgUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const url = URL.createObjectURL(file);
+
+            if (file.type.startsWith('image/')) {
+                this.elements.backgroundImage.src = url;
+                this.elements.backgroundImage.classList.remove('hidden');
+                this.elements.backgroundMedia.classList.add('hidden');
+                this.elements.backgroundMedia.pause();
+                this.elements.backgroundMedia.src = '';
+            } else if (file.type.startsWith('video/')) {
+                this.elements.backgroundMedia.src = url;
+                this.elements.backgroundMedia.play();
+                this.elements.backgroundMedia.classList.remove('hidden');
+                this.elements.backgroundImage.classList.add('hidden');
+                this.elements.backgroundImage.src = '';
+            }
+
+            this.elements.useBgChk.disabled = false;
+            this.elements.useBgChk.checked = true;
+            this.setMsg(`Loaded background: ${file.name}`);
+        });
+        this.elements.maskFeather.addEventListener('input', () => {
+            this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3);
+        });
+        
+        // Automation controls
+        this.elements.autoRandomizeSlider.addEventListener('input', () => {
+            const val = parseFloat(this.elements.autoRandomizeSlider.value);
+            this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
+        });
+        this.elements.presetIterationSlider.addEventListener('input', () => {
+            const val = parseFloat(this.elements.presetIterationSlider.value);
+            this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`;
+        });
+      },
+      // ... (rest of the existing UI object)
+    };
+    // ... (rest of the existing script)
+  })();
+  </script>
+
+  <!-- NEW SCRIPT FOR REMOTE CONTROL FUNCTIONALITY -->
+  <script type="module">
+    const RemoteControl = {
+      peer: null,
+      conn: null,
+      mediaRecorder: null,
+      recordedChunks: [],
+      
+      elements: {
+        modal: document.getElementById('qrModal'),
+        openBtn: document.getElementById('remoteBtn'),
+        closeBtn: document.getElementById('closeQrModalBtn'),
+        qrContainer: document.getElementById('qrCodeContainer'),
+        qrStatus: document.getElementById('qrStatus'),
+        canvas: document.getElementById('glcanvas'),
+        statusBar: document.getElementById('statusBar'),
+      },
+
+      init() {
+        // --- Event Listeners for Modal ---
+        this.elements.openBtn.addEventListener('click', () => this.showModal());
+        this.elements.closeBtn.addEventListener('click', () => this.hideModal());
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !this.elements.modal.classList.contains('hidden')) {
+                this.hideModal();
+            }
+        });
+      },
+
+      showModal() {
+        this.elements.modal.classList.remove('hidden');
+        // Use requestAnimationFrame to ensure the transition is applied after 'display' changes
+        requestAnimationFrame(() => {
+            this.elements.modal.classList.remove('opacity-0');
+        });
+        
+        // Initialize the peer connection only when the modal is opened
+        if (!this.peer || this.peer.disconnected) {
+            this.initializePeer();
+        }
+      },
+
+      hideModal() {
+        this.elements.modal.classList.add('opacity-0');
+        setTimeout(() => {
+            this.elements.modal.classList.add('hidden');
+        }, 300); // Match transition duration
+      },
+
+      updateStatus(text, isError = false) {
+          console.log(text);
+          this.elements.statusBar.textContent = `STATUS: ${text}`;
+          if (isError) {
+              this.elements.statusBar.classList.remove('text-green-400');
+              this.elements.statusBar.classList.add('text-red-400');
+          } else {
+              this.elements.statusBar.classList.add('text-green-400');
+              this.elements.statusBar.classList.remove('text-red-400');
+          }
+      },
+
+      initializePeer() {
+        this.updateStatus('INITIALIZING PEER...');
+        this.elements.qrStatus.textContent = 'Initializing connection...';
+        this.elements.qrContainer.innerHTML = ''; // Clear old QR code
+
+        // For safety, destroy any existing peer connection
+        if (this.peer) {
+            this.peer.destroy();
+        }
+
+        // Create a new Peer object. Passing no ID will cause the server to assign one.
+        this.peer = new Peer();
+
+        // --- PeerJS Event Handlers ---
+
+        // Fired when the connection to the PeerJS server is established
+        this.peer.on('open', (id) => {
+          this.updateStatus('AWAITING CONNECTION');
+          // IMPORTANT: You must create a 'remote.html' file.
+          // The URL should point to where you host that file.
+          // If using GitHub Pages, it would be something like:
+          // https://<YOUR_USERNAME>.github.io/<YOUR_REPO>/remote.html
+          const remoteUrl = `${window.location.href.replace('index.html', '').replace(/\/$/, '')}/remote.html?id=${id}`;
+          
+          this.elements.qrStatus.textContent = `ID: ${id}`;
+          this.generateQRCode(remoteUrl);
+          console.log('My peer ID is: ' + id);
+          console.log('Remote URL: ' + remoteUrl);
+        });
+
+        // Fired when a remote peer tries to connect
+        this.peer.on('connection', (connection) => {
+          this.conn = connection;
+          this.updateStatus('REMOTE CONNECTED');
+          
+          this.conn.on('open', () => {
+            console.log('Connection established with ' + this.conn.peer);
+            this.conn.send('host-ready'); // Let the remote know we are ready
+          });
+
+          // Fired when data is received from the remote
+          this.conn.on('data', (data) => {
+            console.log('Received data:', data);
+            if (data === 'start-recording') {
+              this.startRecording();
+            }
+          });
+        });
+
+        this.peer.on('disconnected', () => {
+            this.updateStatus('CONNECTION LOST', true);
+            // Attempt to reconnect
+            setTimeout(() => this.peer.reconnect(), 3000);
+        });
+
+        this.peer.on('error', (err) => {
+            this.updateStatus(`PEER ERROR: ${err.type}`, true);
+            console.error('PeerJS error:', err);
+        });
+      },
+
+      generateQRCode(url) {
+        try {
+            this.elements.qrContainer.innerHTML = '';
+            const qr = qrcode(0, 'L');
+            qr.addData(url);
+            qr.make();
+            this.elements.qrContainer.innerHTML = qr.createImgTag(8, 8);
+        } catch (e) {
+            console.error("Could not generate QR code.", e);
+            this.elements.qrContainer.innerHTML = 'Error generating QR code.';
+        }
+      },
+
+      startRecording() {
+        if (!this.elements.canvas) {
+            this.updateStatus('CANVAS NOT FOUND', true);
+            return;
+        }
+        this.updateStatus('RECORDING...');
+        this.conn.send('recording-started');
+
+        // Get a stream from the canvas
+        const stream = this.elements.canvas.captureStream(30); // 30 FPS
+        
+        // Check for browser support
+        if (typeof MediaRecorder === 'undefined') {
+            this.updateStatus('RECORDER NOT SUPPORTED', true);
+            this.conn.send('error:recorder-not-supported');
+            return;
+        }
+
+        this.mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+        this.recordedChunks = [];
+
+        this.mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                this.recordedChunks.push(event.data);
+            }
+        };
+
+        this.mediaRecorder.onstop = () => {
+            this.updateStatus('SENDING VIDEO...');
+            const videoBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            
+            // Send the blob to the remote peer
+            if (this.conn && this.conn.open) {
+                this.conn.send(videoBlob);
+                this.updateStatus('VIDEO SENT');
+            } else {
+                this.updateStatus('CANNOT SEND: NO CONNECTION', true);
+            }
+            
+            // Reset for next recording
+            this.recordedChunks = [];
+            this.mediaRecorder = null;
+        };
+
+        this.mediaRecorder.start();
+
+        // Stop recording after 5 seconds
+        setTimeout(() => {
+            if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+            }
+        }, 5000);
+      }
+    };
+
+    // Initialize the remote control module when the page loads
+    window.addEventListener('DOMContentLoaded', () => {
+        RemoteControl.init();
+    });
+  </script>
+</body>
+</html>
