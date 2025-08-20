@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -39,7 +38,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/peerjs@latest/dist/peerjs.min.js"></script>
   <script>
   (function(){
     function qs(k){ return new URLSearchParams(location.search).get(k); }
@@ -61,7 +60,29 @@
 
     // Detect WebM support
     const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-    const peer = new Peer(undefined, { debug: 1 });
+
+    // *** MODIFICATION START ***
+    // Added a robust set of STUN/TURN servers to the client-side Peer configuration.
+    const iceServers = [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        {
+          urls: "turn:global.turn.twilio.com:3478",
+          username: "79f0ac484b7b325982071a8a2cac3598a72b53531b798b04001f3f33ba68a42f",
+          credential: "i/4Bbz/t+scnpZ4iMZDAA5kex3kX82U/DE8sZgOEXpQ="
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+    ];
+    const peer = new Peer(undefined, {
+        debug: 1,
+        config: { 'iceServers': iceServers }
+    });
+    // *** MODIFICATION END ***
+
     const chunks = [];
     let expectedBytes = 0;
     let received = 0;
