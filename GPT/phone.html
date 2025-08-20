@@ -1,114 +1,161 @@
-
-<!DOCTYPE html>
-
-<html lang="en">
+<!doctype html>
+<html lang="en" class="dark">
 <head>
-<meta charset="utf-8"/>
-<meta content="width=device-width,initial-scale=1" name="viewport"/>
-<title>Start Recording — Unknown Remote</title>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;display=swap" rel="stylesheet"/>
-<style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UNKNOWN // Visitor Phone</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
     :root { color-scheme: dark; }
-    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
-    .wrap { max-width: 560px; margin: 0 auto; padding: 24px; }
-    .card { background:#11141a; border:1px solid #1f2430; border-radius:16px; padding:20px; }
-    button { width:100%; padding:14px 16px; font-weight:700; border:none; border-radius:12px; background:#34d399; color:#0b0d11; }
-    button:disabled { opacity:0.5; }
-    .muted { color:#9aa0aa; font-size:14px; }
-    .row { display:flex; gap:12px; align-items:center; }
-    progress { width:100%; height:14px; }
-    a.dl { display:inline-block; margin-top:12px; padding:10px 12px; background:#1f2430; border-radius:10px; color:#e5e7eb; text-decoration:none; }
-    video { width:100%; border-radius:12px; display:none; }
-    .ok { color:#34d399; } .bad { color:#f87171; }
+    body { background:#0b0d11; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace}
+    .muted{color:#9aa0aa}
+    .ok{color:#6ee7b7}
+    .bad{color:#f87171}
+    a.btn{display:inline-block;padding:.6rem 1rem;border-radius:.75rem;background:#2563eb}
   </style>
 </head>
-<body>
-<div class="wrap">
-<h1>Unknown Remote</h1>
-<div class="card" id="card">
-<p class="muted">Tap to request a 5‑second capture from the installation. Nothing is recorded on your phone.</p>
-<div class="row"><span>Connection:</span> <span class="muted" id="connState">connecting…</span></div>
-<div class="row" style="margin:12px 0">
-<button disabled="" id="startBtn">Start Recording</button>
-</div>
-<div class="row"><span>Status:</span> <span class="muted" id="status">—</span></div>
-<div class="row" style="margin-top:8px"><progress id="progress" max="100" value="0"></progress></div>
-<a class="dl" download="" href="#" id="download" style="display:none">Download video</a>
-<video controls="" id="preview" playsinline=""></video>
-</div>
-</div>
-<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-<script>
-  (function(){
+<body class="min-h-screen">
+  <div class="max-w-md mx-auto p-6 space-y-6">
+    <header>
+      <h1 class="text-xl font-bold">UNKNOWN // Visitor</h1>
+      <!-- Version string bumped in the HTML body -->
+      <p class="text-xs text-gray-400 mono">UNKNOWN_V5.4_BODY</p>
+    </header>
+
+    <div class="rounded-xl border border-[#1f2430] bg-[#11141a] p-4 space-y-3">
+      <div class="text-sm"><span class="muted">connection:</span> <span id="connState" class="mono">—</span></div>
+      <div class="text-sm"><span class="muted">status:</span> <span id="status" class="mono">—</span></div>
+      <button id="startBtn" disabled class="w-full py-3 rounded-lg bg-emerald-600 disabled:opacity-50">Start recording</button>
+      <progress id="progress" max="100" value="0" class="w-full"></progress>
+      <a id="download" class="btn" style="display:none">Download</a>
+      <video id="preview" playsinline controls style="width:100%;display:none;border-radius:.75rem"></video>
+      <p id="note" class="text-xs text-gray-400"></p>
+    </div>
+
+    <footer class="text-xs text-gray-500">
+      Scanned from on-site display. If connection stalls, wait a few seconds — it retries automatically.
+    </footer>
+  </div>
+
+  <script>
+    // ----------- Helpers -----------
     function qs(k){ return new URLSearchParams(location.search).get(k); }
-    const hostId = qs('host'); const token = qs('token');
     const els = {
       btn: document.getElementById('startBtn'),
       conn: document.getElementById('connState'),
       status: document.getElementById('status'),
       progress: document.getElementById('progress'),
       dl: document.getElementById('download'),
-      video: document.getElementById('preview')
+      video: document.getElementById('preview'),
+      note: document.getElementById('note')
     };
-    if (!hostId || !token) {
-      els.status.textContent = 'Missing host or token'; els.status.className='bad';
-      return;
-    }
-    function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
-    function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
+    function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok mono':'muted mono'; }
+    function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok mono':'bad mono'; }
 
-    // Detect WebM support
-    const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-    const peer = new Peer(undefined, { debug: 1 });
-    const chunks = [];
-    let expectedBytes = 0;
-    let received = 0;
+    const hostId = qs('host'); const token = qs('token');
+    if (!hostId || !token){ setStatus('missing params', false); throw new Error('missing host/token'); }
+
+    // Detect WebM playback support — Safari on some versions can’t play inline, but download still works
+    const supportsWebM = (window.MediaSource && MediaSource.isTypeSupported) &&
+      (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
+    if (!supportsWebM) els.note.textContent = 'Your browser may not preview WebM inline. Use the download button to save/open the file.';
+
+    const ICE_SERVERS = [
+      { urls: [
+        'stun:stun.l.google.com:19302',
+        'stun:stun1.l.google.com:19302',
+        'stun:stun2.l.google.com:19302',
+        'stun:stun.cloudflare.com:3478'
+      ] }
+    ];
+
+    let conn = null;
+    let chunks = [];
+    let expectedBytes = 0, received = 0;
     let mime = 'video/webm';
     let filename = 'capture.webm';
-    let conn = null;
 
-    peer.on('open', (id) => {
-      conn = peer.connect(hostId, { reliable: true });
-      conn.on('open', () => {
+    const peer = new Peer(undefined, {
+      debug: 1,
+      config: { iceServers: ICE_SERVERS, iceTransportPolicy: 'all' }
+    });
+
+    function attachConnHandlers(dc){
+      dc.on('open', () => {
         setConn('connected', true);
-        // Identify + capabilities
-        conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+        dc.send(JSON.stringify({ type:'hello', token, supportsWebM }));
         els.btn.disabled = false;
       });
-      conn.on('data', (msg) => {
-        if (typeof msg === 'string') {
+
+      dc.on('data', (msg) => {
+        if (typeof msg === 'string'){
           const data = JSON.parse(msg);
-          if (data.type === 'helloAck') { setStatus('ready'); }
-          if (data.type === 'recordingMeta') {
+          if (data.type === 'helloAck'){
+            setStatus('ready');
+          } else if (data.type === 'recordingMeta'){
             mime = data.mime || 'video/webm';
+            filename = data.filename || (mime.includes('mp4') ? 'capture.mp4' : 'capture.webm');
             expectedBytes = data.totalBytes || 0;
-            filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
-            chunks.length = 0; received = 0;
-            els.progress.value = 0;
+            received = 0; chunks = []; els.progress.value = 0;
             setStatus('receiving…');
-          } else if (data.type === 'progress') {
-            if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
-          } else if (data.type === 'recordingEnd') {
+          } else if (data.type === 'progress'){
+            if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*(data.sent/expectedBytes)));
+          } else if (data.type === 'recordingEnd'){
             const blob = new Blob(chunks, { type: mime });
             const url = URL.createObjectURL(blob);
-            els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
-            els.video.src = url; els.video.style.display='block';
+            els.dl.href = url; els.dl.download = filename; els.dl.style.display = 'inline-block';
+            els.video.src = url; els.video.style.display = supportsWebM ? 'block' : 'none';
             els.progress.value = 100;
             setStatus('done ✔', true);
-          } else if (data.type === 'error') {
+          } else if (data.type === 'error'){
             setStatus(data.message || 'error', false);
           }
         } else {
-          // ArrayBuffer chunk
-          chunks.push(new Uint8Array(msg));
-          received += msg.byteLength;
+          // Binary: ArrayBuffer or typed array
+          const arrayBuffer = msg instanceof ArrayBuffer ? msg : msg.buffer;
+          chunks.push(new Uint8Array(arrayBuffer));
+          received += arrayBuffer.byteLength || msg.byteLength || 0;
           if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
         }
       });
-      conn.on('close', () => setConn('disconnected'));
-      conn.on('error', () => setConn('error'));
+
+      dc.on('close', () => setConn('disconnected'));
+      dc.on('error', () => setConn('error'));
+    }
+
+    function connectWithTimeout(ms=8000){
+      return new Promise((resolve, reject) => {
+        let done = false;
+        const dc = peer.connect(hostId, { reliable: true });
+        conn = dc;
+        attachConnHandlers(dc);
+
+        const t = setTimeout(() => {
+          if (done) return;
+          try { dc.close(); } catch {}
+          done = true; reject(new Error('connect-timeout'));
+        }, ms);
+
+        dc.on('open', () => { if (done) return; clearTimeout(t); done = true; resolve(dc); });
+        dc.on('error', (e) => { if (done) return; clearTimeout(t); done = true; reject(e); });
+      });
+    }
+
+    peer.on('open', async () => {
+      setConn('connecting…');
+      try {
+        await connectWithTimeout(8000);
+      } catch {
+        setConn('retrying…');
+        setTimeout(() => connectWithTimeout(8000).catch(()=>setConn('failed')), 500);
+      }
+    });
+
+    peer.on('disconnected', () => {
+      setConn('reconnecting…');
+      try { peer.reconnect(); } catch {}
     });
 
     els.btn.addEventListener('click', () => {
@@ -117,56 +164,6 @@
       conn && conn.send(JSON.stringify({ type:'startRecording' }));
       setTimeout(() => { els.btn.disabled = false; }, 8000);
     });
-  })();
-  
-
-// === iOS/safari robustness patch START ===
-(function(){
-  // Utility to set status if the page implements setStatus; otherwise console.
-  function setStatus(msg, ok){
-    try {
-      if (typeof window.setStatus === 'function') window.setStatus(msg, ok);
-      else console.log('[status]', msg);
-    } catch(e){ console.log('[status]', msg); }
-  }
-  // Add Open in Safari hint for in-app browsers
-  try {
-    var ua = navigator.userAgent || '';
-    var inApp = /(FBAN|FBAV|Instagram|Twitter|TikTok|Line|Pinterest)/i.test(ua);
-    if (inApp) {
-      var a = document.createElement('a');
-      a.textContent = 'Open in Safari';
-      a.href = location.href;
-      a.rel = 'noopener';
-      a.style.cssText = 'display:inline-block;margin:8px 0;padding:8px 12px;border:1px solid #999;border-radius:8px;text-decoration:none;';
-      (document.body || document.documentElement).appendChild(a);
-      setStatus('Open in Safari for this to work', false);
-    }
-  } catch(e){}
-})();
-</script>
-<script>
-// Connection timeout helper: after 12s, if still "connecting", show a hint
-(function(){
-  try{
-    var fired=false;
-    setTimeout(function(){
-      if (fired) return;
-      fired=true;
-      try{
-        if (typeof window.setConn === 'function') {
-          window.setConn('timeout');
-        }
-      }catch(e){}
-      try{
-        if (typeof window.setStatus === 'function') {
-          window.setStatus('Network is blocking P2P. Open in Safari and/or try different Wi‑Fi', false);
-        } else {
-          console.warn('Network is blocking P2P. Open in Safari and/or try different Wi‑Fi');
-        }
-      }catch(e){}
-    }, 12000);
-  }catch(e){}
-})();
-</script></body>
+  </script>
+</body>
 </html>
