@@ -78,12 +78,23 @@
     let mime = 'video/webm';
     let filename = 'capture.webm';
     let conn = null;
+    let peerInitTimeout = null;
+
+    // Add a timeout for peer initialization to prevent getting stuck
+    peerInitTimeout = setTimeout(() => {
+        if (!peer.open) {
+            setConn('connection timed out', false);
+            setStatus('Could not connect to the network. Please check your connection and try again.', false);
+            if (peer && !peer.destroyed) peer.destroy();
+        }
+    }, 15000); // 15 seconds timeout
 
     // Wait for the peer to be ready before attempting to connect.
-    // This is the key fix for the "stuck on connecting" issue.
     peer.on('open', (id) => {
+      clearTimeout(peerInitTimeout); // Success, clear the timeout
       setConn('connecting to host…');
-      conn = peer.connect(hostId, { reliable: true, serialization: 'json' });
+      // Use default 'binary' serialization for better compatibility
+      conn = peer.connect(hostId, { reliable: true });
       
       conn.on('open', () => {
         setConn('connected', true);
@@ -131,8 +142,15 @@
     });
 
     peer.on('error', (err) => {
+        clearTimeout(peerInitTimeout); // An error occurred, clear timeout
         console.error('PeerJS error:', err);
         setConn(`error: ${err.type}`, false);
+        els.btn.disabled = true;
+    });
+
+    peer.on('disconnected', () => {
+        clearTimeout(peerInitTimeout);
+        setConn('network disconnected', false);
         els.btn.disabled = true;
     });
 
