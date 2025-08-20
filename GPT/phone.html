@@ -79,7 +79,6 @@
         function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
         function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
 
-        // FIXED: Safely check for MediaSource API, which doesn't exist on iOS.
         const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
         
         const chunks = [];
@@ -89,7 +88,7 @@
         let filename = 'capture.webm';
         let conn = null;
 
-        logMsg('Initializing PeerJS with STUN servers...');
+        logMsg('Initializing PeerJS with STUN/TURN servers...');
         
         const peer = new Peer(undefined, {
           debug: 2,
@@ -97,6 +96,11 @@
             'iceServers': [
               { urls: 'stun:stun.l.google.com:19302' },
               { urls: 'stun:stun1.l.google.com:19302' },
+              {
+                urls: 'turn:openrelay.metered.ca:80',
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+              }
             ]
           }
         });
@@ -184,7 +188,6 @@
 
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
-        // Improved error message
         if (e instanceof ReferenceError) {
             logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
         }
