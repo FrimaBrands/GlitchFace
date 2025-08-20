@@ -1,0 +1,49 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Scan to Start — Unknown Remote</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    html,body { height:100%; }
+    body { margin:0; display:grid; place-items:center; background:#0b0d11; color:#e5e7eb; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { text-align:center; }
+    #q { background:#fff; padding:10px; border-radius:12px; }
+    .muted { color:#9aa0aa; margin-top:10px; }
+    .link { font-size:12px; word-break: break-all; max-width: 80vw; margin:12px auto 0; color:#9aa0aa; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="q"></div>
+    <div class="muted">Scan to open the remote</div>
+    <div id="small" class="link"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    let target = new URLSearchParams(location.search).get('target');
+    const qDiv = document.getElementById('q');
+    function setQR(url) {
+      qDiv.innerHTML='';
+      new QRCode(qDiv, { text: url, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M });
+      document.getElementById('small').textContent = url;
+    }
+    if (!target) {
+      document.getElementById('small').textContent = 'Waiting for host…';
+    } else {
+      setQR(target);
+    }
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'setTarget' && e.data.url) {
+        target = e.data.url;
+        setQR(target);
+      }
+    });
+  </script>
+</body>
+</html>
