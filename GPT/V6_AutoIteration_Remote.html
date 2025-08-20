@@ -52,7 +52,7 @@
     <div class="controls-panel w-[420px] flex-shrink-0 bg-gray-950/50 border-l border-gray-800 flex flex-col">
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h1 class="text-xl font-bold text-white">SIGNAL PROCESSOR</h1>
-        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.4_BODY</p>
+        <p class="text-sm text-gray-400 font-mono">UNKNOWN_V5.2_BODY</p>
         <div class="flex space-x-2 mt-4">
           <button id="startBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded transition-all duration-200">Initialize</button>
           <button id="stopBtn" class="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition-all duration-200" disabled>Terminate</button>
@@ -1097,13 +1097,17 @@
     await lazyLoadPeerJS();
     sessionToken = randomToken(16);
     
-    // MODIFIED: Added iceServers config for better reliability
     peer = new window.Peer(undefined, {
       debug: 1,
       config: {
         'iceServers': [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
@@ -1166,16 +1170,12 @@
     if (!canvas || !canvas.captureStream) throw new Error('Canvas captureStream not supported');
     const stream = canvas.captureStream(30);
     const chunks = [];
-    
-    // MODIFICATION START: Add a more generic 'video/mp4' check to improve compatibility.
     const optionsList = [
-      { mimeType: 'video/mp4', videoBitsPerSecond: 2_000_000 },
-      { mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2_000_000 },
       { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
       { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
       { mimeType: 'video/webm', videoBitsPerSecond: 2_000_000 },
     ];
-    // MODIFICATION END
+    if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2_000_000 });
 
     let rec = null;
     var mime = '';
