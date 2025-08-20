@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Unknown Remote — Visitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 24px; }
+    .card { background:#11141a; border:1px solid #1f2430; border-radius:16px; padding:20px; }
+    button { width:100%; padding:14px 16px; font-weight:700; border:none; border-radius:12px; background:#34d399; color:#0b0d11; }
+    button:disabled { opacity:0.5; }
+    .muted { color:#9aa0aa; font-size:14px; }
+    .row { display:flex; gap:12px; align-items:center; }
+    progress { width:100%; height:14px; }
+    a.dl { display:inline-block; margin-top:12px; padding:10px 12px; background:#1f2430; border-radius:10px; color:#e5e7eb; text-decoration:none; }
+    video { width:100%; border-radius:12px; display:none; }
+    .ok { color:#34d399; } .bad { color:#f87171; } .warn{color:#fbbf24;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Unknown Remote</h1>
+    <div class="card" id="card">
+      <p class="muted">Tap to request a 5-second capture from the installation. Your phone only receives the video.</p>
+      <div class="row"><span>Connection:</span> <span id="connState" class="muted">connecting…</span></div>
+      <div class="row" style="margin:12px 0">
+        <button id="startBtn" disabled>Start Recording</button>
+      </div>
+      <div class="row"><span>Status:</span> <span id="status" class="muted">—</span></div>
+      <div class="row" style="margin-top:8px"><progress id="progress" value="0" max="100"></progress></div>
+      <a id="download" class="dl" href="#" download style="display:none">Download video</a>
+      <video id="preview" controls playsinline></video>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+  (function(){
+    function qs(k){ return new URLSearchParams(location.search).get(k); }
+    const hostId = qs('host');
+    const els = {
+      btn: document.getElementById('startBtn'),
+      conn: document.getElementById('connState'),
+      status: document.getElementById('status'),
+      progress: document.getElementById('progress'),
+      dl: document.getElementById('download'),
+      video: document.getElementById('preview')
+    };
+    if (!hostId) {
+      els.status.textContent = 'Missing host ID'; els.status.className='bad';
+      return;
+    }
+    function setConn(txt, cls='muted'){ els.conn.textContent = txt; els.conn.className = cls; }
+    function setStatus(txt, cls='ok'){ els.status.textContent = txt; els.status.className = cls; }
+
+    const supportsWebM = !!(window.MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') ));
+    const peer = new Peer(undefined, { debug: 1 });
+    const chunks = [];
+    let expectedBytes = 0;
+    let received = 0;
+    let mime = 'video/webm';
+    let filename = 'capture.webm';
+    let conn = null;
+
+    peer.on('open', () => {
+      conn = peer.connect(hostId, { reliable: true });
+      conn.on('open', () => {
+        setConn('connected', 'ok');
+        conn.send(JSON.stringify({ type:'hello' }));
+        els.btn.disabled = false;
+        setStatus('ready', 'ok');
+      });
+      conn.on('data', (msg) => {
+        if (typeof msg === 'string') {
+          const data = JSON.parse(msg);
+          if (data.type === 'queued') {
+            setStatus(`In queue… position ${data.position}`, 'warn');
+          } else if (data.type === 'recordingMeta') {
+            mime = data.mime || 'video/webm';
+            expectedBytes = data.totalBytes || 0;
+            filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
+            chunks.length = 0; received = 0;
+            els.progress.value = 0;
+            setStatus('receiving…','ok');
+          } else if (data.type === 'progress') {
+            if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
+          } else if (data.type === 'recordingEnd') {
+            const blob = new Blob(chunks, { type: mime });
+            const url = URL.createObjectURL(blob);
+            els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
+            els.video.src = url; els.video.style.display='block';
+            els.progress.value = 100;
+            setStatus('done ✔', 'ok');
+          } else if (data.type === 'error') {
+            setStatus(data.message || 'error', 'bad');
+          }
+        } else {
+          chunks.push(new Uint8Array(msg));
+          received += msg.byteLength;
+          if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
+        }
+      });
+      conn.on('close', () => setConn('disconnected'));
+      conn.on('error', () => setConn('error', 'bad'));
+    });
+
+    els.btn.addEventListener('click', () => {
+      els.btn.disabled = true;
+      setStatus('asking host…','muted');
+      conn && conn.send(JSON.stringify({ type:'startRecording', supportsWebM }));
+      setTimeout(() => { els.btn.disabled = false; }, 9000);
+    });
+  })();
+  </script>
+</body>
+</html>
