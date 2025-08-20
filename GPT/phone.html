@@ -6,7 +6,7 @@
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
     body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
@@ -20,6 +20,20 @@
     a.dl { display:inline-block; margin-top:12px; padding:10px 12px; background:#1f2430; border-radius:10px; color:#e5e7eb; text-decoration:none; }
     video { width:100%; border-radius:12px; display:none; }
     .ok { color:#34d399; } .bad { color:#f87171; }
+    #log-container {
+        background: #000;
+        border: 1px solid #1f2430;
+        border-radius: 8px;
+        margin-top: 20px;
+        padding: 12px;
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #9aa0aa;
+    }
+    #log-container p { margin: 0; padding: 0; }
   </style>
 </head>
 <body>
@@ -36,6 +50,7 @@
       <a id="download" class="dl" href="#" download style="display:none">Download video</a>
       <video id="preview" controls playsinline></video>
     </div>
+    <div id="log-container"></div>
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -49,18 +64,34 @@
       status: document.getElementById('status'),
       progress: document.getElementById('progress'),
       dl: document.getElementById('download'),
-      video: document.getElementById('preview')
+      video: document.getElementById('preview'),
+      log: document.getElementById('log-container')
     };
+
+    function log(message) {
+        console.log(message);
+        const p = document.createElement('p');
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        p.textContent = `[${time}] ${message}`;
+        els.log.appendChild(p);
+        els.log.scrollTop = els.log.scrollHeight;
+    }
+
+    log('Script started.');
+
     if (!hostId || !token) {
       els.status.textContent = 'Missing host or token'; els.status.className='bad';
+      log('Error: Missing host ID or token in URL.');
       return;
     }
+    log(`Host ID: ${hostId.substring(0,10)}... Token: ${token.substring(0,10)}...`);
+
     function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
     function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
 
     // Stun servers for better NAT traversal, crucial for iOS reliability
     const PEERJS_CONFIG = {
-      debug: 1,
+      debug: 2, // Increased debug level for more verbose console logs
       config: {
         'iceServers': [
           { urls: 'stun:stun.l.google.com:19302' },
@@ -71,7 +102,19 @@
 
     // Detect WebM support
     const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-    const peer = new Peer(undefined, PEERJS_CONFIG);
+    log(`WebM support: ${supportsWebM}`);
+    
+    let peer = null;
+    try {
+        peer = new Peer(undefined, PEERJS_CONFIG);
+        log('Peer object created.');
+    } catch (e) {
+        log(`Error creating Peer object: ${e.message}`);
+        setConn('Initialization failed', false);
+        setStatus('Could not create Peer connection.', false);
+        return;
+    }
+    
     const chunks = [];
     let expectedBytes = 0;
     let received = 0;
@@ -83,6 +126,7 @@
     // Add a timeout for peer initialization to prevent getting stuck
     peerInitTimeout = setTimeout(() => {
         if (!peer.open) {
+            log('Peer connection timed out after 15s.');
             setConn('connection timed out', false);
             setStatus('Could not connect to the network. Please check your connection and try again.', false);
             if (peer && !peer.destroyed) peer.destroy();
@@ -92,14 +136,19 @@
     // Wait for the peer to be ready before attempting to connect.
     peer.on('open', (id) => {
       clearTimeout(peerInitTimeout); // Success, clear the timeout
+      log(`Peer connection open. Client ID: ${id.substring(0,10)}...`);
       setConn('connecting to host…');
       // Use default 'binary' serialization for better compatibility
       conn = peer.connect(hostId, { reliable: true });
+      log(`Attempting to connect to host: ${hostId.substring(0,10)}...`);
       
       conn.on('open', () => {
+        log('DataConnection to host is open.');
         setConn('connected', true);
         // Identify + capabilities
-        conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+        const helloMsg = JSON.stringify({ type:'hello', token, supportsWebM });
+        conn.send(helloMsg);
+        log('Sent "hello" message to host.');
         els.btn.disabled = false;
       });
 
@@ -107,6 +156,7 @@
         if (typeof msg === 'string') {
           try {
             const data = JSON.parse(msg);
+            log(`Received message: ${data.type}`);
             if (data.type === 'helloAck') { setStatus('ready'); }
             if (data.type === 'recordingMeta') {
               mime = data.mime || 'video/webm';
@@ -115,6 +165,7 @@
               chunks.length = 0; received = 0;
               els.progress.value = 0;
               setStatus('receiving…');
+              log(`Receiving file: ${filename} (${(expectedBytes/1024/1024).toFixed(2)} MB)`);
             } else if (data.type === 'progress') {
               if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
             } else if (data.type === 'recordingEnd') {
@@ -124,11 +175,13 @@
               els.video.src = url; els.video.style.display='block';
               els.progress.value = 100;
               setStatus('done ✔', true);
+              log('File transfer complete.');
             } else if (data.type === 'error') {
               setStatus(data.message || 'error', false);
+              log(`Host reported error: ${data.message}`);
             }
           } catch(e) {
-            console.error("Failed to parse message", e);
+            log(`Error parsing message: ${e.message}`);
           }
         } else {
           // ArrayBuffer chunk
@@ -137,19 +190,26 @@
           if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
         }
       });
-      conn.on('close', () => { setConn('disconnected'); els.btn.disabled = true; });
-      conn.on('error', (err) => { setConn('error'); console.error('Connection error:', err); els.btn.disabled = true; });
+      conn.on('close', () => { 
+        log('Connection to host closed.');
+        setConn('disconnected'); els.btn.disabled = true; 
+      });
+      conn.on('error', (err) => { 
+        log(`Connection error: ${err}`);
+        setConn('error'); console.error('Connection error:', err); els.btn.disabled = true; 
+      });
     });
 
     peer.on('error', (err) => {
         clearTimeout(peerInitTimeout); // An error occurred, clear timeout
-        console.error('PeerJS error:', err);
+        log(`PeerJS error: ${err.type} - ${err.message || err}`);
         setConn(`error: ${err.type}`, false);
         els.btn.disabled = true;
     });
 
     peer.on('disconnected', () => {
         clearTimeout(peerInitTimeout);
+        log('Peer disconnected from signaling server.');
         setConn('network disconnected', false);
         els.btn.disabled = true;
     });
@@ -157,6 +217,7 @@
     els.btn.addEventListener('click', () => {
       els.btn.disabled = true;
       setStatus('asking host…');
+      log('Sent "startRecording" request.');
       conn && conn.send(JSON.stringify({ type:'startRecording' }));
       setTimeout(() => { els.btn.disabled = false; }, 8000);
     });
