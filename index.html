@@ -11,13 +11,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Main app dependency -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   
-  <!-- New dependencies for remote recording -->
+  <!-- Added for remote control functionality -->
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peer.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; }
@@ -40,16 +38,16 @@
         color: #e5e7eb;
         background-color: rgba(255, 255, 255, 0.05);
     }
-    /* Styles for the new pages */
-    #qrCodePage, #controllerPage { display: none; }
+    #qr-canvas {
+        background-color: white;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
   </style>
 </head>
 <body class="bg-black text-gray-200 flex items-center justify-center min-h-screen p-4">
 
-  <!-- ======================================================================= -->
-  <!-- MAIN INSTALLATION UI (Visible by default)                             -->
-  <!-- ======================================================================= -->
-  <div id="mainApp" class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
+  <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 rounded-lg shadow-2xl shadow-green-500/10 flex overflow-hidden">
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center">
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
@@ -71,6 +69,17 @@
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h2 class="font-bold text-gray-300 mb-2">PRESET MANAGER</h2>
+        <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="text" id="presetName" placeholder="Preset Name..." class="col-span-3 bg-gray-900 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
+          <button id="savePresetBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 rounded text-sm transition-colors">Save</button>
+          <button id="deletePresetBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 rounded text-sm transition-colors">Delete</button>
+          <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
+        </div>
+      </div>
+      
       <!-- TABS -->
       <div class="flex border-b border-gray-800 flex-shrink-0">
         <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-500 hover:text-gray-200 transition-colors duration-200">Effects</button>
@@ -85,16 +94,6 @@
         </div>
         <div id="globals-tab-content" class="p-4 space-y-4">
           <!-- Global controls will be generated and moved here -->
-           <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
-            <h3 class="font-semibold text-gray-200 mb-3">PRESET MANAGER</h2>
-            <select id="presetList" class="w-full bg-gray-900 border border-gray-600 rounded p-2 mb-2 text-sm focus:outline-none focus:border-green-500"></select>
-            <div class="grid grid-cols-3 gap-2">
-              <input type="text" id="presetName" placeholder="Preset Name..." class="col-span-3 bg-gray-900 border border-gray-600 rounded p-2 text-sm focus:outline-none focus:border-green-500">
-              <button id="savePresetBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1 rounded text-sm transition-colors">Save</button>
-              <button id="deletePresetBtn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 rounded text-sm transition-colors">Delete</button>
-              <button id="randomBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-1 rounded text-sm transition-colors">Randomize</button>
-            </div>
-          </div>
           <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
             <h3 class="font-semibold text-gray-200 mb-3">BACKGROUND</h3>
             <div class="space-y-3">
@@ -147,17 +146,19 @@
         <div id="remote-tab-content" class="hidden p-4 space-y-4">
             <div class="control-group bg-black/50 border border-gray-800 rounded-lg p-3">
                 <h3 class="font-semibold text-gray-200 mb-3">REMOTE CONTROL</h3>
-                <p class="text-sm text-gray-400 mb-2">Use this to allow visitors to record clips.</p>
-                <a href="#qrcode" target="_blank" class="block w-full text-center bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 rounded text-sm transition-colors">
-                    Open QR Code Display
-                </a>
-                <div class="mt-4">
-                    <h4 class="font-mono text-sm text-gray-300">CONNECTION STATUS</h4>
-                    <p id="remoteStatus" class="font-mono text-sm text-yellow-400 mt-1">Initializing...</p>
-                </div>
-                 <div class="mt-4">
-                    <h4 class="font-mono text-sm text-gray-300">YOUR ID</h4>
-                    <p id="peerIdDisplay" class="font-mono text-xs text-green-400 mt-1 break-all">Waiting for PeerJS network...</p>
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-400">Scan the QR code with a phone to open the remote control page.</p>
+                    <div>
+                        <label class="text-xs font-mono text-gray-500">STATUS</label>
+                        <p id="remoteStatus" class="text-sm font-mono text-green-400">Initializing...</p>
+                    </div>
+                    <div>
+                        <label class="text-xs font-mono text-gray-500">HOST ID</label>
+                        <p id="hostId" class="text-sm font-mono text-gray-300 break-all">Waiting for ID...</p>
+                    </div>
+                    <div class="flex justify-center items-center pt-2">
+                        <canvas id="qr-canvas"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -165,45 +166,16 @@
     </div>
   </div>
 
-  <!-- ======================================================================= -->
-  <!-- QR CODE PAGE (hidden by default)                                        -->
-  <!-- ======================================================================= -->
-  <div id="qrCodePage" class="w-full max-w-md text-center">
-    <h1 class="text-3xl font-bold text-white mb-4">Scan to Record</h1>
-    <p class="text-gray-400 mb-8">Scan this code with your phone to open the recording controller.</p>
-    <div id="qrcode-container" class="p-4 bg-white rounded-lg inline-block">
-        <div id="qrcode"></div>
-    </div>
-    <p id="qrStatus" class="text-yellow-400 font-mono mt-4">Waiting for connection ID from main application...</p>
-  </div>
-
-  <!-- ======================================================================= -->
-  <!-- CONTROLLER PAGE (hidden by default)                                     -->
-  <!-- ======================================================================= -->
-  <div id="controllerPage" class="w-full max-w-sm text-center">
-      <div id="controller-ui">
-        <h1 class="text-3xl font-bold text-white mb-4">Signal Recorder</h1>
-        <p id="controllerStatus" class="text-yellow-400 font-mono mb-6">Connecting to installation...</p>
-        <button id="startRecordingBtn" class="bg-green-500 hover:bg-green-600 text-black font-bold py-4 px-8 rounded-lg text-xl transition-all duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>
-            Start 5s Recording
-        </button>
-      </div>
-      <div id="video-container" class="hidden mt-6">
-        <h2 class="text-2xl font-bold text-white mb-4">Your Recording</h2>
-        <video id="receivedVideo" controls class="w-full rounded-lg border-2 border-gray-700"></video>
-        <a id="downloadLink" class="mt-4 inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Download Video</a>
-        <button id="recordAgainBtn" class="mt-4 ml-2 inline-block bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">Record Another</button>
-      </div>
-  </div>
-
-
   <script>
   (() => {
     // --- APP ARCHITECTURE ---
-    // This script now contains logic for three "pages" controlled by the URL hash.
-    // 1. Main App (no hash): The original signal processor application. It acts as the WebRTC "receiver".
-    // 2. QR Code Page (#qrcode): Displays a QR code for phones to scan.
-    // 3. Controller Page (#controller): The UI for the visitor's phone. It acts as the WebRTC "sender".
+    // This script is organized into several modules, each handling a specific concern.
+    // 1. UI: Manages all DOM elements, control creation, and user feedback.
+    // 2. Renderer: Encapsulates all WebGL logic, including setup, shaders, and the render pipeline.
+    // 3. BodySegmenter: Handles the MediaPipe Selfie Segmentation setup and result processing.
+    // 4. PresetManager: Manages saving, loading, and randomizing effect presets.
+    // 5. RemoteControl: Manages PeerJS connection for remote recording.
+    // 6. App: The main controller that initializes all modules and runs the main loop.
     
     const vertSrc = `
       attribute vec2 a_pos;
@@ -379,7 +351,7 @@
       init(definitions, globalDefinitions) {
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
-        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'remoteTabBtn', 'effects-tab-content', 'globals-tab-content', 'remote-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'remoteStatus', 'peerIdDisplay'];
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'remoteTabBtn', 'effects-tab-content', 'globals-tab-content', 'remote-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'remoteStatus', 'hostId', 'qr-canvas'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
         // Create randomized controls in the 'Effects' tab
@@ -441,8 +413,7 @@
       },
 
       switchTab(tabName) {
-        const tabs = ['effects', 'globals', 'remote'];
-        tabs.forEach(tab => {
+        ['effects', 'globals', 'remote'].forEach(tab => {
             const btn = this.elements[`${tab}TabBtn`];
             const content = this.elements[`${tab}-tab-content`];
             if (tab === tabName) {
@@ -568,7 +539,7 @@
       maskCanvas: document.createElement('canvas'),
 
       init(canvas, vsSrc, fsSrc, uniformKeys) {
-        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true, preserveDrawingBuffer: true });
         if (!this.gl) throw new Error('WebGL not available');
 
         const compile = (type, src) => {
@@ -902,6 +873,106 @@
       }
     };
 
+    const RemoteControl = {
+        peer: null,
+        conn: null,
+        isRecording: false,
+
+        init() {
+            try {
+                this.peer = new Peer();
+            } catch(err) {
+                console.error("PeerJS init failed:", err);
+                UI.elements.remoteStatus.textContent = "Error: PeerJS failed";
+                UI.elements.remoteStatus.classList.add('text-red-400');
+                return;
+            }
+
+            this.peer.on('open', (id) => {
+                UI.elements.hostId.textContent = id;
+                UI.elements.remoteStatus.textContent = 'Awaiting connection...';
+                
+                // Assumes client.html is in the same directory
+                const clientUrl = `${window.location.href.substring(0, window.location.href.lastIndexOf('/'))}/client.html?host=${id}`;
+                
+                QRCode.toCanvas(UI.elements['qr-canvas'], clientUrl, { width: 220 }, (error) => {
+                    if (error) console.error(error);
+                });
+            });
+
+            this.peer.on('connection', (connection) => {
+                this.conn = connection;
+                UI.elements.remoteStatus.textContent = 'Client connected!';
+                UI.setMsg(`Remote client connected: ${this.conn.peer}`);
+
+                this.conn.on('data', (data) => {
+                    if (data.type === 'start-recording' && !this.isRecording) {
+                        this.startRecording();
+                    }
+                });
+                
+                this.conn.on('close', () => {
+                    UI.elements.remoteStatus.textContent = 'Client disconnected. Awaiting connection...';
+                    UI.setMsg('Remote client disconnected.');
+                    this.conn = null;
+                });
+            });
+
+            this.peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                UI.elements.remoteStatus.textContent = `Error: ${err.type}`;
+                UI.elements.remoteStatus.classList.add('text-red-400');
+            });
+        },
+
+        startRecording() {
+            this.isRecording = true;
+            UI.setMsg('Starting 5s recording for remote client...');
+            UI.elements.remoteStatus.textContent = 'Recording...';
+            this.conn.send({ type: 'status', message: 'Recording started...' });
+
+            const stream = UI.elements.glcanvas.captureStream(30);
+            const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+            const chunks = [];
+
+            recorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    chunks.push(event.data);
+                }
+            };
+
+            recorder.onstop = () => {
+                UI.setMsg('Recording finished. Sending file...');
+                UI.elements.remoteStatus.textContent = 'Sending file...';
+                this.conn.send({ type: 'status', message: 'Sending file...' });
+
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                
+                // PeerJS can send Blobs directly
+                this.conn.send({ type: 'video-blob', blob: blob });
+                
+                this.isRecording = false;
+                UI.setMsg('File sent to remote client.');
+                UI.elements.remoteStatus.textContent = 'Client connected!';
+            };
+            
+            recorder.onerror = (err) => {
+                console.error("MediaRecorder error:", err);
+                UI.setMsg("Error during recording.");
+                UI.elements.remoteStatus.textContent = 'Recording Error!';
+                this.conn.send({ type: 'status', message: 'Error during recording.' });
+                this.isRecording = false;
+            };
+
+            recorder.start();
+            setTimeout(() => {
+                if (recorder.state === 'recording') {
+                    recorder.stop();
+                }
+            }, 5000);
+        }
+    };
+
     const App = {
       stream: null,
       rafId: null,
@@ -911,10 +982,6 @@
       lastRandomizeTime: 0,
       lastPresetIterateTime: 0,
       currentPresetIndex: 0,
-      peer: null,
-      remoteConnection: null,
-      mediaRecorder: null,
-      recordedChunks: [],
 
       async start() {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -937,8 +1004,6 @@
           UI.setStatus('Initializing Body Segmentation...');
           if (!(await BodySegmenter.init())) return UI.setStatus('Segmentation Failed', true);
 
-          this.initRemoteControl(); // Initialize PeerJS
-
           UI.elements.startBtn.disabled = true;
           UI.elements.stopBtn.disabled = false;
           UI.setMsg('');
@@ -956,111 +1021,9 @@
         this.rafId = null;
         if (this.stream) this.stream.getTracks().forEach(t => t.stop());
         this.stream = null;
-        if (this.peer) this.peer.destroy();
         UI.elements.startBtn.disabled = false;
         UI.elements.stopBtn.disabled = true;
         UI.setStatus('Terminated');
-      },
-      
-      initRemoteControl() {
-        const remoteStatusEl = document.getElementById('remoteStatus');
-        const peerIdDisplayEl = document.getElementById('peerIdDisplay');
-        
-        this.peer = new Peer();
-        
-        this.peer.on('open', id => {
-            remoteStatusEl.textContent = 'Awaiting connection...';
-            remoteStatusEl.className = 'font-mono text-sm text-green-400 mt-1';
-            peerIdDisplayEl.textContent = id;
-            // Store the ID for the QR code page to pick up
-            localStorage.setItem('peerIdForQrCode', id);
-        });
-
-        this.peer.on('connection', conn => {
-            this.remoteConnection = conn;
-            remoteStatusEl.textContent = `Connected to: ${conn.peer}`;
-            
-            conn.on('data', data => {
-                if (data === 'start-recording') {
-                    this.startRecording();
-                }
-            });
-
-            conn.on('close', () => {
-                remoteStatusEl.textContent = 'Awaiting connection...';
-                this.remoteConnection = null;
-            });
-        });
-
-        this.peer.on('error', err => {
-            console.error('PeerJS error:', err);
-            remoteStatusEl.textContent = `Error: ${err.type}`;
-            remoteStatusEl.className = 'font-mono text-sm text-red-400 mt-1';
-        });
-      },
-
-      async startRecording() {
-        if (!this.remoteConnection) {
-            UI.setMsg('No remote client connected.');
-            return;
-        }
-        
-        UI.setMsg('Starting recording...');
-        this.remoteConnection.send('recording-starting');
-
-        try {
-            // IMPORTANT: This requires user interaction to select the screen/tab to record.
-            // The operator must be present to do this.
-            const displayStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { mediaSource: "screen" }
-            });
-
-            this.recordedChunks = [];
-            this.mediaRecorder = new MediaRecorder(displayStream, { mimeType: 'video/webm' });
-
-            this.mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    this.recordedChunks.push(event.data);
-                }
-            };
-
-            this.mediaRecorder.onstop = () => {
-                const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
-                this.sendVideoToRemote(blob);
-                // Stop the screen sharing track
-                displayStream.getTracks().forEach(track => track.stop());
-            };
-
-            this.mediaRecorder.start();
-            UI.setMsg('Recording for 5 seconds...');
-
-            setTimeout(() => {
-                if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                    this.mediaRecorder.stop();
-                    UI.setMsg('Recording finished. Sending...');
-                }
-            }, 5000);
-
-        } catch (err) {
-            console.error("Error starting recording:", err);
-            UI.setMsg('Could not start recording.');
-            this.remoteConnection.send({ type: 'error', message: 'Recording failed to start.' });
-        }
-      },
-
-      async sendVideoToRemote(blob) {
-        if (!this.remoteConnection) return;
-        
-        try {
-            const arrayBuffer = await blob.arrayBuffer();
-            // For simplicity, sending the whole buffer. For very large files, chunking is needed.
-            // PeerJS handles chunking for ArrayBuffers automatically!
-            this.remoteConnection.send(arrayBuffer);
-            UI.setMsg('Video sent to remote user.');
-        } catch (err) {
-            console.error("Error sending video:", err);
-            UI.setMsg('Failed to send video.');
-        }
       },
 
       loop(time) {
@@ -1131,165 +1094,57 @@
         this.globalDefinitions = globalDefinitions;
         UI.init(definitions, globalDefinitions);
         PresetManager.init();
+        RemoteControl.init(); // Initialize the new module
         UI.elements.startBtn.addEventListener('click', () => this.start());
         UI.elements.stopBtn.addEventListener('click', () => this.stop());
       }
     };
     
-    // --- Definitions ---
+    // --- Entry Point ---
+    // Definitions for effects that can be randomized
     const definitions = {
       Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
-      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
+      Smear: { 
+        title: 'Smearing', 
+        active: true, 
+        controls: { 
+          globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, 
+          globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, 
+          spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, 
+          spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, 
+          spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } 
+        } 
+      },
       Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
       Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
       Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
       Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
     };
+
+    // Definitions for global controls that are NOT randomized
     const globalDefinitions = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 } } },
-        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0, neutral: 0.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20, neutral: 0.0 } } }
+        Opacity: {
+            title: 'Global Opacity',
+            active: true,
+            controls: {
+                overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 },
+                flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 },
+                flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 },
+                flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 },
+                flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }
+            }
+        },
+        Seep: {
+            title: 'Effect Seep',
+            active: true,
+            controls: {
+              seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0, neutral: 0.0 },
+              seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20, neutral: 0.0 }
+            }
+        }
     };
 
-
-    // --- PAGE ROUTER ---
-    // This part decides which "page" to show based on the URL hash.
-    
-    function initMainApp() {
-        document.getElementById('mainApp').style.display = 'flex';
-        App.init(definitions, globalDefinitions, { vert: vertSrc, frag: fragSrc });
-    }
-
-    function initQrCodePage() {
-        document.getElementById('mainApp').style.display = 'none';
-        document.getElementById('qrCodePage').style.display = 'block';
-        
-        const qrStatus = document.getElementById('qrStatus');
-        const qrcodeContainer = document.getElementById('qrcode');
-
-        const generateQrCode = (id) => {
-            qrcodeContainer.innerHTML = ''; // Clear previous QR code
-            const url = new URL(window.location.href);
-            url.hash = 'controller';
-            url.search = `?id=${id}`;
-            new QRCode(qrcodeContainer, {
-                text: url.href,
-                width: 256,
-                height: 256,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-            qrStatus.textContent = 'QR Code generated. Ready to scan.';
-            qrStatus.className = 'text-green-400 font-mono mt-4';
-        };
-
-        // Check localStorage immediately and then set up a listener for changes.
-        const checkPeerId = () => {
-            const peerId = localStorage.getItem('peerIdForQrCode');
-            if (peerId) {
-                generateQrCode(peerId);
-            }
-        };
-        
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'peerIdForQrCode') {
-                checkPeerId();
-            }
-        });
-
-        checkPeerId(); // Initial check
-    }
-
-    function initControllerPage() {
-        document.getElementById('mainApp').style.display = 'none';
-        document.getElementById('controllerPage').style.display = 'block';
-
-        const statusEl = document.getElementById('controllerStatus');
-        const startBtn = document.getElementById('startRecordingBtn');
-        const videoContainer = document.getElementById('video-container');
-        const receivedVideo = document.getElementById('receivedVideo');
-        const downloadLink = document.getElementById('downloadLink');
-        const recordAgainBtn = document.getElementById('recordAgainBtn');
-        const controllerUi = document.getElementById('controller-ui');
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const receiverId = urlParams.get('id');
-
-        if (!receiverId) {
-            statusEl.textContent = 'Error: No installation ID found in URL.';
-            statusEl.className = 'text-red-400 font-mono mb-6';
-            return;
-        }
-
-        const peer = new Peer();
-        let conn;
-
-        peer.on('open', id => {
-            statusEl.textContent = 'Connecting to installation...';
-            conn = peer.connect(receiverId);
-
-            conn.on('open', () => {
-                statusEl.textContent = 'Connected! Ready to record.';
-                statusEl.className = 'text-green-400 font-mono mb-6';
-                startBtn.disabled = false;
-            });
-
-            conn.on('data', data => {
-                if (typeof data === 'string' && data === 'recording-starting') {
-                    statusEl.textContent = 'Recording has started on the main screen...';
-                    startBtn.disabled = true;
-                } else if (data instanceof ArrayBuffer) {
-                    statusEl.textContent = 'Video received!';
-                    const blob = new Blob([data], { type: 'video/webm' });
-                    const videoUrl = URL.createObjectURL(blob);
-                    receivedVideo.src = videoUrl;
-                    downloadLink.href = videoUrl;
-                    downloadLink.download = `signal-recording-${Date.now()}.webm`;
-                    
-                    controllerUi.classList.add('hidden');
-                    videoContainer.classList.remove('hidden');
-                }
-            });
-            
-            conn.on('close', () => {
-                statusEl.textContent = 'Connection lost. Please re-scan QR code.';
-                statusEl.className = 'text-red-400 font-mono mb-6';
-                startBtn.disabled = true;
-            });
-        });
-        
-        peer.on('error', err => {
-            console.error('PeerJS error on controller:', err);
-            statusEl.textContent = `Error: ${err.type}. Please try again.`;
-            statusEl.className = 'text-red-400 font-mono mb-6';
-        });
-
-        startBtn.addEventListener('click', () => {
-            if (conn) {
-                conn.send('start-recording');
-                statusEl.textContent = 'Recording command sent...';
-                startBtn.disabled = true;
-            }
-        });
-        
-        recordAgainBtn.addEventListener('click', () => {
-            videoContainer.classList.add('hidden');
-            controllerUi.classList.remove('hidden');
-            statusEl.textContent = 'Connected! Ready to record.';
-            startBtn.disabled = false;
-        });
-    }
-
-    // --- Entry Point ---
-    // Run the correct initialization function based on the URL hash.
-    const hash = window.location.hash;
-    if (hash === '#qrcode') {
-        initQrCodePage();
-    } else if (hash === '#controller') {
-        initControllerPage();
-    } else {
-        initMainApp();
-    }
+    App.init(definitions, globalDefinitions, { vert: vertSrc, frag: fragSrc });
 
   })();
   </script>
