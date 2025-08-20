@@ -1,61 +1,69 @@
-
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Scan to Start — Unknown Remote</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UNKNOWN // QR</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
   <style>
     :root { color-scheme: dark; }
-    html,body { height:100%; }
-    body { margin:0; display:grid; place-items:center; background:#0b0d11; color:#e5e7eb; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .wrap { text-align:center; }
-    #q { background:#fff; padding:10px; border-radius:12px; }
-    .muted { color:#9aa0aa; margin-top:10px; }
-    .link { font-size:12px; word-break: break-all; max-width: 80vw; margin:12px auto 0; color:#9aa0aa; }
+    body { background:#0b0d11; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace}
+    canvas{ image-rendering: pixelated; }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <div id="q"></div>
-    <div class="muted">Scan to open the remote</div>
-    <div id="small" class="link"></div>
+<body class="min-h-screen">
+  <div class="max-w-xl mx-auto p-6 text-center space-y-4">
+    <h1 class="text-xl font-bold">Scan to Participate</h1>
+    <!-- Version string bumped in the HTML body -->
+    <p class="text-xs text-gray-400 mono">UNKNOWN_V5.4_BODY</p>
+
+    <div class="flex justify-center">
+      <canvas id="qr"></canvas>
+    </div>
+    <div class="text-sm">
+      <p class="text-gray-300">Point your camera at the QR to open the controller on your phone.</p>
+      <p class="text-xs text-gray-500 mono mt-2"><span class="text-gray-400">URL:</span> <span id="u">—</span></p>
+      <p class="text-xs text-gray-500 mono"><span class="text-gray-400">peer:</span> <span id="p">—</span> · <span class="text-gray-400">token:</span> <span id="t">—</span></p>
+    </div>
   </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
   <script>
-    const target = new URLSearchParams(location.search).get('target');
-    if (!target) {
-      document.getElementById('small').textContent = 'Missing target URL';
-    } else {
-      const q = new QRCode(document.getElementById('q'), {
-        text: target,
-        width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M
-      });
-      document.getElementById('small').textContent = target;
+    // Accept either a full "url" param, or host/token(/phone) to build it.
+    const sp = new URLSearchParams(location.search);
+    const host = sp.get('host');
+    const token = sp.get('token');
+    const phone = sp.get('phone') || 'phone.html';
+    let url = sp.get('url');
+
+    if (!url) {
+      if (!host || !token) {
+        document.getElementById('u').textContent = 'missing parameters';
+        throw new Error('missing host/token');
+      }
+      const base = location.origin + location.pathname.replace(/[^/]+$/, '');
+      const u = new URL(base + phone);
+      u.searchParams.set('host', host);
+      u.searchParams.set('token', token);
+      url = u.toString();
     }
-  </script>
 
-  <script>
-    // Allow the host page to update the QR code without closing this window.
-    window.addEventListener('message', (ev) => {
-      const data = ev.data || {};
-      if (data.type !== 'updateTarget' || !data.target) return;
-      const holder = document.getElementById('q');
-      if (!holder) return;
-      holder.innerHTML = '';
-      new QRCode(holder, {
-        text: data.target,
-        width: 360,
-        height: 360,
-        correctLevel: QRCode.CorrectLevel.M
-      });
-      const s = document.getElementById('small');
-      if (s) s.textContent = data.target;
+    document.getElementById('u').textContent = url;
+    if (host) document.getElementById('p').textContent = host;
+    if (token) document.getElementById('t').textContent = token;
+
+    const canvas = document.getElementById('qr');
+    QRCode.toCanvas(canvas, url, { width: 420, margin: 2 }, (err) => {
+      if (err) console.error(err);
     });
-  </script>
 
+    // Optional: blink the token text gently so staff notice it updates
+    let on = true;
+    setInterval(() => {
+      on = !on;
+      document.getElementById('t').style.opacity = on ? '1' : '.6';
+    }, 1200);
+  </script>
 </body>
 </html>
