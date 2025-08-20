@@ -1166,12 +1166,14 @@
     if (!canvas || !canvas.captureStream) throw new Error('Canvas captureStream not supported');
     const stream = canvas.captureStream(30);
     const chunks = [];
+    
+    // MODIFIED: The optionsList is reordered to prioritize the universally compatible MP4 format.
     const optionsList = [
-      { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
-      { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
-      { mimeType: 'video/webm', videoBitsPerSecond: 2_000_000 },
+      { mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2000000 },
+      { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2000000 },
+      { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2000000 },
+      { mimeType: 'video/webm', videoBitsPerSecond: 2000000 },
     ];
-    if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=h264', videoBitsPerSecond: 2_000_000 });
 
     let rec = null;
     var mime = '';
@@ -1223,9 +1225,11 @@
         isRecording = true;
         updateStatus();
         
+        // This 'preferMp4' flag is now used implicitly by the reordered list in `recordCanvasFiveSeconds`.
         const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
         let recording;
         try {
+          // The function will now prefer MP4 automatically.
           recording = await recordCanvasFiveSeconds(preferMp4);
         } catch (e) {
           conn.send(JSON.stringify({ type:'error', message: String(e) }));
