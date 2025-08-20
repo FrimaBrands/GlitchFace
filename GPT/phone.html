@@ -79,7 +79,9 @@
         function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
         function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
 
-        const supportsWebM = MediaSource && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
+        // FIXED: Safely check for MediaSource API, which doesn't exist on iOS.
+        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
+        
         const chunks = [];
         let expectedBytes = 0;
         let received = 0;
@@ -182,8 +184,9 @@
 
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
+        // Improved error message
         if (e instanceof ReferenceError) {
-            logMsg('This may mean the PeerJS library from unpkg.com was blocked or failed to load.');
+            logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
         }
         setConn('Script Error');
         setStatus(e.message, false);
