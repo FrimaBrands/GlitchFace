@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- Add CSP meta tag to allow connections to the PeerJS server -->
-  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com:*/*;">
+  <!-- Refined CSP to be compatible with both iOS and Android -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; connect-src 'self' *.peerjs.com:* wss:;">
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -100,13 +100,9 @@
         log('PeerJS library is loaded.');
     }
 
-    // Stun servers for better NAT traversal, crucial for iOS reliability
+    // Simplified PeerJS config to let the library use its defaults, which is more robust across platforms.
     const PEERJS_CONFIG = {
-      host: '0.peerjs.com', // Explicitly set the host
-      port: 443,             // Standard HTTPS port
-      path: '/peerjs',       // Standard path
-      secure: true,          // Use WSS
-      debug: 3,              // Max debug level for verbose logs
+      debug: 3,
       config: {
         'iceServers': [
           { urls: 'stun:stun.l.google.com:19302' },
