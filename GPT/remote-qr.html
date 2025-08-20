@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -37,5 +36,25 @@
       document.getElementById('small').textContent = target;
     }
   </script>
+
+  <script>
+    // Allow the host page to update the QR code without closing this window.
+    window.addEventListener('message', (ev) => {
+      const data = ev.data || {};
+      if (data.type !== 'updateTarget' || !data.target) return;
+      const holder = document.getElementById('q');
+      if (!holder) return;
+      holder.innerHTML = '';
+      new QRCode(holder, {
+        text: data.target,
+        width: 360,
+        height: 360,
+        correctLevel: QRCode.CorrectLevel.M
+      });
+      const s = document.getElementById('small');
+      if (s) s.textContent = data.target;
+    });
+  </script>
+
 </body>
 </html>
