@@ -90,13 +90,9 @@
 
         logMsg('Initializing PeerJS with STUN/TURN servers...');
         
-        // MODIFIED: Force a secure connection to the PeerJS signaling server
-        // to improve reliability on restrictive networks.
+        // CORRECTED: Removed manual server configuration to use the reliable PeerJS cloud defaults.
+        // The library handles secure connections automatically.
         const peer = new Peer(undefined, {
-          host: 'peerjs.com',
-          port: 443,
-          path: '/peerjs',
-          secure: true,
           debug: 2,
           config: {
             'iceServers': [
