@@ -10,76 +10,55 @@
   <style>
     :root { color-scheme: dark; }
     html, body { height: 100%; }
-    body { margin: 0; display: grid; place-items: center; background: #0b0d11; color: #e5e7eb; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    .wrap { text-align: center; }
-    #q { background: #fff; padding: 10px; border-radius: 12px; display: inline-block; }
-    .muted { color: #9aa0aa; margin-top: 16px; }
-    .link-container { max-width: 80vw; margin: 16px auto 0; }
-    .link { font-size: 12px; word-break: break-all; color: #9aa0aa; background: #1a1d23; padding: 8px; border-radius: 6px; }
-    .copy-btn { margin-top: 12px; padding: 8px 16px; background: #374151; border: none; color: #e5e7eb; border-radius: 8px; cursor: pointer; transition: background-color 0.2s; }
-    .copy-btn:hover { background-color: #4b5563; }
-    .error { color: #f87171; background: #2d1d22; padding: 16px; border-radius: 8px; border: 1px solid #5c2a32; max-width: 360px; }
+    body { margin:0; display:grid; place-items:center; background:#0b0d11; color:#e5e7eb; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    .wrap { text-align:center; }
+    #qr-code { background:#fff; padding:10px; border-radius:12px; line-height: 0; /* Fix for extra space */ }
+    .muted { color:#9aa0aa; margin-top:10px; }
+    .link { font-size:12px; word-break: break-all; max-width: 80vw; margin:12px auto 0; color:#9aa0aa; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div id="content">
-      <div id="q"></div>
-      <div class="muted">Scan this code to open the remote</div>
-      <div class="link-container">
-        <div id="small" class="link"></div>
-        <button id="copyBtn" class="copy-btn">Copy Link</button>
-      </div>
-    </div>
+    <div id="qr-code"></div>
+    <div class="muted">Scan to open the remote</div>
+    <div id="link-display" class="link"></div>
   </div>
-
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    const content = document.getElementById('content');
-    const targetUrl = new URLSearchParams(location.search).get('target');
+    const qrHolder = document.getElementById('qr-code');
+    const linkDisplay = document.getElementById('link-display');
 
-    if (!targetUrl) {
-      content.innerHTML = `<div class="error"><strong>Configuration Error:</strong> Missing target URL. This window cannot generate a QR code.</div>`;
-    } else {
-      // Generate QR Code
-      new QRCode(document.getElementById('q'), {
-        text: targetUrl,
-        width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M
+    function generateQrCode(url) {
+      if (!url) {
+        linkDisplay.textContent = 'Error: Missing target URL.';
+        return;
+      }
+      // Clear previous QR code before generating a new one.
+      qrHolder.innerHTML = ''; 
+      new QRCode(qrHolder, {
+        text: url,
+        width: 360,
+        height: 360,
+        correctLevel: QRCode.CorrectLevel.M
       });
-      document.getElementById('small').textContent = targetUrl;
-
-      // "Copy Link" functionality
-      const copyBtn = document.getElementById('copyBtn');
-      copyBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(targetUrl)
-          .then(() => {
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => { copyBtn.textContent = 'Copy Link'; }, 2000);
-          })
-          .catch(err => {
-            copyBtn.textContent = 'Failed to copy';
-            console.error('Failed to copy URL: ', err);
-          });
-      });
+      linkDisplay.textContent = url;
     }
 
-    // Allow the host page to update the QR code without closing this window.
-    window.addEventListener('message', (ev) => {
-      const data = ev.data || {};
+    // Generate the initial QR code from the URL parameter.
+    const initialTarget = new URLSearchParams(location.search).get('target');
+    generateQrCode(initialTarget);
+
+    // This listener allows the main host application to update the QR code
+    // in this window without needing to close and reopen it. This is useful
+    // when the host's connection ID is reset.
+    window.addEventListener('message', (event) => {
+      const data = event.data || {};
+      // Check for a valid message structure.
       if (data.type !== 'updateTarget' || !data.target) return;
       
-      const holder = document.getElementById('q');
-      const s = document.getElementById('small');
-      if (!holder || !s) return;
-      
-      // Clear old QR code and create a new one
-      holder.innerHTML = '';
-      new QRCode(holder, {
-        text: data.target,
-        width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M
-      });
-      
-      s.textContent = data.target;
+      console.log('Received new target URL:', data.target);
+      generateQrCode(data.target);
     });
   </script>
 </body>
