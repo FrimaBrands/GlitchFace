@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -9,57 +10,52 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
-    html, body { height: 100%; }
+    html,body { height:100%; }
     body { margin:0; display:grid; place-items:center; background:#0b0d11; color:#e5e7eb; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     .wrap { text-align:center; }
-    #qr-code { background:#fff; padding:10px; border-radius:12px; line-height: 0; /* Fix for extra space */ }
+    #q { background:#fff; padding:10px; border-radius:12px; }
     .muted { color:#9aa0aa; margin-top:10px; }
     .link { font-size:12px; word-break: break-all; max-width: 80vw; margin:12px auto 0; color:#9aa0aa; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div id="qr-code"></div>
+    <div id="q"></div>
     <div class="muted">Scan to open the remote</div>
-    <div id="link-display" class="link"></div>
+    <div id="small" class="link"></div>
   </div>
-  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    const qrHolder = document.getElementById('qr-code');
-    const linkDisplay = document.getElementById('link-display');
+    const target = new URLSearchParams(location.search).get('target');
+    if (!target) {
+      document.getElementById('small').textContent = 'Missing target URL';
+    } else {
+      const q = new QRCode(document.getElementById('q'), {
+        text: target,
+        width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M
+      });
+      document.getElementById('small').textContent = target;
+    }
+  </script>
 
-    function generateQrCode(url) {
-      if (!url) {
-        linkDisplay.textContent = 'Error: Missing target URL.';
-        return;
-      }
-      // Clear previous QR code before generating a new one.
-      qrHolder.innerHTML = ''; 
-      new QRCode(qrHolder, {
-        text: url,
+  <script>
+    // Allow the host page to update the QR code without closing this window.
+    window.addEventListener('message', (ev) => {
+      const data = ev.data || {};
+      if (data.type !== 'updateTarget' || !data.target) return;
+      const holder = document.getElementById('q');
+      if (!holder) return;
+      holder.innerHTML = '';
+      new QRCode(holder, {
+        text: data.target,
         width: 360,
         height: 360,
         correctLevel: QRCode.CorrectLevel.M
       });
-      linkDisplay.textContent = url;
-    }
-
-    // Generate the initial QR code from the URL parameter.
-    const initialTarget = new URLSearchParams(location.search).get('target');
-    generateQrCode(initialTarget);
-
-    // This listener allows the main host application to update the QR code
-    // in this window without needing to close and reopen it. This is useful
-    // when the host's connection ID is reset.
-    window.addEventListener('message', (event) => {
-      const data = event.data || {};
-      // Check for a valid message structure.
-      if (data.type !== 'updateTarget' || !data.target) return;
-      
-      console.log('Received new target URL:', data.target);
-      generateQrCode(data.target);
+      const s = document.getElementById('small');
+      if (s) s.textContent = data.target;
     });
   </script>
+
 </body>
 </html>

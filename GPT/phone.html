@@ -6,20 +6,19 @@
   <title>Start Recording — Unknown Remote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
     body { margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#0b0d11; color:#e5e7eb; }
     .wrap { max-width: 560px; margin: 0 auto; padding: 24px; }
     .card { background:#11141a; border:1px solid #1f2430; border-radius:16px; padding:20px; }
-    button { width:100%; padding:14px 16px; font-weight:700; border:none; border-radius:12px; background:#34d399; color:#0b0d11; transition: background-color 0.2s; }
-    button:disabled { opacity:0.5; background-color: #333; }
-    button:hover:not(:disabled) { background-color: #4feab3; }
+    button { width:100%; padding:14px 16px; font-weight:700; border:none; border-radius:12px; background:#34d399; color:#0b0d11; }
+    button:disabled { opacity:0.5; }
     .muted { color:#9aa0aa; font-size:14px; }
     .row { display:flex; gap:12px; align-items:center; }
     progress { width:100%; height:14px; }
     a.dl { display:inline-block; margin-top:12px; padding:10px 12px; background:#1f2430; border-radius:10px; color:#e5e7eb; text-decoration:none; }
-    video { width:100%; border-radius:12px; display:none; margin-top: 12px; }
+    video { width:100%; border-radius:12px; display:none; }
     .ok { color:#34d399; } .bad { color:#f87171; }
     #debugLog { font-size:10px; text-align:left; height: 120px; overflow-y:scroll; background:#000; padding:8px; border-radius:4px; margin-top:12px; line-height:1.4; white-space:pre-wrap; }
   </style>
@@ -44,10 +43,9 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
-    // Select all necessary DOM elements once.
     const els = {
       btn: document.getElementById('startBtn'),
-      connState: document.getElementById('connState'),
+      conn: document.getElementById('connState'),
       status: document.getElementById('status'),
       progress: document.getElementById('progress'),
       dl: document.getElementById('download'),
@@ -55,7 +53,11 @@
       debug: document.getElementById('debugLog')
     };
 
-    // Centralized logging function to update both console and the on-screen debug log.
+    if (!els.debug) {
+        alert('Critical Error: The debug log element could not be found.');
+        return;
+    }
+
     function logMsg(msg) {
         console.log(msg);
         const time = new Date().toLocaleTimeString();
@@ -65,122 +67,128 @@
     logMsg('DOM is ready. Starting script.');
 
     try {
-        const urlParams = new URLSearchParams(location.search);
-        const hostId = urlParams.get('host');
-        const token = urlParams.get('token');
+        function qs(k){ return new URLSearchParams(location.search).get(k); }
+        const hostId = qs('host'); const token = qs('token');
 
         if (!hostId || !token) {
-          setStatus('Missing host or token in URL.', false);
-          logMsg('Error: URL must contain "host" and "token" parameters.');
+          els.status.textContent = 'Missing host or token'; els.status.className='bad';
+          logMsg('Error: Missing host or token in URL.');
           return;
         }
 
-        function setConnState(txt, ok = false){ els.connState.textContent = txt; els.connState.className = ok ? 'ok' : 'muted'; }
-        function setStatus(txt, ok = true){ els.status.textContent = txt; els.status.className = ok ? 'ok' : 'bad'; }
+        function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
+        function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
 
-        // Determine if the browser supports WebM video format. This is important on iOS, which prefers MP4.
-        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9'));
+        // FIXED: Safely check for MediaSource API, which doesn't exist on iOS.
+        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
         
-        // Variables to manage the incoming video file transfer.
         const chunks = [];
         let expectedBytes = 0;
-        let receivedBytes = 0;
-        let mimeType = 'video/webm';
+        let received = 0;
+        let mime = 'video/webm';
         let filename = 'capture.webm';
-        let hostConnection = null;
+        let conn = null;
 
-        logMsg('Initializing PeerJS client...');
+        logMsg('Initializing PeerJS with STUN servers...');
         
         const peer = new Peer(undefined, {
           debug: 2,
-          config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] }
+          config: {
+            'iceServers': [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+            ]
+          }
         });
 
         peer.on('open', (id) => {
-          logMsg(`PeerJS client opened with ID: ${id}`);
-          setConnState('connecting to host...');
+          logMsg(`PeerJS client is open with ID: ${id}`);
+          setConn('connecting to host...');
           logMsg(`Attempting to connect to host: ${hostId}`);
           
-          hostConnection = peer.connect(hostId, { reliable: true });
+          conn = peer.connect(hostId, { reliable: true });
 
-          hostConnection.on('open', () => {
+          conn.on('open', () => {
             logMsg('Connection established with host!');
-            setConnState('connected', true);
-            logMsg('Sending handshake with token...');
-            // Announce capabilities to the host.
-            hostConnection.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+            setConn('connected', true);
+            logMsg('Sending handshake (hello) with token...');
+            conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
           });
 
-          hostConnection.on('data', (msg) => {
-            // Differentiate between JSON metadata (string) and binary video data (ArrayBuffer).
+          conn.on('data', (msg) => {
             if (typeof msg === 'string') {
               const data = JSON.parse(msg);
-              switch (data.type) {
-                case 'helloAck':
-                  setStatus('Ready');
-                  logMsg('Handshake acknowledged by host.');
-                  break;
-                case 'recordingMeta':
-                  mimeType = data.mime || 'video/webm';
-                  expectedBytes = data.totalBytes || 0;
-                  filename = data.filename || 'capture.webm';
-                  chunks.length = 0;
-                  receivedBytes = 0;
-                  els.progress.value = 0;
-                  els.dl.style.display = 'none';
-                  els.video.style.display = 'none';
-                  setStatus('Receiving...');
-                  logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
-                  break;
-                case 'recordingEnd':
-                  const blob = new Blob(chunks, { type: mimeType });
-                  const url = URL.createObjectURL(blob);
-                  els.dl.href = url;
-                  els.dl.download = filename;
-                  els.dl.style.display = 'inline-block';
-                  els.video.src = url;
-                  els.video.style.display = 'block';
-                  els.progress.value = 100;
-                  setStatus('Done ✔', true);
-                  logMsg('File received successfully.');
-                  els.btn.disabled = false;
-                  break;
-                case 'error':
-                  setStatus(data.message || 'Unknown error from host', false);
-                  logMsg(`Host sent error: ${data.message}`);
-                  els.btn.disabled = false;
-                  break;
+              if (data.type === 'helloAck') {
+                setStatus('ready');
+                logMsg('Handshake acknowledged by host. Ready.');
+              } else if (data.type === 'recordingMeta') {
+                mime = data.mime || 'video/webm';
+                expectedBytes = data.totalBytes || 0;
+                filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
+                chunks.length = 0; received = 0;
+                els.progress.value = 0;
+                setStatus('receiving…');
+                logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
+              } else if (data.type === 'progress') {
+                if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
+              } else if (data.type === 'recordingEnd') {
+                const blob = new Blob(chunks, { type: mime });
+                const url = URL.createObjectURL(blob);
+                els.dl.href = url; els.dl.download = filename; els.dl.style.display='inline-block';
+                els.video.src = url; els.video.style.display='block';
+                els.progress.value = 100;
+                setStatus('done ✔', true);
+                logMsg('File received successfully.');
+              } else if (data.type === 'error') {
+                setStatus(data.message || 'error', false);
+                logMsg(`Host sent error: ${data.message}`);
               }
             } else {
-              // This is a binary chunk of the video file.
               chunks.push(new Uint8Array(msg));
-              receivedBytes += msg.byteLength;
-              if (expectedBytes) {
-                els.progress.value = Math.min(100, Math.round(100 * receivedBytes / expectedBytes));
-              }
+              received += msg.byteLength;
+              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
             }
           });
 
-          hostConnection.on('close', () => { logMsg('Connection closed by host.'); setConnState('disconnected'); setStatus('Disconnected', false); });
-          hostConnection.on('error', (err) => { logMsg(`Connection error: ${err}`); setConnState('connection error', false); });
+          conn.on('close', () => {
+            logMsg('Connection closed by host.');
+            setConn('disconnected');
+            setStatus('disconnected');
+          });
+
+          conn.on('error', (err) => {
+            logMsg(`Connection error: ${err}`);
+            setConn('connection error');
+          });
         });
 
-        peer.on('error', (err) => { logMsg(`PeerJS error: ${err.type} - ${err.message}`); setConnState(`peer error: ${err.type}`, false); setStatus('Error', false); });
-        peer.on('disconnected', () => { logMsg('Disconnected from PeerJS server. Reconnecting...'); setConnState('reconnecting...'); });
+        peer.on('error', (err) => {
+          logMsg(`A peer error occurred: ${err.type} - ${err.message || err}`);
+          setConn(`peer error: ${err.type}`);
+          setStatus('Error', false);
+        });
+
+        peer.on('disconnected', () => {
+            logMsg('Disconnected from PeerJS server. Attempting to reconnect...');
+            setConn('reconnecting signal...');
+        });
         
         els.btn.addEventListener('click', () => {
           els.btn.disabled = true;
-          setStatus('Requesting recording...');
+          setStatus('asking host…');
           logMsg('Sent startRecording request to host.');
-          hostConnection?.send(JSON.stringify({ type:'startRecording' }));
-          // Timeout to prevent the UI from being stuck if the host doesn't respond.
-          setTimeout(() => { if (els.status.textContent === 'Requesting recording...') { setStatus('Request timed out', false); els.btn.disabled = false; } }, 8000);
+          conn && conn.send(JSON.stringify({ type:'startRecording' }));
+          setTimeout(() => { if (els.status.textContent === 'asking host…') setStatus('request timed out'); els.btn.disabled = false; }, 8000);
         });
 
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
-        setConnState('Script Error', false);
+        // Improved error message
+        if (e instanceof ReferenceError) {
+            logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
+        }
+        setConn('Script Error');
         setStatus(e.message, false);
     }
   });
