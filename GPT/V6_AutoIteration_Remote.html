@@ -871,9 +871,16 @@
         try {
           UI.setStatus('Requesting camera...');
           this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
-          UI.elements.video.srcObject = this.stream;
-          await UI.elements.video.play();
-          await new Promise(res => { UI.elements.video.onloadedmetadata = res; });
+          const video = UI.elements.video;
+          video.srcObject = this.stream;
+
+          // Wait for the video's metadata to load before attempting to play it.
+          // This prevents a race condition that can interrupt the play() request.
+          await new Promise(resolve => {
+            video.onloadedmetadata = resolve;
+          });
+          
+          await video.play();
 
           UI.setStatus('Initializing GL...');
           const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather'];
