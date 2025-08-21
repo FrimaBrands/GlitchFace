@@ -40,7 +40,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
@@ -115,12 +115,9 @@
           setConn('connecting to host...');
           logMsg(`Attempting to connect to host: ${hostId}`);
           
-          // MODIFIED: Re-applying the robust connection options for iOS compatibility.
           const connectionOptions = {
             reliable: true,
-            // This simplifies the connection by telling browsers it's data-only.
             serialization: 'json', 
-            // This cleans up technical details that often cause issues with iPhones.
             sdpTransform: sdp => {
               return sdp.replace('a=rtcp-fb:100 nack pli\r\n', '');
             }
