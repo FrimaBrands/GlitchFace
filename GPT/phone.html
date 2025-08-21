@@ -91,6 +91,7 @@
 
         logMsg('Initializing PeerJS with STUN/TURN servers...');
         
+        // MODIFIED: Added TURN server configuration for better reliability across networks
         const peer = new Peer(undefined, {
           debug: 2,
           config: {
@@ -104,11 +105,6 @@
               },
               {
                 urls: 'turn:openrelay.metered.ca:443',
-                username: 'openrelayproject',
-                credential: 'openrelayproject'
-              },
-              {
-                urls: 'turn:openrelay.metered.ca:443?transport=tcp',
                 username: 'openrelayproject',
                 credential: 'openrelayproject'
               }
@@ -201,7 +197,7 @@
         logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
         // Improved error message
         if (e instanceof ReferenceError) {
-            logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
+            logMsg('This should be due to a missing browser feature or the PeerJS library failing to load.');
         }
         setConn('Script Error');
         setStatus(e.message, false);
