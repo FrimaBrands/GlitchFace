@@ -91,7 +91,6 @@
 
         logMsg('Initializing PeerJS with STUN/TURN servers...');
         
-        // MODIFIED: Added TURN server configuration for better reliability across networks
         const peer = new Peer(undefined, {
           debug: 2,
           config: {
@@ -117,7 +116,17 @@
           setConn('connecting to host...');
           logMsg(`Attempting to connect to host: ${hostId}`);
           
-          conn = peer.connect(hostId, { reliable: true });
+          // MODIFIED: Added sdpTransform to fix iOS/Safari negotiation issues
+          const connectionOptions = {
+            reliable: true,
+            sdpTransform: sdp => {
+              sdp = sdp.replace('a=rtcp-fb:100 nack pli\r\n', '');
+              sdp = sdp.replace('a=rtcp-fb:100 ccm fir\r\n', '');
+              return sdp;
+            }
+          };
+
+          conn = peer.connect(hostId, connectionOptions);
 
           conn.on('open', () => {
             logMsg('Connection established with host!');
@@ -195,9 +204,8 @@
 
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
-        // Improved error message
         if (e instanceof ReferenceError) {
-            logMsg('This should be due to a missing browser feature or the PeerJS library failing to load.');
+            logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
         }
         setConn('Script Error');
         setStatus(e.message, false);
