@@ -79,7 +79,6 @@
         function setConn(txt, ok=false){ els.conn.textContent = txt; els.conn.className = ok?'ok':'muted'; }
         function setStatus(txt, ok=true){ els.status.textContent = txt; els.status.className = ok?'ok':'bad'; }
 
-        // FIXED: Safely check for MediaSource API, which doesn't exist on iOS.
         const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
         
         const chunks = [];
@@ -116,9 +115,11 @@
           setConn('connecting to host...');
           logMsg(`Attempting to connect to host: ${hostId}`);
           
-          // MODIFIED: Added sdpTransform to fix iOS/Safari negotiation issues
+          // MODIFIED: Added serialization:'json' to force a data-only connection, 
+          // which is more compatible with iOS/Safari.
           const connectionOptions = {
             reliable: true,
+            serialization: 'json', // This simplifies the connection negotiation.
             sdpTransform: sdp => {
               sdp = sdp.replace('a=rtcp-fb:100 nack pli\r\n', '');
               sdp = sdp.replace('a=rtcp-fb:100 ccm fir\r\n', '');
