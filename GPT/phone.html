@@ -90,8 +90,6 @@
 
         logMsg('Initializing PeerJS with STUN/TURN servers...');
         
-        // CORRECTED: Removed manual server configuration to use the reliable PeerJS cloud defaults.
-        // The library handles secure connections automatically.
         const peer = new Peer(undefined, {
           debug: 2,
           config: {
@@ -117,7 +115,18 @@
           setConn('connecting to host...');
           logMsg(`Attempting to connect to host: ${hostId}`);
           
-          conn = peer.connect(hostId, { reliable: true });
+          // MODIFIED: Re-applying the robust connection options for iOS compatibility.
+          const connectionOptions = {
+            reliable: true,
+            // This simplifies the connection by telling browsers it's data-only.
+            serialization: 'json', 
+            // This cleans up technical details that often cause issues with iPhones.
+            sdpTransform: sdp => {
+              return sdp.replace('a=rtcp-fb:100 nack pli\r\n', '');
+            }
+          };
+
+          conn = peer.connect(hostId, connectionOptions);
 
           conn.on('open', () => {
             logMsg('Connection established with host!');
