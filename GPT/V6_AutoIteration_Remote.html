@@ -1097,13 +1097,9 @@
     await lazyLoadPeerJS();
     sessionToken = randomToken(16);
     
-    // MODIFIED: Force a secure connection to the PeerJS signaling server
-    // to improve reliability on restrictive networks.
+    // CORRECTED: Removed manual server configuration to use the reliable PeerJS cloud defaults.
+    // The library handles secure connections automatically.
     peer = new window.Peer(undefined, {
-      host: 'peerjs.com',
-      port: 443,
-      path: '/peerjs',
-      secure: true,
       debug: 1,
       config: {
         'iceServers': [
