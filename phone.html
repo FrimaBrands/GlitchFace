@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>U N K N O W N // Remote</title>
+  <title>U N K N O W N</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root { 
       color-scheme: dark; 
@@ -15,7 +15,7 @@
       --accent-color: #FFFFFF;
       --dim-color: #555555;
       --error-color: #ff4747;
-      --success-color: #00ff8c;
+      --recording-color: #ff4747;
     }
     html, body {
       height: 100%;
@@ -23,148 +23,193 @@
       overscroll-behavior: none;
     }
     body { 
-      font-family: 'Inter', sans-serif; 
+      font-family: 'JetBrains Mono', monospace; 
       background: var(--bg-color); 
       color: var(--text-color);
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
       padding: 20px;
       box-sizing: border-box;
-      transition: background-color 0.5s ease;
     }
     .container {
       width: 100%;
       max-width: 400px;
       display: flex;
       flex-direction: column;
-      align-items: center;
       gap: 24px;
     }
     .title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      letter-spacing: 0.3em;
-      text-indent: 0.3em;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5em;
+      text-indent: 0.5em;
       color: var(--accent-color);
       text-shadow: 0 0 5px rgba(255,255,255,0.2);
-      margin-bottom: 24px;
     }
     .instructions {
       font-size: 0.9rem;
       color: var(--dim-color);
       line-height: 1.6;
-      min-height: 48px; /* Reserve space */
-      transition: opacity 0.3s ease;
     }
-    .orb-container {
-      position: relative;
-      width: 200px;
-      height: 200px;
-      margin: 20px 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+
+    /* --- Record Button & Animation --- */
+    #record-button-area {
+      margin: 20px auto;
     }
-    #orb-svg {
-      width: 100%;
-      height: 100%;
-      position: absolute;
-      top: 0;
-      left: 0;
-      transform: rotate(-90deg); /* Start from the top */
+    .record-button {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        padding: 0;
+        border: 1px solid var(--dim-color);
+        border-radius: 50%;
+        background: transparent;
+        color: var(--text-color);
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
-    .progress-ring-bg {
-      fill: transparent;
-      stroke: var(--dim-color);
-      stroke-width: 2;
-      opacity: 0.2;
+    .record-button:not(:disabled) {
+        animation: pulse 3s infinite ease-in-out;
+    }
+    .record-button:not(:disabled):hover {
+        background: var(--accent-color);
+        color: var(--bg-color);
+        border-color: var(--accent-color);
+        transform: scale(1.05);
+        animation: none;
+    }
+    .record-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        animation: none;
+    }
+    .record-button__text {
+        font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 0.1em;
+        transition: font-size 0.2s ease;
     }
     .progress-ring {
-      fill: transparent;
-      stroke: var(--accent-color);
-      stroke-width: 2;
-      stroke-linecap: round;
-      transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+        position: absolute;
+        top: 0;
+        left: 0;
     }
-    @keyframes countdown-animation {
-        from { stroke-dashoffset: 0; }
-        to { stroke-dashoffset: var(--circumference); }
+    .progress-ring__circle, .progress-ring__circle-bg {
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
     }
-    .is-recording .progress-ring {
-        animation: countdown-animation 5s linear forwards;
+    .progress-ring__circle-bg {
+        stroke: var(--dim-color);
+        opacity: 0.3;
     }
-    #startBtn {
-      width: 100%;
-      height: 100%;
-      font-weight: 600;
-      font-size: 1rem;
-      letter-spacing: 0.1em;
-      border: 1px solid var(--dim-color);
-      border-radius: 50%;
-      background: transparent;
-      color: var(--text-color);
-      cursor: pointer;
-      transition: all 0.2s ease-in-out;
+    .progress-ring__circle {
+        stroke: var(--accent-color);
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.3s ease;
+    }
+    .record-button.is-recording {
+        animation: none;
+        border-color: var(--recording-color);
+        box-shadow: 0 0 15px rgba(255, 71, 71, 0.5);
+        cursor: not-allowed;
+    }
+    .record-button.is-recording .progress-ring__circle {
+        stroke: var(--recording-color);
+    }
+    .record-button.is-recording .record-button__text {
+        font-size: 2rem;
+        font-weight: 700;
+        letter-spacing: 0;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.2); }
+      70% { box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    }
+    
+    /* --- Status and Progress --- */
+    .status-area {
+      min-height: 60px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 10px;
-      line-height: 1.4;
+      gap: 12px;
     }
-    #startBtn:not(:disabled):hover {
-      background: rgba(255,255,255,0.1);
-      border-color: var(--accent-color);
-      transform: scale(1.05);
-    }
-    #startBtn:disabled {
-      cursor: not-allowed;
+    .status-text {
+      font-size: 0.9rem;
       color: var(--dim-color);
-      border-color: var(--dim-color);
     }
-    #status-text {
-        font-size: 0.8rem;
-        color: var(--dim-color);
-        margin-top: 4px;
+    .status-text.ok { color: var(--text-color); }
+    .status-text.bad { color: var(--error-color); }
+    #progress-container {
+        width: 100%;
+        display: none;
     }
-    #result-area {
+    progress {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 2px;
+      background-color: var(--dim-color);
+      border: none;
+    }
+    progress::-webkit-progress-bar { background-color: var(--dim-color); }
+    progress::-webkit-progress-value { background-color: var(--accent-color); transition: width 0.1s linear; }
+    progress::-moz-progress-bar { background-color: var(--accent-color); }
+
+    /* --- Result Area --- */
+    .result-area {
+      width: 100%;
       display: none;
       flex-direction: column;
+      align-items: center;
       gap: 16px;
+    }
+    .result-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-color);
+        letter-spacing: 0.2em;
+        margin: 0;
+        text-indent: 0.2em;
+    }
+    video { width: 100%; border: 1px solid var(--dim-color); }
+    a.dl {
+      display: inline-block;
       width: 100%;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    video { 
-      width: 100%; 
-      border-radius: 8px;
-      border: 1px solid var(--dim-color);
-      display: none; 
-    }
-    a.dl { 
-      display: none;
-      padding: 12px 20px; 
+      box-sizing: border-box;
+      padding: 10px 16px; 
       border: 1px solid var(--dim-color);
       color: var(--text-color); 
       text-decoration: none; 
       font-size: 0.9rem;
-      font-weight: 600;
-      border-radius: 8px;
       transition: all 0.2s ease-in-out;
-      background: rgba(255,255,255,0.05);
     }
     a.dl:hover {
       background: var(--accent-color);
       color: var(--bg-color);
-      border-color: var(--accent-color);
     }
-    #debugLog { display: none; } /* Hidden for guests */
+    .reset-button {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--accent-color);
+        background: var(--accent-color);
+        color: var(--bg-color);
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+    .reset-button:hover {
+        background: transparent;
+        color: var(--accent-color);
+    }
+    #debugLog { display: none; }
   </style>
 </head>
 <body>
@@ -172,22 +217,29 @@
     <h1 class="title">UNKNOWN</h1>
     <p id="instructions" class="instructions">Tap the orb to request a 5‑second capture from the installation.</p>
     
-    <div id="main-interface">
-        <div class="orb-container">
-            <svg id="orb-svg" viewBox="0 0 100 100">
-                <circle class="progress-ring-bg" cx="50" cy="50" r="48"/>
-                <circle id="progress-ring" class="progress-ring" cx="50" cy="50" r="48"/>
-            </svg>
-            <button id="startBtn" disabled>
-                <span id="btn-main-text">CONNECTING</span>
-                <span id="status-text">Initializing...</span>
-            </button>
-        </div>
+    <div id="record-button-area">
+      <button id="startBtn" class="record-button" disabled>
+          <svg class="progress-ring" width="160" height="160" viewBox="0 0 160 160">
+              <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="76" cx="80" cy="80"/>
+              <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="76" cx="80" cy="80"/>
+          </svg>
+          <span id="startBtnText" class="record-button__text">CONNECTING</span>
+      </button>
     </div>
     
-    <div id="result-area">
+    <div class="status-area">
+      <div id="connState" class="status-text">initializing…</div>
+      <div id="status" class="status-text">—</div>
+      <div id="progress-container">
+        <progress id="progress" value="0" max="100"></progress>
+      </div>
+    </div>
+
+    <div id="result-area" class="result-area">
+      <h2 class="result-title">CAPTURE COMPLETE</h2>
       <video id="preview" controls playsinline></video>
       <a id="download" class="dl" href="#" download>Download Video</a>
+      <button id="resetBtn" class="reset-button">Record Another</button>
     </div>
 
     <pre id="debugLog"></pre>
@@ -197,220 +249,184 @@
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
-      container: document.querySelector('.container'),
       btn: document.getElementById('startBtn'),
-      btnMainText: document.getElementById('btn-main-text'),
-      statusText: document.getElementById('status-text'),
-      progressRing: document.getElementById('progress-ring'),
-      instructions: document.getElementById('instructions'),
-      mainInterface: document.getElementById('main-interface'),
-      resultArea: document.getElementById('result-area'),
+      btnText: document.getElementById('startBtnText'),
+      progressRing: document.querySelector('.progress-ring__circle'),
+      conn: document.getElementById('connState'),
+      status: document.getElementById('status'),
+      progress: document.getElementById('progress'),
+      progressContainer: document.getElementById('progress-container'),
       dl: document.getElementById('download'),
       video: document.getElementById('preview'),
       debug: document.getElementById('debugLog'),
+      instructions: document.getElementById('instructions'),
+      resultArea: document.getElementById('result-area'),
+      recordArea: document.getElementById('record-button-area'),
+      resetBtn: document.getElementById('resetBtn')
     };
 
-    // --- SVG Progress Ring Setup ---
+    let recordingTimer = null;
     const radius = els.progressRing.r.baseVal.value;
-    const circumference = 2 * Math.PI * radius;
+    const circumference = radius * 2 * Math.PI;
     els.progressRing.style.strokeDasharray = `${circumference} ${circumference}`;
-    els.progressRing.style.setProperty('--circumference', circumference);
-
-    function setProgress(percent) {
-        const offset = circumference - (percent / 100) * circumference;
+    
+    function setRingProgress(percent) {
+        const offset = circumference - percent / 100 * circumference;
         els.progressRing.style.strokeDashoffset = offset;
     }
-    setProgress(0); // Start empty
+    setRingProgress(0);
 
-    // --- UI State Machine ---
-    let recordingTimeout = null;
-    let requestTimeout = null;
-
-    function updateUI(state, data = {}) {
-        // Reset all animations and styles first
-        els.container.classList.remove('is-recording');
-        els.progressRing.style.animation = '';
-        els.progressRing.style.transition = 'stroke-dashoffset 0.1s linear, stroke 0.3s ease';
-        els.progressRing.style.stroke = 'var(--accent-color)';
+    function startRecordingAnimation() {
+        els.btn.disabled = true;
+        els.btn.classList.add('is-recording');
+        let secondsLeft = 5;
         
-        clearTimeout(recordingTimeout);
-        clearTimeout(requestTimeout);
+        els.btnText.textContent = secondsLeft;
+        els.progressRing.style.transition = 'stroke-dashoffset 5s linear';
+        setRingProgress(100);
 
-        switch(state) {
-            case 'connecting':
-                els.btn.disabled = true;
-                els.btnMainText.textContent = 'CONNECTING';
-                els.statusText.textContent = data.message || 'Initializing...';
-                break;
-            
-            case 'ready':
-                els.btn.disabled = false;
-                els.btnMainText.textContent = 'TAP TO CAPTURE';
-                els.statusText.textContent = 'Connection: OK';
-                els.instructions.textContent = 'Tap the orb to request a 5-second capture from the installation.';
-                setProgress(0);
-                break;
-
-            case 'requesting':
-                els.btn.disabled = true;
-                els.btnMainText.textContent = 'REQUESTING';
-                els.statusText.textContent = 'Waiting for host...';
-                // Optimistically start recording animation
-                updateUI('recording');
-                break;
-
-            case 'recording':
-                els.btn.disabled = true;
-                els.btnMainText.textContent = 'RECORDING';
-                els.statusText.textContent = '00:05';
-                els.container.classList.add('is-recording');
-                els.progressRing.style.transition = 'none'; // Use animation instead
-                setProgress(circumference); // Set to full
-                els.progressRing.style.animation = 'countdown-animation 5s linear forwards';
-                
-                // After 5s, assume it's processing
-                recordingTimeout = setTimeout(() => updateUI('processing'), 5000);
-                break;
-
-            case 'processing':
-                els.btn.disabled = true;
-                els.btnMainText.textContent = 'PROCESSING';
-                els.statusText.textContent = 'Preparing your file...';
-                setProgress(100);
-                break;
-
-            case 'receiving':
-                els.btn.disabled = true;
-                els.btnMainText.textContent = 'RECEIVING';
-                els.statusText.textContent = `0%`;
-                setProgress(0);
-                break;
-            
-            case 'progress':
-                const percent = Math.round(data.percent);
-                els.statusText.textContent = `${percent}%`;
-                setProgress(percent);
-                break;
-
-            case 'complete':
-                els.instructions.textContent = 'Capture complete.';
-                els.mainInterface.style.display = 'none';
-                els.resultArea.style.display = 'flex';
-                els.dl.style.display='inline-block';
-                els.video.style.display='block';
-                els.progressRing.style.stroke = 'var(--success-color)';
-                setProgress(100);
-                break;
-
-            case 'error':
-                els.btn.disabled = false;
-                els.btnMainText.textContent = 'RETRY';
-                els.statusText.textContent = `Error: ${data.message}`;
-                els.instructions.textContent = 'Something went wrong. Please try again.';
-                els.progressRing.style.stroke = 'var(--error-color)';
-                setProgress(100);
-                // After a delay, reset to ready
-                setTimeout(() => updateUI('ready'), 3000);
-                break;
-        }
+        recordingTimer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft > 0) {
+                els.btnText.textContent = secondsLeft;
+            } else {
+                els.btnText.textContent = '...';
+                clearInterval(recordingTimer);
+                recordingTimer = null;
+            }
+        }, 1000);
     }
 
-    // --- PeerJS Logic ---
-    function logMsg(msg) { console.log(msg); if(els.debug) els.debug.textContent = `${new Date().toLocaleTimeString()}: ${msg}\n${els.debug.textContent}`; }
+    function resetUI() {
+        els.resultArea.style.display = 'none';
+        els.video.src = '';
+        els.dl.href = '#';
+        els.recordArea.style.display = 'block';
+        els.instructions.style.display = 'block';
+        
+        els.btn.disabled = false;
+        els.btn.classList.remove('is-recording');
+        els.btnText.textContent = 'INITIATE';
+
+        if (recordingTimer) clearInterval(recordingTimer);
+        els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
+        setRingProgress(0);
+        
+        setStatus('ready');
+        els.progressContainer.style.display = 'none';
+        els.progress.value = 0;
+    }
+
+    function logMsg(msg) {
+        console.log(msg);
+        if (els.debug) els.debug.textContent = `${new Date().toLocaleTimeString()}: ${msg}\n${els.debug.textContent}`;
+    }
+
+    logMsg('DOM is ready. Starting script.');
+    els.resetBtn.addEventListener('click', resetUI);
 
     try {
-        logMsg('DOM is ready. Starting script.');
         const hostId = new URLSearchParams(location.search).get('host');
         const token = new URLSearchParams(location.search).get('token');
 
         if (!hostId || !token) {
-          updateUI('error', { message: 'Invalid Link' });
+          els.status.textContent = 'ERROR: Invalid Link'; els.status.className='status-text bad';
+          logMsg('Error: Missing host or token in URL.');
           return;
         }
-        
-        updateUI('connecting', { message: 'Awaiting signal...' });
 
-        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-        
+        function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
+        function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
+
+        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
         const chunks = [];
-        let expectedBytes = 0;
-        let received = 0;
-        let mime = 'video/webm';
-        let filename = 'capture.webm';
-        let conn = null;
+        let expectedBytes = 0, received = 0, mime = 'video/webm', filename = 'capture.webm', conn = null;
 
+        logMsg('Initializing PeerJS with STUN servers...');
         const peer = new Peer(undefined, {
           debug: 2,
           config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
         });
 
         peer.on('open', (id) => {
-          logMsg(`PeerJS client open with ID: ${id}`);
-          updateUI('connecting', { message: 'Contacting host...' });
+          logMsg(`PeerJS client is open with ID: ${id}`);
+          setConn('connecting...');
           conn = peer.connect(hostId, { reliable: true });
 
           conn.on('open', () => {
-            logMsg('Connection established!');
+            logMsg('Connection established with host!');
+            setConn('connected', true);
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+            els.btn.disabled = false;
+            els.btnText.textContent = 'INITIATE';
           });
 
           conn.on('data', (msg) => {
             if (typeof msg === 'string') {
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
+                setStatus('ready');
                 logMsg('Handshake acknowledged. Ready.');
-                updateUI('ready');
               } else if (data.type === 'recordingMeta') {
-                mime = data.mime || 'video/webm';
-                expectedBytes = data.totalBytes || 0;
-                filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
+                mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
                 chunks.length = 0; received = 0;
-                updateUI('receiving');
+                els.progressContainer.style.display = 'block';
+                els.progress.value = 0;
+                setStatus('receiving…');
                 logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
               } else if (data.type === 'recordingEnd') {
-                updateUI('progress', { percent: 100 });
+                if (recordingTimer) clearInterval(recordingTimer);
                 const blob = new Blob(chunks, { type: mime });
                 const url = URL.createObjectURL(blob);
                 els.dl.href = url; els.dl.download = filename;
                 els.video.src = url; 
-                setTimeout(() => updateUI('complete'), 500);
+                
+                els.recordArea.style.display = 'none';
+                els.instructions.style.display = 'none';
+                els.resultArea.style.display = 'flex';
+                
+                els.progress.value = 100;
+                setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
+                setStatus('complete', true);
                 logMsg('File received successfully.');
               } else if (data.type === 'error') {
-                updateUI('error', { message: data.message || 'Host error' });
+                setStatus(data.message || 'error', false);
                 logMsg(`Host sent error: ${data.message}`);
+                resetUI();
+                els.btnText.textContent = 'RETRY';
               }
             } else {
               chunks.push(new Uint8Array(msg));
               received += msg.byteLength;
-              if (expectedBytes) {
-                const percent = Math.min(100, (100 * received / expectedBytes));
-                updateUI('progress', { percent });
-              }
+              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
             }
           });
 
-          conn.on('close', () => { logMsg('Connection closed.'); updateUI('error', { message: 'Disconnected' }); });
-          conn.on('error', (err) => { logMsg(`Connection error: ${err}`); updateUI('error', { message: 'Connection failed' }); });
+          conn.on('close', () => { logMsg('Connection closed.'); setConn('disconnected'); setStatus('disconnected', false); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
+          conn.on('error', (err) => { logMsg(`Connection error: ${err}`); setConn('connection error', false); });
         });
-
-        peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); updateUI('error', { message: `Peer Error: ${err.type}` }); });
-        peer.on('disconnected', () => { logMsg('Disconnected from PeerJS server.'); updateUI('connecting', { message: 'Reconnecting signal...' }); });
+        
+        peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); setConn(`peer error: ${err.type}`, false); setStatus('Error', false); });
+        peer.on('disconnected', () => { logMsg('Disconnected from server.'); setConn('reconnecting signal...'); });
         
         els.btn.addEventListener('click', () => {
-          updateUI('requesting');
+          setStatus('requesting...');
           logMsg('Sent startRecording request.');
           conn && conn.send(JSON.stringify({ type:'startRecording' }));
-          
-          requestTimeout = setTimeout(() => { 
-            if (els.btnMainText.textContent === 'PROCESSING') {
-              updateUI('error', { message: 'Request timed out' });
+          startRecordingAnimation();
+
+          setTimeout(() => { 
+            if (els.status.textContent === 'STATUS: requesting...') {
+              setStatus('request timed out', false);
+              resetUI();
+              els.btnText.textContent = 'RETRY';
             }
           }, 8000);
         });
-
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.message}.`);
-        updateUI('error', { message: 'Script failure' });
+        setConn('Script Error', false);
+        setStatus(e.message, false);
     }
   });
   </script>
