@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>U N K N O W N // Remote</title>
+  <title>U N K N O W N</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -11,11 +11,9 @@
     :root { 
       color-scheme: dark; 
       --bg-color: #000000;
-      --panel-bg: #0a0a0a;
       --text-color: #EAEAEA;
       --accent-color: #FFFFFF;
       --dim-color: #555555;
-      --border-color: #333333;
       --error-color: #ff4747;
       --recording-color: #ff4747;
     }
@@ -41,23 +39,18 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
-      background: var(--panel-bg);
-      border: 1px solid var(--border-color);
-      padding: 24px;
-      box-sizing: border-box;
     }
     .title {
-      font-size: 1.5rem;
+      font-size: 2rem;
       font-weight: 700;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
+      letter-spacing: 0.5em;
+      text-indent: 0.5em;
       color: var(--accent-color);
+      text-shadow: 0 0 5px rgba(255,255,255,0.2);
     }
     .instructions {
-      font-size: 0.8rem;
-      color: #888;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+      font-size: 0.9rem;
+      color: var(--dim-color);
       line-height: 1.6;
     }
 
@@ -70,11 +63,11 @@
         width: 160px;
         height: 160px;
         padding: 0;
-        background-color: transparent;
-        border: 2px solid var(--dim-color);
-        box-shadow: none;
+        background-color: var(--recording-color);
+        border: 2px solid rgba(0,0,0,0.5);
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5);
         border-radius: 50%;
-        color: var(--dim-color);
+        color: var(--accent-color);
         cursor: pointer;
         transition: all 0.2s ease-in-out;
         display: flex;
@@ -82,8 +75,8 @@
         justify-content: center;
     }
     .record-button:not(:disabled):hover {
-        border-color: var(--accent-color);
-        color: var(--accent-color);
+        background-color: #ff6a6a;
+        box-shadow: 0 0 0 3px #ff6a6a, 0 0 35px rgba(255, 106, 106, 1);
         transform: scale(1.02);
     }
     .record-button:not(:disabled):active {
@@ -91,8 +84,8 @@
         transition: transform 0.1s;
     }
     .record-button:disabled {
-        border-color: #222;
-        background-color: #111;
+        background-color: #4d1515;
+        box-shadow: none;
         opacity: 0.5;
         cursor: not-allowed;
     }
@@ -102,24 +95,24 @@
         align-items: center;
         justify-content: center;
         line-height: 1.1;
+        /* UPDATED: This is the fix. It ensures the text is rendered on top of the progress ring. */
         position: relative;
         z-index: 2;
     }
     .record-button__text {
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 1.2rem;
         line-height: 1.2;
         letter-spacing: 0.15em;
         text-transform: uppercase;
-        transition: font-size 0.2s ease, color 0.2s ease;
-    }
-    .record-button:not(:disabled):hover .record-button__text {
-        color: var(--accent-color);
+        transition: font-size 0.2s ease;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
     .record-button__subtext {
         font-size: 0.7rem;
         font-weight: 400;
         letter-spacing: 0.1em;
+        color: var(--accent-color);
         opacity: 0.7;
         display: none;
         margin-top: 4px;
@@ -127,10 +120,10 @@
     }
     .progress-ring {
         position: absolute;
-        top: -2px;
-        left: -2px;
-        width: 160px;
-        height: 160px;
+        top: -4px;
+        left: -4px;
+        width: 168px;
+        height: 168px;
     }
     .progress-ring__circle, .progress-ring__circle-bg {
         transform: rotate(-90deg);
@@ -146,14 +139,10 @@
         stroke-linecap: round;
         transition: stroke-dashoffset 0.3s ease;
     }
-
-    /* Red for Recording State */
     .record-button.is-recording {
-        background-color: var(--recording-color);
-        border-color: var(--recording-color);
-        color: var(--accent-color);
-        box-shadow: 0 0 25px rgba(255, 71, 71, 1);
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 1);
         animation: pulse 1.5s infinite;
+        background-color: #000;
     }
     .record-button.is-recording .record-button__text {
         font-size: 2.8rem;
@@ -164,20 +153,20 @@
     }
     .record-button.is-recording .record-button__subtext {
         display: block;
-        color: var(--accent-color);
+        color: var(--recording-color);
         opacity: 1;
         text-shadow: 0 0 5px var(--recording-color);
     }
     .record-button.is-recording .progress-ring__circle {
-        stroke: var(--accent-color);
+        stroke: var(--recording-color);
     }
     .record-button.is-recording .progress-ring__circle-bg {
         opacity: 0.3;
     }
     @keyframes pulse {
-      0% { box-shadow: 0 0 25px rgba(255, 71, 71, 0.5); }
-      50% { box-shadow: 0 0 40px rgba(255, 71, 71, 1); }
-      100% { box-shadow: 0 0 25px rgba(255, 71, 71, 0.5); }
+      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
+      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 40px rgba(255, 71, 71, 1); }
+      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
     }
     @keyframes text-vibrate {
         0%, 100% { transform: scale(1); }
@@ -192,14 +181,10 @@
       align-items: center;
       justify-content: center;
       gap: 12px;
-      border: 1px solid var(--border-color);
-      padding: 12px;
     }
     .status-text {
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       color: var(--dim-color);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
     }
     .status-text.ok { color: var(--text-color); }
     .status-text.bad { color: var(--error-color); }
@@ -231,36 +216,37 @@
         color: var(--text-color);
         letter-spacing: 0.2em;
         margin: 0;
-        text-transform: uppercase;
+        text-indent: 0.2em;
     }
     video { width: 100%; border: 1px solid var(--dim-color); }
-    .btn {
+    a.dl {
       display: inline-block;
       width: 100%;
       box-sizing: border-box;
-      padding: 10px 16px;
-      text-align: center;
+      padding: 10px 16px; 
       border: 1px solid var(--dim-color);
       color: var(--text-color); 
       text-decoration: none; 
       font-size: 0.9rem;
-      font-family: inherit;
-      background: transparent;
-      cursor: pointer;
       transition: all 0.2s ease-in-out;
     }
-    .btn:hover {
+    a.dl:hover {
       background: var(--accent-color);
       color: var(--bg-color);
-      border-color: var(--accent-color);
     }
-    .btn.btn-primary {
-        background-color: var(--accent-color);
+    .reset-button {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--accent-color);
+        background: var(--accent-color);
         color: var(--bg-color);
-        border-color: var(--accent-color);
+        font-family: inherit;
+        font-size: 0.9rem;
         font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
     }
-    .btn.btn-primary:hover {
+    .reset-button:hover {
         background: transparent;
         color: var(--accent-color);
     }
@@ -269,14 +255,14 @@
 </head>
 <body>
   <div class="container">
-    <h1 class="title">U N K N O W N</h1>
-    <p id="instructions" class="instructions">// Tap the orb to request a 5-second capture from the installation.</p>
+    <h1 class="title">UNKNOWN</h1>
+    <p id="instructions" class="instructions">Tap the orb to request a 5‑second capture from the installation.</p>
     
     <div id="record-button-area">
       <button id="startBtn" class="record-button" disabled>
-          <svg class="progress-ring" viewBox="0 0 160 160">
-              <circle class="progress-ring__circle-bg" stroke-width="2" fill="transparent" r="78" cx="80" cy="80"/>
-              <circle class="progress-ring__circle" stroke-width="2" fill="transparent" r="78" cx="80" cy="80"/>
+          <svg class="progress-ring" viewBox="0 0 168 168">
+              <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
+              <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
           </svg>
           <div class="record-button__content">
             <span id="startBtnText" class="record-button__text">CONNECTING</span>
@@ -294,10 +280,10 @@
     </div>
 
     <div id="result-area" class="result-area">
-      <h2 class="result-title">Capture Complete</h2>
+      <h2 class="result-title">CAPTURE COMPLETE</h2>
       <video id="preview" controls playsinline></video>
-      <a id="download" class="btn" href="#" download>Download Video</a>
-      <button id="resetBtn" class="btn btn-primary">Record Another</button>
+      <a id="download" class="dl" href="#" download>Download Video</a>
+      <button id="resetBtn" class="reset-button">Record Another</button>
     </div>
 
     <pre id="debugLog"></pre>
@@ -366,7 +352,7 @@
         
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
-        els.btnText.innerHTML = 'Request';
+        els.btnText.innerHTML = 'START<br>RECORDING';
         els.btnSubtext.textContent = '';
 
 
@@ -420,7 +406,7 @@
             setConn('connected', true);
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            els.btnText.innerHTML = 'Request';
+            els.btnText.innerHTML = 'START<br>RECORDING';
           });
 
           conn.on('data', (msg) => {
@@ -455,7 +441,7 @@
                 setStatus(data.message || 'error', false);
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                els.btnText.innerHTML = 'Retry';
+                els.btnText.innerHTML = 'RETRY<br>RECORDING';
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -481,7 +467,7 @@
             if (els.status.textContent === 'STATUS: requesting...') {
               setStatus('request timed out', false);
               resetUI();
-              els.btnText.innerHTML = 'Retry';
+              els.btnText.innerHTML = 'RETRY<br>RECORDING';
             }
           }, 8000);
         });
