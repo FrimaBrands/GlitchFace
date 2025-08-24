@@ -136,15 +136,28 @@
       background: var(--accent-color);
       color: var(--bg-color);
     }
+    .timer {
+        display: none;
+        font-size: 6rem;
+        font-weight: 700;
+        margin: 20px auto;
+        height: 150px;
+        line-height: 150px;
+        color: var(--accent-color);
+    }
+    .hidden {
+        display: none !important;
+    }
     #debugLog { display: none; } /* Hidden for guests */
   </style>
 </head>
 <body>
   <div class="container">
     <h1 class="title">UNKNOWN</h1>
-    <p id="instructions" class="instructions">Tap the orb to request a 5‑second capture from the installation.</p>
+    <p id="instructions" class="instructions">Tap the orb to initiate a 5-second recording at the installation.</p>
     
     <button id="startBtn" disabled>CONNECTING</button>
+    <div id="timer" class="timer"></div>
     
     <div class="status-area">
       <div id="connState" class="status-text">initializing…</div>
@@ -152,7 +165,7 @@
       <progress id="progress" value="0" max="100"></progress>
     </div>
 
-    <div id="result-area" style="display: none;">
+    <div id="result-area" class="hidden">
       <video id="preview" controls playsinline></video>
       <a id="download" class="dl" href="#" download>Download Video</a>
     </div>
@@ -162,7 +175,6 @@
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
-  // --- All JavaScript functionality remains unchanged. ---
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
       btn: document.getElementById('startBtn'),
@@ -173,13 +185,11 @@
       video: document.getElementById('preview'),
       debug: document.getElementById('debugLog'),
       instructions: document.getElementById('instructions'),
-      resultArea: document.getElementById('result-area')
+      resultArea: document.getElementById('result-area'),
+      timer: document.getElementById('timer'),
     };
 
-    if (!els.debug) {
-        // Non-critical for guest UI
-        console.error('Debug log element not found.');
-    }
+    let timerInterval = null;
 
     function logMsg(msg) {
         console.log(msg);
@@ -187,6 +197,27 @@
         const time = new Date().toLocaleTimeString();
         els.debug.textContent = `${time}: ${msg}\n${els.debug.textContent}`;
     }
+    
+    function startTimer() {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        let timeLeft = 5;
+        els.btn.classList.add('hidden');
+        els.timer.classList.remove('hidden');
+        els.timer.textContent = timeLeft;
+        setStatus('recording...');
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            els.timer.textContent = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                els.timer.classList.add('hidden');
+                setStatus('transferring...');
+            }
+        }, 1000);
+    }
+
 
     logMsg('DOM is ready. Starting script.');
 
@@ -263,13 +294,16 @@
                 els.video.src = url; 
                 
                 // Show results
-                els.resultArea.style.display = 'block';
+                els.resultArea.classList.remove('hidden');
                 els.dl.style.display='inline-block';
                 els.video.style.display='block';
                 
                 // Hide button and instructions
-                els.btn.style.display = 'none';
-                els.instructions.style.display = 'none';
+                els.btn.classList.add('hidden');
+                els.instructions.classList.add('hidden');
+                els.timer.classList.add('hidden');
+                if(timerInterval) clearInterval(timerInterval);
+
 
                 els.progress.value = 100;
                 setStatus('complete', true);
@@ -279,6 +313,9 @@
                 logMsg(`Host sent error: ${data.message}`);
                 els.btn.disabled = false;
                 els.btn.textContent = 'RETRY';
+                els.btn.classList.remove('hidden');
+                els.timer.classList.add('hidden');
+                if(timerInterval) clearInterval(timerInterval);
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -314,15 +351,20 @@
         
         els.btn.addEventListener('click', () => {
           els.btn.disabled = true;
-          els.btn.textContent = 'WAIT';
           setStatus('requesting...');
           logMsg('Sent startRecording request to host.');
           conn && conn.send(JSON.stringify({ type:'startRecording' }));
+          
+          startTimer();
+
           setTimeout(() => { 
             if (els.status.textContent === 'STATUS: requesting...') {
               setStatus('request timed out', false);
               els.btn.disabled = false;
               els.btn.textContent = 'RETRY';
+              els.btn.classList.remove('hidden');
+              els.timer.classList.add('hidden');
+              if(timerInterval) clearInterval(timerInterval);
             }
           }, 8000);
         });
