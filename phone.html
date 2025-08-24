@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>U N K N O W N</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     :root { 
@@ -16,9 +16,6 @@
       --dim-color: #555555;
       --error-color: #ff4747;
       --recording-color: #ff4747;
-      --clickable-bg: #EAEAEA;
-      --clickable-text: #111111;
-      --clickable-glow: rgba(255, 71, 71, 0.7);
     }
     html, body {
       height: 100%;
@@ -66,29 +63,33 @@
         width: 160px;
         height: 160px;
         padding: 0;
-        border: none;
+        /* UPDATED: Prettier button styling */
+        background-color: var(--recording-color);
+        border: 2px solid rgba(0,0,0,0.5);
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5);
         border-radius: 50%;
-        background: var(--clickable-bg);
-        color: var(--clickable-text);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 2px 1px #fff, inset 0 -2px 1px #ccc;
+        color: var(--accent-color);
         cursor: pointer;
-        transition: all 0.15s ease-out;
+        transition: all 0.2s ease-in-out;
         display: flex;
         align-items: center;
         justify-content: center;
     }
-    .record-button:not(:disabled) {
-        animation: pulse 2.5s infinite ease-in-out;
-    }
     .record-button:not(:disabled):hover {
-        transform: scale(1.05) translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.5), inset 0 2px 1px #fff, inset 0 -2px 1px #ccc;
-        animation: none;
+        background-color: #ff6a6a; /* Lighter red on hover */
+        box-shadow: 0 0 0 3px #ff6a6a, 0 0 35px rgba(255, 106, 106, 0.7);
+        transform: scale(1.02); /* Pop out on hover */
+    }
+    /* UPDATED: Added active state for click feedback */
+    .record-button:not(:disabled):active {
+        transform: scale(0.98);
+        transition: transform 0.1s;
     }
     .record-button:disabled {
+        background-color: #4d1515;
+        box-shadow: none;
         opacity: 0.5;
         cursor: not-allowed;
-        animation: none;
     }
     .record-button__content {
         display: flex;
@@ -101,21 +102,25 @@
         font-weight: 700;
         font-size: 0.9rem;
         letter-spacing: 0.1em;
-        transition: all 0.2s ease;
+        transition: font-size 0.2s ease;
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4); /* Add shadow to text */
     }
     .record-button__subtext {
         font-size: 0.7rem;
         font-weight: 400;
         letter-spacing: 0.1em;
-        color: var(--dim-color);
+        color: var(--accent-color);
+        opacity: 0.7;
         display: none;
         margin-top: 4px;
         transition: color 0.2s;
     }
     .progress-ring {
         position: absolute;
-        top: 0;
-        left: 0;
+        top: -4px; /* Adjust for border width */
+        left: -4px; /* Adjust for border width */
+        width: 168px; /* Adjust for border width */
+        height: 168px; /* Adjust for border width */
     }
     .progress-ring__circle, .progress-ring__circle-bg {
         transform: rotate(-90deg);
@@ -123,7 +128,8 @@
     }
     .progress-ring__circle-bg {
         stroke: var(--dim-color);
-        opacity: 0.3;
+        opacity: 0; /* Hide background ring unless recording */
+        transition: opacity 0.3s;
     }
     .progress-ring__circle {
         stroke: var(--accent-color);
@@ -131,28 +137,38 @@
         transition: stroke-dashoffset 0.3s ease;
     }
     .record-button.is-recording {
-        animation: none;
-        transform: scale(0.98) translateY(1px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 2px 5px rgba(0,0,0,0.3);
-        cursor: not-allowed;
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.7);
+        animation: pulse 1.5s infinite;
+        background-color: #000; /* Black background during recording */
     }
+    /* UPDATED: Vibrant timer text */
     .record-button.is-recording .record-button__text {
-        font-size: 2.2rem;
+        font-size: 2.5rem; /* Slightly larger */
         letter-spacing: 0;
-        color: var(--recording-color);
-        text-shadow: 0 0 8px var(--recording-color), 0 0 12px rgba(255, 255, 255, 0.7);
+        color: var(--accent-color);
+        text-shadow: 0 0 8px var(--accent-color), 0 0 15px var(--recording-color); /* White and Red glow */
+        animation: text-vibrate 1s infinite ease-in-out;
     }
     .record-button.is-recording .record-button__subtext {
         display: block;
         color: var(--recording-color);
+        opacity: 1;
     }
     .record-button.is-recording .progress-ring__circle {
         stroke: var(--recording-color);
     }
+    .record-button.is-recording .progress-ring__circle-bg {
+        opacity: 0.3; /* Show background ring during recording */
+    }
     @keyframes pulse {
-      0% { box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 2px 1px #fff, inset 0 -2px 1px #ccc, 0 0 0 0 var(--clickable-glow); }
-      70% { box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 2px 1px #fff, inset 0 -2px 1px #ccc, 0 0 0 15px rgba(255, 71, 71, 0); }
-      100% { box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 2px 1px #fff, inset 0 -2px 1px #ccc, 0 0 0 0 var(--clickable-glow); }
+      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
+      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 40px rgba(255, 71, 71, 1); }
+      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
+    }
+    /* UPDATED: Animation for vibrant text */
+    @keyframes text-vibrate {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
     }
     
     /* --- Status and Progress --- */
@@ -242,9 +258,9 @@
     
     <div id="record-button-area">
       <button id="startBtn" class="record-button" disabled>
-          <svg class="progress-ring" width="160" height="160" viewBox="0 0 160 160">
-              <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="76" cx="80" cy="80"/>
-              <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="76" cx="80" cy="80"/>
+          <svg class="progress-ring" viewBox="0 0 168 168">
+              <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
+              <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
           </svg>
           <div class="record-button__content">
             <span id="startBtnText" class="record-button__text">CONNECTING</span>
