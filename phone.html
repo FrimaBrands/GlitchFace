@@ -38,6 +38,7 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
+      align-items: center;
     }
     .title {
       font-size: 2rem;
@@ -51,13 +52,22 @@
       font-size: 0.9rem;
       color: var(--dim-color);
       line-height: 1.6;
+      transition: opacity 0.3s ease;
+    }
+    .trigger-area {
+      position: relative;
+      width: 160px;
+      height: 160px;
+      margin: 20px auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     #startBtn {
       width: 150px;
       height: 150px;
-      margin: 20px auto;
       font-weight: 700;
-      font-size: 1rem;
+      font-size: 1.1rem;
       letter-spacing: 0.1em;
       border: 1px solid var(--dim-color);
       border-radius: 50%;
@@ -66,6 +76,7 @@
       cursor: pointer;
       transition: all 0.2s ease-in-out;
       animation: pulse 3s infinite ease-in-out;
+      z-index: 10;
     }
     #startBtn:not(:disabled):hover {
       background: var(--accent-color);
@@ -75,17 +86,27 @@
       animation: none;
     }
     #startBtn:disabled {
-      opacity: 0.5;
+      opacity: 0.8;
       cursor: not-allowed;
       animation: none;
     }
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.2); }
-      70% { box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+    .progress-ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 160px;
+        height: 160px;
+        transform: rotate(-90deg);
+        z-index: 5;
+    }
+    .progress-ring__circle {
+        stroke: var(--accent-color);
+        stroke-width: 2;
+        fill: transparent;
+        transition: stroke-dashoffset 0.5s linear;
     }
     .status-area {
-      min-height: 60px;
+      min-height: 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -98,79 +119,82 @@
     }
     .status-text.ok { color: var(--text-color); }
     .status-text.bad { color: var(--error-color); }
-    progress {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 2px;
-      background-color: var(--dim-color);
-      border: none;
+
+    /* Result styling */
+    #result-area {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 16px;
+        margin-top: 12px;
     }
-    progress::-webkit-progress-bar {
-      background-color: var(--dim-color);
-    }
-    progress::-webkit-progress-value {
-      background-color: var(--accent-color);
-      transition: width 0.1s linear;
-    }
-    progress::-moz-progress-bar {
-      background-color: var(--accent-color);
+    #result-area.visible {
+        display: flex;
     }
     video { 
       width: 100%; 
       border: 1px solid var(--dim-color);
-      display: none; 
-      margin-top: 12px;
+      display: block;
     }
-    a.dl { 
-      display: none;
-      margin-top: 12px; 
-      padding: 10px 16px; 
+    .button-group {
+        display: flex;
+        gap: 12px;
+        width: 100%;
+    }
+    .btn { 
+      flex: 1;
+      padding: 12px 16px; 
       border: 1px solid var(--dim-color);
       color: var(--text-color); 
+      background: transparent;
       text-decoration: none; 
+      font-family: 'JetBrains Mono', monospace;
       font-size: 0.9rem;
+      font-weight: 700;
       transition: all 0.2s ease-in-out;
     }
-    a.dl:hover {
+    .btn:hover {
       background: var(--accent-color);
       color: var(--bg-color);
+      border-color: var(--accent-color);
     }
-    .timer {
-        display: none;
-        font-size: 6rem;
-        font-weight: 700;
-        margin: 20px auto;
-        height: 150px;
-        line-height: 150px;
-        color: var(--accent-color);
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.2); }
+      70% { box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
     }
-    .hidden {
-        display: none !important;
-    }
-    #debugLog { display: none; } /* Hidden for guests */
   </style>
 </head>
 <body>
   <div class="container">
     <h1 class="title">UNKNOWN</h1>
-    <p id="instructions" class="instructions">Tap the orb to initiate a 5-second recording at the installation.</p>
+    <p id="instructions" class="instructions">Tap the orb to request a 5‑second capture from the installation.</p>
     
-    <button id="startBtn" disabled>CONNECTING</button>
-    <div id="timer" class="timer"></div>
+    <div id="trigger-area" class="trigger-area">
+        <button id="startBtn" disabled>CONNECTING</button>
+        <svg id="progress-svg" class="progress-ring" viewBox="0 0 160 160">
+            <circle
+              class="progress-ring__circle"
+              r="78"
+              cx="80"
+              cy="80"
+            />
+        </svg>
+    </div>
     
     <div class="status-area">
       <div id="connState" class="status-text">initializing…</div>
       <div id="status" class="status-text">—</div>
-      <progress id="progress" value="0" max="100"></progress>
     </div>
 
-    <div id="result-area" class="hidden">
+    <div id="result-area">
       <video id="preview" controls playsinline></video>
-      <a id="download" class="dl" href="#" download>Download Video</a>
+      <div class="button-group">
+        <a id="download" class="btn" href="#" download>Download</a>
+        <button id="resetBtn" class="btn">Again</button>
+      </div>
     </div>
-
-    <pre id="debugLog"></pre>
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -180,203 +204,158 @@
       btn: document.getElementById('startBtn'),
       conn: document.getElementById('connState'),
       status: document.getElementById('status'),
-      progress: document.getElementById('progress'),
       dl: document.getElementById('download'),
       video: document.getElementById('preview'),
-      debug: document.getElementById('debugLog'),
       instructions: document.getElementById('instructions'),
       resultArea: document.getElementById('result-area'),
-      timer: document.getElementById('timer'),
+      triggerArea: document.getElementById('trigger-area'),
+      resetBtn: document.getElementById('resetBtn'),
+      progressSvg: document.getElementById('progress-svg'),
+      progressCircle: document.querySelector('.progress-ring__circle')
     };
 
-    let timerInterval = null;
+    const radius = els.progressCircle.r.baseVal.value;
+    const circumference = 2 * Math.PI * radius;
+    els.progressCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+    els.progressCircle.style.strokeDashoffset = circumference;
 
-    function logMsg(msg) {
-        console.log(msg);
-        if (!els.debug) return;
-        const time = new Date().toLocaleTimeString();
-        els.debug.textContent = `${time}: ${msg}\n${els.debug.textContent}`;
+    function setProgress(percent) {
+        const offset = circumference - (percent / 100) * circumference;
+        els.progressCircle.style.strokeDashoffset = offset;
     }
     
-    function startTimer() {
-        if (timerInterval) clearInterval(timerInterval);
-        
-        let timeLeft = 5;
-        els.btn.classList.add('hidden');
-        els.timer.classList.remove('hidden');
-        els.timer.textContent = timeLeft;
-        setStatus('recording...');
+    let recordingInterval;
 
-        timerInterval = setInterval(() => {
-            timeLeft--;
-            els.timer.textContent = timeLeft;
-            if (timeLeft <= 0) {
-                clearInterval(timerInterval);
-                els.timer.classList.add('hidden');
-                setStatus('transferring...');
-            }
-        }, 1000);
+    function resetUI() {
+        clearInterval(recordingInterval);
+        els.resultArea.classList.remove('visible');
+        els.triggerArea.style.display = 'flex';
+        els.instructions.style.opacity = '1';
+        els.btn.disabled = false;
+        els.btn.textContent = 'INITIATE';
+        setStatus('ready');
+        setProgress(0);
+        // Ensure video is paused to stop network activity
+        els.video.pause();
+        els.video.src = ""; 
     }
 
+    function qs(k){ return new URLSearchParams(location.search).get(k); }
+    const hostId = qs('host'); const token = qs('token');
 
-    logMsg('DOM is ready. Starting script.');
+    if (!hostId || !token) {
+      setStatus('ERROR: Invalid Link', false);
+      return;
+    }
 
-    try {
-        function qs(k){ return new URLSearchParams(location.search).get(k); }
-        const hostId = qs('host'); const token = qs('token');
+    function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
+    function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
 
-        if (!hostId || !token) {
-          els.status.textContent = 'ERROR: Invalid Link'; els.status.className='status-text bad';
-          logMsg('Error: Missing host or token in URL.');
-          return;
-        }
+    const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
+    
+    const chunks = [];
+    let expectedBytes = 0;
+    let received = 0;
+    let mime = 'video/webm';
+    let filename = 'capture.webm';
+    let conn = null;
 
-        function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
-        function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
+    const peer = new Peer(undefined, {
+      debug: 1,
+      config: { 'iceServers': [ { urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' } ] }
+    });
 
-        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && ( MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8') );
-        
-        const chunks = [];
-        let expectedBytes = 0;
-        let received = 0;
-        let mime = 'video/webm';
-        let filename = 'capture.webm';
-        let conn = null;
+    peer.on('open', (id) => {
+      setConn('connecting...');
+      conn = peer.connect(hostId, { reliable: true });
 
-        logMsg('Initializing PeerJS with STUN servers...');
-        
-        const peer = new Peer(undefined, {
-          debug: 2,
-          config: {
-            'iceServers': [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-            ]
+      conn.on('open', () => {
+        setConn('connected', true);
+        conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+        resetUI();
+      });
+
+      conn.on('data', (msg) => {
+        if (typeof msg === 'string') {
+          const data = JSON.parse(msg);
+          if (data.type === 'helloAck') {
+            setStatus('ready');
+          } else if (data.type === 'recordingStarted') {
+              setStatus('recording...');
+              let countdown = 5;
+              els.btn.textContent = countdown;
+              els.progressCircle.style.transition = 'stroke-dashoffset 1s linear';
+              setProgress(100); // Start the animation
+              
+              recordingInterval = setInterval(() => {
+                  countdown--;
+                  els.btn.textContent = countdown > 0 ? countdown : '...';
+                  if (countdown <= 0) {
+                      clearInterval(recordingInterval);
+                  }
+              }, 1000);
+
+          } else if (data.type === 'recordingMeta') {
+            clearInterval(recordingInterval);
+            mime = data.mime || 'video/webm';
+            expectedBytes = data.totalBytes || 0;
+            filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
+            chunks.length = 0; received = 0;
+            setProgress(0); // Reset for download progress
+            els.progressCircle.style.transition = 'stroke-dashoffset 0.1s linear';
+            setStatus('receiving…');
+            els.btn.textContent = '0%';
+          } else if (data.type === 'recordingEnd') {
+            setProgress(100);
+            const blob = new Blob(chunks, { type: mime });
+            const url = URL.createObjectURL(blob);
+            els.dl.href = url; els.dl.download = filename;
+            els.video.src = url; 
+            
+            els.resultArea.classList.add('visible');
+            els.triggerArea.style.display = 'none';
+            els.instructions.style.opacity = '0';
+
+            setStatus('complete', true);
+          } else if (data.type === 'error') {
+            setStatus(data.message || 'error', false);
+            resetUI();
           }
-        });
-
-        peer.on('open', (id) => {
-          logMsg(`PeerJS client is open with ID: ${id}`);
-          setConn('connecting...');
-          logMsg(`Attempting to connect to host: ${hostId}`);
-          
-          conn = peer.connect(hostId, { reliable: true });
-
-          conn.on('open', () => {
-            logMsg('Connection established with host!');
-            setConn('connected', true);
-            logMsg('Sending handshake (hello) with token...');
-            conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
-            els.btn.disabled = false;
-            els.btn.textContent = 'INITIATE';
-          });
-
-          conn.on('data', (msg) => {
-            if (typeof msg === 'string') {
-              const data = JSON.parse(msg);
-              if (data.type === 'helloAck') {
-                setStatus('ready');
-                logMsg('Handshake acknowledged by host. Ready.');
-              } else if (data.type === 'recordingMeta') {
-                mime = data.mime || 'video/webm';
-                expectedBytes = data.totalBytes || 0;
-                filename = data.filename || ('capture.'+(mime.includes('mp4')?'mp4':'webm'));
-                chunks.length = 0; received = 0;
-                els.progress.value = 0;
-                setStatus('receiving…');
-                logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
-              } else if (data.type === 'progress') {
-                if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*data.sent/expectedBytes));
-              } else if (data.type === 'recordingEnd') {
-                const blob = new Blob(chunks, { type: mime });
-                const url = URL.createObjectURL(blob);
-                els.dl.href = url; els.dl.download = filename;
-                els.video.src = url; 
-                
-                // Show results
-                els.resultArea.classList.remove('hidden');
-                els.dl.style.display='inline-block';
-                els.video.style.display='block';
-                
-                // Hide button and instructions
-                els.btn.classList.add('hidden');
-                els.instructions.classList.add('hidden');
-                els.timer.classList.add('hidden');
-                if(timerInterval) clearInterval(timerInterval);
-
-
-                els.progress.value = 100;
-                setStatus('complete', true);
-                logMsg('File received successfully.');
-              } else if (data.type === 'error') {
-                setStatus(data.message || 'error', false);
-                logMsg(`Host sent error: ${data.message}`);
-                els.btn.disabled = false;
-                els.btn.textContent = 'RETRY';
-                els.btn.classList.remove('hidden');
-                els.timer.classList.add('hidden');
-                if(timerInterval) clearInterval(timerInterval);
-              }
-            } else {
-              chunks.push(new Uint8Array(msg));
-              received += msg.byteLength;
-              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
-            }
-          });
-
-          conn.on('close', () => {
-            logMsg('Connection closed by host.');
-            setConn('disconnected');
-            setStatus('disconnected', false);
-            els.btn.disabled = true;
-            els.btn.textContent = 'OFFLINE';
-          });
-
-          conn.on('error', (err) => {
-            logMsg(`Connection error: ${err}`);
-            setConn('connection error', false);
-          });
-        });
-
-        peer.on('error', (err) => {
-          logMsg(`A peer error occurred: ${err.type} - ${err.message || err}`);
-          setConn(`peer error: ${err.type}`, false);
-          setStatus('Error', false);
-        });
-
-        peer.on('disconnected', () => {
-            logMsg('Disconnected from PeerJS server. Attempting to reconnect...');
-            setConn('reconnecting signal...');
-        });
-        
-        els.btn.addEventListener('click', () => {
-          els.btn.disabled = true;
-          setStatus('requesting...');
-          logMsg('Sent startRecording request to host.');
-          conn && conn.send(JSON.stringify({ type:'startRecording' }));
-          
-          startTimer();
-
-          setTimeout(() => { 
-            if (els.status.textContent === 'STATUS: requesting...') {
-              setStatus('request timed out', false);
-              els.btn.disabled = false;
-              els.btn.textContent = 'RETRY';
-              els.btn.classList.remove('hidden');
-              els.timer.classList.add('hidden');
-              if(timerInterval) clearInterval(timerInterval);
-            }
-          }, 8000);
-        });
-
-    } catch (e) {
-        logMsg(`CRITICAL ERROR: ${e.name} - ${e.message}.`);
-        if (e instanceof ReferenceError) {
-            logMsg('This could be due to a missing browser feature or the PeerJS library failing to load.');
+        } else {
+          chunks.push(new Uint8Array(msg));
+          received += msg.byteLength;
+          if (expectedBytes > 0) {
+            const percent = Math.round(100 * received / expectedBytes);
+            setProgress(percent);
+            els.btn.textContent = `${percent}%`;
+          }
         }
-        setConn('Script Error', false);
-        setStatus(e.message, false);
-    }
+      });
+
+      conn.on('close', () => {
+        setConn('disconnected');
+        setStatus('disconnected', false);
+        els.btn.disabled = true;
+        els.btn.textContent = 'OFFLINE';
+      });
+
+      conn.on('error', (err) => setConn('connection error', false));
+    });
+
+    peer.on('error', (err) => {
+      setConn(`peer error: ${err.type}`, false);
+      setStatus('Error', false);
+    });
+    
+    els.btn.addEventListener('click', () => {
+      els.btn.disabled = true;
+      setStatus('requesting...');
+      conn?.send(JSON.stringify({ type:'startRecording' }));
+    });
+
+    els.resetBtn.addEventListener('click', resetUI);
+
+    setProgress(0); // Initial reset
   });
   </script>
 </body>
