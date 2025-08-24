@@ -121,10 +121,8 @@
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
 
-  <!-- Main container with a stark, black aesthetic -->
   <div class="container w-full max-w-7xl h-[90vh] bg-black border border-gray-800 flex overflow-hidden">
     
-    <!-- Main video display area -->
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center overflow-hidden">
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
@@ -135,10 +133,8 @@
       </div>
     </div>
 
-    <!-- Right-side control panel -->
     <div class="controls-panel w-[420px] flex-shrink-0 bg-[#0a0a0a] border-l border-gray-800 flex flex-col">
       
-      <!-- Header and primary controls -->
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h1 class="text-xl font-bold text-white tracking-widest">U N K N O W N</h1>
         <p class="text-sm text-gray-400 font-mono">// SIGNAL PROCESSOR</p>
@@ -149,7 +145,6 @@
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
       </div>
 
-      <!-- Preset Manager -->
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
         <h2 class="font-bold text-gray-300 mb-2">// PRESET_MANAGER</h2>
         <select id="presetList" class="w-full bg-black border border-gray-700 p-2 mb-2 text-sm focus:outline-none focus:border-gray-400"></select>
@@ -161,19 +156,15 @@
         </div>
       </div>
       
-      <!-- Tab navigation -->
       <div class="flex border-b border-gray-800 flex-shrink-0">
         <button id="globalsTabBtn" class="tab-button active flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 text-gray-400 hover:text-white">Globals</button>
         <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-white">Effects</button>
       </div>
 
-      <!-- Scrollable content area for controls -->
       <div class="flex-grow custom-scrollbar overflow-y-auto">
         <div id="effects-tab-content" class="hidden p-4 space-y-4">
-          <!-- Effect controls will be dynamically inserted here -->
-        </div>
+          </div>
         <div id="globals-tab-content" class="p-4 space-y-4">
-          <!-- Remote Control Panel -->
           <div class="control-group bg-black/50 border border-gray-800 p-3">
             <h3 class="font-semibold text-gray-200 mb-3">// REMOTE_TRIGGER</h3>
             <p class="text-xs text-gray-500 mb-3">Enable guest phone to trigger a 5s canvas recording.</p>
@@ -190,7 +181,6 @@
             </div>
           </div>
 
-          <!-- Background Controls -->
           <div class="control-group bg-black/50 border border-gray-800 p-3">
             <h3 class="font-semibold text-gray-200 mb-3">// BACKGROUND_SOURCE</h3>
             <div class="space-y-3">
@@ -210,7 +200,6 @@
             </div>
           </div>
           
-          <!-- General Settings -->
           <div class="control-group bg-black/50 border border-gray-800 p-3">
             <h3 class="font-semibold text-gray-200 mb-3">// SYSTEM_SETTINGS</h3>
             <div class="space-y-3">
@@ -225,7 +214,6 @@
             </div>
           </div>
           
-          <!-- Automation Controls -->
           <div class="control-group bg-black/50 border border-gray-800 p-3">
             <h3 class="font-semibold text-gray-200 mb-3">// AUTOMATION_MODULE</h3>
             <div class="control-item space-y-2">
@@ -1329,6 +1317,7 @@
         
         isRecording = true;
         updateStatus();
+        conn.send(JSON.stringify({ type: 'recordingStarted' }));
         
         const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
         let recording;
