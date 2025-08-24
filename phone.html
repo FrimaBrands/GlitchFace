@@ -14,8 +14,8 @@
       --text-color: #EAEAEA;
       --accent-color: #FFFFFF;
       --dim-color: #555555;
-      --error-color: #ff4747;
-      --recording-color: #EF1818;
+      --error-color: #FF4136; /* A clearer, more urgent red */
+      --recording-color: #FF0033; /* A vibrant, neon-like red for a mysterious, digital feel */
     }
     html, body {
       height: 100%;
@@ -74,8 +74,8 @@
         justify-content: center;
     }
     .record-button:not(:disabled):hover {
-        background-color: #ff6a6a;
-        box-shadow: 0 0 0 3px #ff6a6a, 0 0 35px rgba(255, 106, 106, 1);
+        background-color: #ff2d55; /* A slightly brighter version for hover feedback */
+        box-shadow: 0 0 0 4px #ff2d55, 0 0 45px rgba(255, 0, 51, 0.9);
         transform: scale(1.02);
     }
     .record-button:not(:disabled):active {
@@ -83,7 +83,7 @@
         transition: transform 0.1s;
     }
     .record-button:disabled {
-        background-color: #4d1515;
+        background-color: #44000F; /* A deeper, more mysterious crimson */
         box-shadow: none;
         cursor: not-allowed;
     }
@@ -93,7 +93,6 @@
         align-items: center;
         justify-content: center;
         line-height: 1.1;
-        /* UPDATED: This is the fix. It ensures the text is rendered on top of the progress ring. */
         position: relative;
         z-index: 2;
     }
@@ -160,9 +159,9 @@
         opacity: 0.3;
     }
     @keyframes pulse {
-      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
-      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 40px rgba(255, 71, 71, 1); }
-      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
+      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 0, 51, 0.5); }
+      50% { box-shadow: 0 0 0 5px var(--recording-color), 0 0 50px rgba(255, 0, 51, 1); }
+      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 0, 51, 0.5); }
     }
     @keyframes text-vibrate {
         0%, 100% { transform: scale(1); }
