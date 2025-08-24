@@ -175,6 +175,495 @@
     
     /* --- Status and Progress --- */
     .status-area {
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .status-text {
+      font-size: 0.9rem;
+      color: var(--dim-color);
+    }
+    .status-text.ok { color: var(--text-color); }
+    .status-text.bad { color: var(--error-color); }
+    #progress-container {
+        width: 100%;
+        display: none;
+    }
+    progress {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 2px;
+      background-color: var(--dim-color);
+      border: none;
+    }
+    progress::-webkit-progress-bar { background-color: var(--dim-color); }
+    progress::-webkit-progress-value { background-color: var(--accent-color); transition: width 0.1s linear; }
+    progress::-moz-progress-bar { background-color: var(--accent-color); }
+
+    /* --- Result Area --- */
+    .result-area {
+      width: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    .result-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text-color);
+        letter-spacing: 0.2em;
+        margin: 0;
+        text-indent: 0.2em;
+    }
+    video { width: 100%; border: 1px solid var(--dim-color); }
+    a.dl {
+      display: inline-block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 16px;
+      border: 1px solid var(--dim-color);
+      color: var(--text-color);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: all 0.2s ease-in-out;
+    }
+    a.dl:hover {
+      background: var(--accent-color);
+      color: var(--bg-color);
+    }
+    .reset-button {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--accent-color);
+        background: var(--accent-color);
+        color: var(--bg-color);
+        font-family: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+    }
+    .reset-button:hover {
+        background: transparent;
+        color: var(--accent-color);
+    }
+    #debugLog { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="title">UNKNOWN</h1>
+      
+    <div id="record-button-area">
+      <button id="startBtn" class="record-button" disabled>
+          <svg class="progress-ring" viewBox="0 0 168 168">
+              <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
+              <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
+          </svg>
+          <div class="record-button__content">
+            <span id="startBtnText" class="record-button__text">CONNECTING</span>
+            <span id="startBtnSubtext" class="record-button__subtext"></span>
+          </div>
+      </button>
+    </div>
+    <p id="instructions" class="instructions">Tap to record a 5 second video</p>
+
+    <div class="status-area">
+      <div id="connState" class="status-text">initializing…</div>
+      <div id="status" class="status-text">—</div>
+      <div id="progress-container">
+        <progress id="progress" value="0" max="100"></progress>
+      </div>
+    </div>
+
+    <div id="result-area" class="result-area">
+      <h2 class="result-title">CAPTURE COMPLETE</h2>
+      <video id="preview" controls playsinline></video>
+      <a id="download" class="dl" href="#" download>Download Video</a>
+      <button id="resetBtn" class="reset-button">Record Another</button>
+    </div>
+
+    <pre id="debugLog"></pre>
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const els = {
+      btn: document.getElementById('startBtn'),
+      btnText: document.getElementById('startBtnText'),
+      btnSubtext: document.getElementById('startBtnSubtext'),
+      progressRing: document.querySelector('.progress-ring__circle'),
+      conn: document.getElementById('connState'),
+      status: document.getElementById('status'),
+      progress: document.getElementById('progress'),
+      progressContainer: document.getElementById('progress-container'),
+      dl: document.getElementById('download'),
+      video: document.getElementById('preview'),
+      debug: document.getElementById('debugLog'),
+      instructions: document.getElementById('instructions'),
+      resultArea: document.getElementById('result-area'),
+      recordArea: document.getElementById('record-button-area'),
+      resetBtn: document.getElementById('resetBtn')
+    };
+
+    let recordingTimer = null;
+    const radius = els.progressRing.r.baseVal.value;
+    const circumference = radius * 2 * Math.PI;
+    els.progressRing.style.strokeDasharray = `${circumference} ${circumference}`;
+    
+    function setRingProgress(percent) {
+        const offset = circumference - percent / 100 * circumference;
+        els.progressRing.style.strokeDashoffset = offset;
+    }
+    setRingProgress(0);
+
+    function startRecordingAnimation() {
+        els.btn.disabled = true;
+        els.btn.classList.add('is-recording');
+        els.btnSubtext.textContent = 'RECORDING';
+        let secondsLeft = 5;
+        
+        els.btnText.textContent = secondsLeft;
+        els.progressRing.style.transition = 'stroke-dashoffset 5s linear';
+        setRingProgress(100);
+
+        recordingTimer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft > 0) {
+                els.btnText.textContent = secondsLeft;
+            } else {
+                els.btnText.textContent = '...';
+                clearInterval(recordingTimer);
+                recordingTimer = null;
+            }
+        }, 1000);
+    }
+
+    function resetUI() {
+        els.resultArea.style.display = 'none';
+        els.video.src = '';
+        els.dl.href = '#';
+        els.recordArea.style.display = 'block';
+        els.instructions.style.display = 'block';
+        
+        els.btn.disabled = false;
+        els.btn.classList.remove('is-recording');
+        els.btnText.innerHTML = 'START<br>RECORDING';
+        els.btnSubtext.textContent = '';
+
+
+        if (recordingTimer) clearInterval(recordingTimer);
+        els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
+        setRingProgress(0);
+        
+        setStatus('ready');
+        els.progressContainer.style.display = 'none';
+        els.progress.value = 0;
+    }
+
+    function logMsg(msg) {
+        console.log(msg);
+        if (els.debug) els.debug.textContent = `${new Date().toLocaleTimeString()}: ${msg}\n${els.debug.textContent}`;
+    }
+
+    logMsg('DOM is ready. Starting script.');
+    els.resetBtn.addEventListener('click', resetUI);
+
+    try {
+        const hostId = new URLSearchParams(location.search).get('host');
+        const token = new URLSearchParams(location.search).get('token');
+
+        if (!hostId || !token) {
+          els.status.textContent = 'ERROR: Invalid Link'; els.status.className='status-text bad';
+          logMsg('Error: Missing host or token in URL.');
+          return;
+        }
+
+        function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
+        function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
+
+        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
+        const chunks = [];
+        let expectedBytes = 0, received = 0, mime = 'video/webm', filename = 'capture.webm', conn = null;
+
+        logMsg('Initializing PeerJS with STUN servers...');
+        const peer = new Peer(undefined, {
+          debug: 2,
+          config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+        });
+
+        peer.on('open', (id) => {
+          logMsg(`PeerJS client is open with ID: ${id}`);
+          setConn('connecting...');
+          conn = peer.connect(hostId, { reliable: true });
+
+          conn.on('open', () => {
+            logMsg('Connection established with host!');
+            setConn('connected', true);
+            conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+            els.btn.disabled = false;
+            els.btnText.innerHTML = 'START<br>RECORDING';
+          });
+
+          conn.on('data', (msg) => {
+            if (typeof msg === 'string') {
+              const data = JSON.parse(msg);
+              if (data.type === 'helloAck') {
+                setStatus('ready');
+                logMsg('Handshake acknowledged. Ready.');
+              } else if (data.type === 'recordingMeta') {
+                mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
+                chunks.length = 0; received = 0;
+                els.progressContainer.style.display = 'block';
+                els.progress.value = 0;
+                setStatus('receiving…');
+                logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
+              } else if (data.type === 'recordingEnd') {
+                if (recordingTimer) clearInterval(recordingTimer);
+                const blob = new Blob(chunks, { type: mime });
+                const url = URL.createObjectURL(blob);
+                els.dl.href = url; els.dl.download = filename;
+                els.video.src = url; 
+                
+                els.recordArea.style.display = 'none';
+                els.instructions.style.display = 'none';
+                els.resultArea.style.display = 'flex';
+                
+                els.progress.value = 100;
+                setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
+                setStatus('complete', true);
+                logMsg('File received successfully.');
+              } else if (data.type === 'error') {
+                setStatus(data.message || 'error', false);
+                logMsg(`Host sent error: ${data.message}`);
+                resetUI();
+                els.btnText.innerHTML = 'RETRY<br>RECORDING';
+              }
+            } else {
+              chunks.push(new Uint8Array(msg));
+              received += msg.byteLength;
+              if (expectedBytes) els.progress.value = Math.min(100, Math.round(100*received/expectedBytes));
+            }
+          });
+
+          conn.on('close', () => { logMsg('Connection closed.'); setConn('disconnected'); setStatus('disconnected', false); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
+          conn.on('error', (err) => { logMsg(`Connection error: ${err}`); setConn('connection error', false); });
+        });
+        
+        peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); setConn(`peer error: ${err.type}`, false); setStatus('Error', false); });
+        peer.on('disconnected', () => { logMsg('Disconnected from server.'); setConn('reconnecting signal...'); });
+        
+        els.btn.addEventListener('click', () => {
+          setStatus('requesting...');
+          logMsg('Sent startRecording request.');
+          conn && conn.send(JSON.stringify({ type:'startRecording' }));
+          startRecordingAnimation();
+
+          setTimeout(() => { 
+            if (els.status.textContent === 'STATUS: requesting...') {
+              setStatus('request timed out', false);
+              resetUI();
+              els.btnText.innerHTML = 'RETRY<br>RECORDING';
+            }
+          }, 8000);
+        });
+    } catch (e) {
+        logMsg(`CRITICAL ERROR: ${e.message}.`);
+        setConn('Script Error', false);
+        setStatus(e.message, false);
+    }
+  });
+  </script>
+</body>
+</html>
+
+
+Show thinking
+Of course! Here is the updated HTML code with the connection/status lines removed and the button colors swapped.
+
+HTML
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>U N K N O W N</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-color: #000000;
+      --text-color: #EAEAEA;
+      --accent-color: #FFFFFF;
+      --dim-color: #555555;
+      --error-color: #FF073A;
+      --recording-color: #FF073A;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      overscroll-behavior: none;
+    }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .title {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.5em;
+      text-indent: 0.5em;
+      color: var(--accent-color);
+    }
+    .instructions {
+      font-size: 0.9rem;
+      color: var(--dim-color);
+      line-height: 1.6;
+    }
+
+    /* --- Record Button & Animation --- */
+    #record-button-area {
+      margin: 20px auto;
+    }
+    .record-button {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        padding: 0;
+        background-color: var(--recording-color);
+        border: 2px solid rgba(0,0,0,0.5);
+        /* UPDATED: Shadow uses the new vibrant red's RGB values */
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 7, 58, 0.5);
+        border-radius: 50%;
+        color: var(--accent-color);
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .record-button:not(:disabled):hover {
+        /* UPDATED: A lighter shade of the new vibrant red for hover */
+        background-color: #ff3d67;
+        /* UPDATED: Hover shadow uses new vibrant red's RGB values */
+        box-shadow: 0 0 0 3px #ff3d67, 0 0 35px rgba(255, 61, 103, 0.7);
+        transform: scale(1.02);
+    }
+    .record-button:not(:disabled):active {
+        transform: scale(0.98);
+        transition: transform 0.1s;
+    }
+    .record-button:disabled {
+        background-color: #4d0210; /* Darker shade of new red */
+        box-shadow: none;
+        opacity: 1;
+        cursor: not-allowed;
+    }
+    .record-button__content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        line-height: 1.1;
+        position: relative;
+        z-index: 2;
+    }
+    .record-button__text {
+        font-weight: 700;
+        font-size: 1.2rem;
+        line-height: 1.2;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        transition: font-size 0.2s ease;
+    }
+    .record-button__subtext {
+        font-size: 0.7rem;
+        font-weight: 400;
+        letter-spacing: 0.1em;
+        color: var(--accent-color);
+        opacity: 1;
+        display: none;
+        margin-top: 4px;
+        transition: color 0.2s;
+    }
+    .progress-ring {
+        position: absolute;
+        top: -4px;
+        left: -4px;
+        width: 168px;
+        height: 168px;
+    }
+    .progress-ring__circle, .progress-ring__circle-bg {
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+    }
+    .progress-ring__circle-bg {
+        stroke: var(--dim-color);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .progress-ring__circle {
+        stroke: var(--accent-color);
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.3s ease;
+    }
+    .record-button.is-recording {
+        /* UPDATED: Slower, more 'breathing' animation */
+        box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 7, 58, 0.7);
+        animation: pulse 2.5s infinite ease-in-out;
+        background-color: #000;
+    }
+    .record-button.is-recording .record-button__text {
+        font-size: 2.8rem;
+        letter-spacing: 0;
+        color: var(--accent-color);
+        animation: text-vibrate 1s infinite ease-in-out;
+    }
+    .record-button.is-recording .record-button__subtext {
+        display: block;
+        color: var(--recording-color);
+        opacity: 1;
+    }
+    .record-button.is-recording .progress-ring__circle {
+        stroke: var(--recording-color);
+    }
+    .record-button.is-recording .progress-ring__circle-bg {
+        opacity: 0.3;
+    }
+    /* UPDATED: Slower, more intense pulse for a mysterious "breathing" effect */
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 20px rgba(255, 7, 58, 0.5); }
+      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 50px rgba(255, 7, 58, 1); }
+      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 20px rgba(255, 7, 58, 0.5); }
+    }
+    @keyframes text-vibrate {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+    
+    /* --- Status and Progress --- */
+    .status-area {
       min-height: 20px; /* Reduced height */
       display: flex;
       flex-direction: column;
@@ -256,7 +745,7 @@
 <body>
   <div class="container">
     <h1 class="title">UNKNOWN</h1>
-    <p id="instructions" class="instructions">Tap to record a 5 second video</p>
+    <p id="instructions" class="instructions">Tap to record a 5 second video of yourself</p>
     
     <div id="record-button-area">
       <button id="startBtn" class="record-button" disabled>
