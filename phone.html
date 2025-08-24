@@ -10,17 +10,14 @@
   <style>
     :root { 
       color-scheme: dark; 
-      --bg-color: #101214;
-      --surface-color: #1a1c20;
-      --border-color: #333;
+      --bg-color: #000000;
+      --panel-bg: #0a0a0a;
       --text-color: #EAEAEA;
-      --accent-ready: #00ffff;
-      --accent-record: #ff3c3c;
-      --dim-color: #666666;
+      --accent-color: #FFFFFF;
+      --dim-color: #555555;
+      --border-color: #333333;
       --error-color: #ff4747;
-    }
-    *, *::before, *::after {
-      box-sizing: border-box;
+      --recording-color: #ff4747;
     }
     html, body {
       height: 100%;
@@ -29,21 +26,14 @@
     }
     body { 
       font-family: 'JetBrains Mono', monospace; 
-      background-color: var(--bg-color); 
-      background-image: 
-        linear-gradient(var(--border-color) 1px, transparent 1px),
-        linear-gradient(to right, var(--border-color) 1px, transparent 1px);
-      background-size: 40px 40px;
+      background: var(--bg-color); 
       color: var(--text-color);
       display: flex;
       align-items: center;
       justify-content: center;
+      text-align: center;
       padding: 20px;
-      animation: bg-pan 30s linear infinite;
-    }
-    @keyframes bg-pan {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 40px 40px; }
+      box-sizing: border-box;
     }
     .container {
       width: 100%;
@@ -51,159 +41,165 @@
       display: flex;
       flex-direction: column;
       gap: 24px;
-      text-align: center;
-    }
-    .header {
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 16px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 24px;
+      box-sizing: border-box;
     }
     .title {
-      font-size: 2rem;
+      font-size: 1.5rem;
       font-weight: 700;
-      letter-spacing: 0.5em;
-      text-indent: 0.5em;
-      color: var(--text-color);
-      margin: 0 0 8px 0;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--accent-color);
     }
-    .instructions, .connection-status {
+    .instructions {
       font-size: 0.8rem;
-      color: var(--dim-color);
+      color: #888;
       letter-spacing: 0.1em;
       text-transform: uppercase;
+      line-height: 1.6;
     }
-    .connection-status.ok { color: var(--accent-ready); }
-    .connection-status.bad { color: var(--error-color); }
 
-    /* --- Interaction Orb & Animation --- */
-    .orb-container {
-      margin: 20px 0;
-      perspective: 1000px;
+    /* --- Record Button & Animation --- */
+    #record-button-area {
+      margin: 20px auto;
     }
-    .orb {
+    .record-button {
         position: relative;
-        width: 180px;
-        height: 180px;
+        width: 160px;
+        height: 160px;
         padding: 0;
         background-color: transparent;
-        border: 2px solid var(--accent-ready);
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3), inset 0 0 15px rgba(0, 255, 255, 0.2);
+        border: 2px solid var(--dim-color);
+        box-shadow: none;
         border-radius: 50%;
-        color: var(--text-color);
+        color: var(--dim-color);
         cursor: pointer;
-        transition: all 0.3s ease-in-out;
+        transition: all 0.2s ease-in-out;
         display: flex;
         align-items: center;
         justify-content: center;
-        transform-style: preserve-3d;
     }
-    .orb:not(:disabled):hover {
-        background-color: rgba(0, 255, 255, 0.05);
-        box-shadow: 0 0 25px rgba(0, 255, 255, 0.5), inset 0 0 25px rgba(0, 255, 255, 0.3);
-        transform: scale(1.05) rotateY(10deg);
+    .record-button:not(:disabled):hover {
+        border-color: var(--accent-color);
+        color: var(--accent-color);
+        transform: scale(1.02);
     }
-    .orb:not(:disabled):active {
+    .record-button:not(:disabled):active {
         transform: scale(0.98);
-        transition-duration: 0.1s;
+        transition: transform 0.1s;
     }
-    .orb:disabled {
-        border-color: var(--dim-color);
-        box-shadow: none;
+    .record-button:disabled {
+        border-color: #222;
+        background-color: #111;
         opacity: 0.5;
         cursor: not-allowed;
     }
-    .orb__content {
+    .record-button__content {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        line-height: 1.1;
         position: relative;
         z-index: 2;
-        transition: opacity 0.3s ease;
     }
-    .orb__text-primary {
+    .record-button__text {
         font-weight: 700;
-        font-size: 1.1rem;
-        line-height: 1.3;
+        font-size: 1rem;
+        line-height: 1.2;
         letter-spacing: 0.15em;
         text-transform: uppercase;
-        transition: all 0.2s ease;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+        transition: font-size 0.2s ease, color 0.2s ease;
     }
-    .orb__text-secondary {
+    .record-button:not(:disabled):hover .record-button__text {
+        color: var(--accent-color);
+    }
+    .record-button__subtext {
         font-size: 0.7rem;
+        font-weight: 400;
         letter-spacing: 0.1em;
-        color: var(--text-color);
         opacity: 0.7;
+        display: none;
         margin-top: 4px;
+        transition: color 0.2s;
     }
     .progress-ring {
         position: absolute;
-        top: -4px;
-        left: -4px;
-        width: 188px;
-        height: 188px;
-        z-index: 1;
+        top: -2px;
+        left: -2px;
+        width: 160px;
+        height: 160px;
     }
     .progress-ring__circle, .progress-ring__circle-bg {
         transform: rotate(-90deg);
         transform-origin: 50% 50%;
     }
     .progress-ring__circle-bg {
-        stroke: var(--border-color);
+        stroke: var(--dim-color);
         opacity: 0;
         transition: opacity 0.3s;
     }
     .progress-ring__circle {
-        stroke: var(--accent-ready);
+        stroke: var(--accent-color);
         stroke-linecap: round;
         transition: stroke-dashoffset 0.3s ease;
     }
 
-    /* Recording State */
-    .orb.is-recording {
-        border-color: var(--accent-record);
-        box-shadow: 0 0 25px rgba(255, 60, 60, 0.5), inset 0 0 25px rgba(255, 60, 60, 0.3);
+    /* Red for Recording State */
+    .record-button.is-recording {
+        background-color: var(--recording-color);
+        border-color: var(--recording-color);
+        color: var(--accent-color);
+        box-shadow: 0 0 25px rgba(255, 71, 71, 0.7);
         animation: pulse 1.5s infinite;
-        background-color: rgba(255, 60, 60, 0.05);
-        transform: scale(1.05);
     }
-    .orb.is-recording .orb__text-primary {
-        font-size: 3.5rem;
+    .record-button.is-recording .record-button__text {
+        font-size: 2.8rem;
         letter-spacing: 0;
-        color: var(--text-color);
-        text-shadow: 0 0 5px var(--text-color), 0 0 15px var(--accent-record);
+        color: var(--accent-color);
+        text-shadow: 0 0 5px var(--accent-color), 0 0 12px var(--accent-color), 0 0 25px var(--recording-color), 0 0 40px var(--recording-color);
+        animation: text-vibrate 1s infinite ease-in-out;
     }
-    .orb.is-recording .orb__text-secondary {
-        color: var(--accent-record);
+    .record-button.is-recording .record-button__subtext {
+        display: block;
+        color: var(--accent-color);
         opacity: 1;
-        text-shadow: 0 0 5px var(--accent-record);
+        text-shadow: 0 0 5px var(--recording-color);
     }
-    .orb.is-recording .progress-ring__circle {
-        stroke: var(--accent-record);
+    .record-button.is-recording .progress-ring__circle {
+        stroke: var(--accent-color);
     }
-    .orb.is-recording .progress-ring__circle-bg {
+    .record-button.is-recording .progress-ring__circle-bg {
         opacity: 0.3;
     }
     @keyframes pulse {
-      0% { box-shadow: 0 0 25px rgba(255, 60, 60, 0.5), inset 0 0 25px rgba(255, 60, 60, 0.3); }
-      50% { box-shadow: 0 0 40px rgba(255, 60, 60, 0.8), inset 0 0 40px rgba(255, 60, 60, 0.5); }
-      100% { box-shadow: 0 0 25px rgba(255, 60, 60, 0.5), inset 0 0 25px rgba(255, 60, 60, 0.3); }
+      0% { box-shadow: 0 0 25px rgba(255, 71, 71, 0.5); }
+      50% { box-shadow: 0 0 40px rgba(255, 71, 71, 1); }
+      100% { box-shadow: 0 0 25px rgba(255, 71, 71, 0.5); }
+    }
+    @keyframes text-vibrate {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
     }
     
-    /* --- Status and Progress Bar --- */
-    .status-bar {
-      min-height: 40px;
+    /* --- Status and Progress --- */
+    .status-area {
+      min-height: 60px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 12px;
+      border: 1px solid var(--border-color);
+      padding: 12px;
     }
     .status-text {
       font-size: 0.8rem;
       color: var(--dim-color);
-      letter-spacing: 0.1em;
       text-transform: uppercase;
+      letter-spacing: 0.1em;
     }
     .status-text.ok { color: var(--text-color); }
     .status-text.bad { color: var(--error-color); }
@@ -213,16 +209,16 @@
     }
     progress {
       -webkit-appearance: none; appearance: none;
-      width: 100%; height: 4px;
-      background-color: var(--border-color);
+      width: 100%; height: 2px;
+      background-color: var(--dim-color);
       border: none;
     }
-    progress::-webkit-progress-bar { background-color: var(--border-color); }
-    progress::-webkit-progress-value { background-color: var(--accent-ready); transition: width 0.1s linear; }
-    progress::-moz-progress-bar { background-color: var(--accent-ready); }
+    progress::-webkit-progress-bar { background-color: var(--dim-color); }
+    progress::-webkit-progress-value { background-color: var(--accent-color); transition: width 0.1s linear; }
+    progress::-moz-progress-bar { background-color: var(--accent-color); }
 
     /* --- Result Area --- */
-    .result-ui {
+    .result-area {
       width: 100%;
       display: none;
       flex-direction: column;
@@ -232,127 +228,99 @@
     .result-title {
         font-size: 1.2rem;
         font-weight: 700;
+        color: var(--text-color);
         letter-spacing: 0.2em;
         margin: 0;
-        color: var(--accent-ready);
-        text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        text-transform: uppercase;
     }
-    video { 
-      width: 100%; 
-      border: 1px solid var(--border-color);
-      background-color: #000;
-    }
-    .result-actions {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+    video { width: 100%; border: 1px solid var(--dim-color); }
     .btn {
       display: inline-block;
       width: 100%;
-      padding: 12px 16px; 
-      border: 1px solid var(--border-color);
+      box-sizing: border-box;
+      padding: 10px 16px;
+      text-align: center;
+      border: 1px solid var(--dim-color);
       color: var(--text-color); 
-      background-color: transparent;
       text-decoration: none; 
-      font-family: inherit;
       font-size: 0.9rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+      font-family: inherit;
+      background: transparent;
       cursor: pointer;
       transition: all 0.2s ease-in-out;
     }
     .btn:hover {
-      border-color: var(--accent-ready);
-      background-color: rgba(0, 255, 255, 0.1);
-      color: var(--accent-ready);
-    }
-    .btn-primary {
-      background-color: var(--accent-ready);
-      border-color: var(--accent-ready);
+      background: var(--accent-color);
       color: var(--bg-color);
+      border-color: var(--accent-color);
     }
-    .btn-primary:hover {
-      background-color: transparent;
-      border-color: var(--accent-ready);
-      color: var(--accent-ready);
+    .btn.btn-primary {
+        background-color: var(--accent-color);
+        color: var(--bg-color);
+        border-color: var(--accent-color);
+        font-weight: 700;
     }
-    
-    /* General UI visibility control */
-    .main-ui, .result-ui {
-        transition: opacity 0.5s, transform 0.5s;
+    .btn.btn-primary:hover {
+        background: transparent;
+        color: var(--accent-color);
     }
-    .hidden {
-        display: none !important;
-    }
+    #debugLog { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <h1 class="title">U N K N O W N</h1>
-      <div id="connState" class="connection-status">INITIALIZING…</div>
+    <h1 class="title">U N K N O W N</h1>
+    <p id="instructions" class="instructions">// Tap the orb to request a 5-second capture from the installation.</p>
+    
+    <div id="record-button-area">
+      <button id="startBtn" class="record-button" disabled>
+          <svg class="progress-ring" viewBox="0 0 160 160">
+              <circle class="progress-ring__circle-bg" stroke-width="2" fill="transparent" r="78" cx="80" cy="80"/>
+              <circle class="progress-ring__circle" stroke-width="2" fill="transparent" r="78" cx="80" cy="80"/>
+          </svg>
+          <div class="record-button__content">
+            <span id="startBtnText" class="record-button__text">CONNECTING</span>
+            <span id="startBtnSubtext" class="record-button__subtext"></span>
+          </div>
+      </button>
     </div>
     
-    <div id="main-ui" class="main-ui">
-      <p id="instructions" class="instructions">Tap the orb to request a 5‑second capture.</p>
-      <div class="orb-container">
-        <button id="startBtn" class="orb" disabled>
-            <svg class="progress-ring" viewBox="0 0 188 188">
-                <circle class="progress-ring__circle-bg" stroke-width="4" fill="transparent" r="90" cx="94" cy="94"/>
-                <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="90" cx="94" cy="94"/>
-            </svg>
-            <div class="orb__content">
-              <span id="startBtnText" class="orb__text-primary">CONNECTING</span>
-              <span id="startBtnSubtext" class="orb__text-secondary"></span>
-            </div>
-        </button>
-      </div>
-    </div>
-
-    <div id="result-ui" class="result-ui hidden">
-      <h2 class="result-title">// CAPTURE COMPLETE</h2>
-      <video id="preview" controls playsinline></video>
-      <div class="result-actions">
-        <a id="download" class="btn btn-primary" href="#" download>Download Video</a>
-        <button id="resetBtn" class="btn">Request Another</button>
-      </div>
-    </div>
-
-    <div class="status-bar">
+    <div class="status-area">
+      <div id="connState" class="status-text">initializing…</div>
       <div id="status" class="status-text">—</div>
       <div id="progress-container">
         <progress id="progress" value="0" max="100"></progress>
       </div>
     </div>
+
+    <div id="result-area" class="result-area">
+      <h2 class="result-title">Capture Complete</h2>
+      <video id="preview" controls playsinline></video>
+      <a id="download" class="btn" href="#" download>Download Video</a>
+      <button id="resetBtn" class="btn btn-primary">Record Another</button>
+    </div>
+
+    <pre id="debugLog"></pre>
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
-      // Main UI elements
-      connState: document.getElementById('connState'),
-      instructions: document.getElementById('instructions'),
-      mainUI: document.getElementById('main-ui'),
-      resultUI: document.getElementById('result-ui'),
-      
-      // Orb / Button elements
-      orb: document.getElementById('startBtn'),
-      orbText: document.getElementById('startBtnText'),
-      orbSubtext: document.getElementById('startBtnSubtext'),
+      btn: document.getElementById('startBtn'),
+      btnText: document.getElementById('startBtnText'),
+      btnSubtext: document.getElementById('startBtnSubtext'),
       progressRing: document.querySelector('.progress-ring__circle'),
-      
-      // Status elements
+      conn: document.getElementById('connState'),
       status: document.getElementById('status'),
       progress: document.getElementById('progress'),
       progressContainer: document.getElementById('progress-container'),
-      
-      // Result elements
-      downloadLink: document.getElementById('download'),
+      dl: document.getElementById('download'),
       video: document.getElementById('preview'),
+      debug: document.getElementById('debugLog'),
+      instructions: document.getElementById('instructions'),
+      resultArea: document.getElementById('result-area'),
+      recordArea: document.getElementById('record-button-area'),
       resetBtn: document.getElementById('resetBtn')
     };
 
@@ -367,33 +335,22 @@
     }
     setRingProgress(0);
 
-    function showMainUI() {
-        els.resultUI.classList.add('hidden');
-        els.mainUI.classList.remove('hidden');
-    }
-    
-    function showResultUI() {
-        els.mainUI.classList.add('hidden');
-        els.resultUI.classList.remove('hidden');
-    }
-
     function startRecordingAnimation() {
-        els.orb.disabled = true;
-        els.orb.classList.add('is-recording');
-        els.orbSubtext.textContent = 'RECORDING';
+        els.btn.disabled = true;
+        els.btn.classList.add('is-recording');
+        els.btnSubtext.textContent = 'RECORDING';
         let secondsLeft = 5;
         
-        els.orbText.textContent = secondsLeft;
-        // The transition is now defined in the CSS for better performance
+        els.btnText.textContent = secondsLeft;
         els.progressRing.style.transition = 'stroke-dashoffset 5s linear';
         setRingProgress(100);
 
         recordingTimer = setInterval(() => {
             secondsLeft--;
             if (secondsLeft > 0) {
-                els.orbText.textContent = secondsLeft;
+                els.btnText.textContent = secondsLeft;
             } else {
-                els.orbText.textContent = '...';
+                els.btnText.textContent = '...';
                 clearInterval(recordingTimer);
                 recordingTimer = null;
             }
@@ -401,18 +358,20 @@
     }
 
     function resetUI() {
-        showMainUI();
+        els.resultArea.style.display = 'none';
         els.video.src = '';
-        els.downloadLink.href = '#';
+        els.dl.href = '#';
+        els.recordArea.style.display = 'block';
+        els.instructions.style.display = 'block';
         
-        els.orb.disabled = false;
-        els.orb.classList.remove('is-recording');
-        els.orbText.textContent = 'REQUEST CAPTURE';
-        els.orbSubtext.textContent = '';
+        els.btn.disabled = false;
+        els.btn.classList.remove('is-recording');
+        els.btnText.innerHTML = 'Request';
+        els.btnSubtext.textContent = '';
 
 
         if (recordingTimer) clearInterval(recordingTimer);
-        els.progressRing.style.transition = 'stroke-dashoffset 0.3s ease';
+        els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
         setRingProgress(0);
         
         setStatus('ready');
@@ -420,9 +379,12 @@
         els.progress.value = 0;
     }
 
-    // --- PeerJS Logic (unchanged) ---
-    function logMsg(msg) { console.log(msg); }
+    function logMsg(msg) {
+        console.log(msg);
+        if (els.debug) els.debug.textContent = `${new Date().toLocaleTimeString()}: ${msg}\n${els.debug.textContent}`;
+    }
 
+    logMsg('DOM is ready. Starting script.');
     els.resetBtn.addEventListener('click', resetUI);
 
     try {
@@ -430,41 +392,35 @@
         const token = new URLSearchParams(location.search).get('token');
 
         if (!hostId || !token) {
-          setStatus('ERROR: Invalid Link', false);
+          els.status.textContent = 'ERROR: Invalid Link'; els.status.className='status-text bad';
           logMsg('Error: Missing host or token in URL.');
           return;
         }
 
-        function setConn(txt, ok=false){ 
-          els.connState.textContent = `// ${txt}`; 
-          els.connState.className = ok ? 'connection-status ok' : (txt.includes('error') ? 'connection-status bad' : 'connection-status');
-        }
-        function setStatus(txt, ok=true){ 
-          els.status.textContent = `STATUS: ${txt}`; 
-          els.status.className = ok ? 'status-text ok' : 'status-text bad';
-        }
+        function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
+        function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
 
         const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
         const chunks = [];
         let expectedBytes = 0, received = 0, mime = 'video/webm', filename = 'capture.webm', conn = null;
 
-        logMsg('Initializing PeerJS...');
+        logMsg('Initializing PeerJS with STUN servers...');
         const peer = new Peer(undefined, {
           debug: 2,
           config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
         });
 
         peer.on('open', (id) => {
-          logMsg(`PeerJS client open: ${id}`);
+          logMsg(`PeerJS client is open with ID: ${id}`);
           setConn('connecting...');
           conn = peer.connect(hostId, { reliable: true });
 
           conn.on('open', () => {
-            logMsg('Connection established!');
+            logMsg('Connection established with host!');
             setConn('connected', true);
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
-            els.orb.disabled = false;
-            els.orbText.textContent = 'REQUEST CAPTURE';
+            els.btn.disabled = false;
+            els.btnText.innerHTML = 'Request';
           });
 
           conn.on('data', (msg) => {
@@ -472,22 +428,24 @@
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
                 setStatus('ready');
-                logMsg('Handshake acknowledged.');
+                logMsg('Handshake acknowledged. Ready.');
               } else if (data.type === 'recordingMeta') {
                 mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
                 chunks.length = 0; received = 0;
                 els.progressContainer.style.display = 'block';
                 els.progress.value = 0;
-                setStatus('receiving data…');
+                setStatus('receiving…');
                 logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
               } else if (data.type === 'recordingEnd') {
                 if (recordingTimer) clearInterval(recordingTimer);
                 const blob = new Blob(chunks, { type: mime });
                 const url = URL.createObjectURL(blob);
-                els.downloadLink.href = url; els.downloadLink.download = filename;
+                els.dl.href = url; els.dl.download = filename;
                 els.video.src = url; 
                 
-                showResultUI();
+                els.recordArea.style.display = 'none';
+                els.instructions.style.display = 'none';
+                els.resultArea.style.display = 'flex';
                 
                 els.progress.value = 100;
                 setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
@@ -495,9 +453,9 @@
                 logMsg('File received successfully.');
               } else if (data.type === 'error') {
                 setStatus(data.message || 'error', false);
-                logMsg(`Host error: ${data.message}`);
+                logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                els.orbText.textContent = 'RETRY';
+                els.btnText.innerHTML = 'Retry';
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -506,14 +464,14 @@
             }
           });
 
-          conn.on('close', () => { logMsg('Connection closed.'); setConn('disconnected'); setStatus('disconnected', false); els.orb.disabled = true; els.orbText.textContent = 'OFFLINE'; });
+          conn.on('close', () => { logMsg('Connection closed.'); setConn('disconnected'); setStatus('disconnected', false); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
           conn.on('error', (err) => { logMsg(`Connection error: ${err}`); setConn('connection error', false); });
         });
         
         peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); setConn(`peer error: ${err.type}`, false); setStatus('Error', false); });
         peer.on('disconnected', () => { logMsg('Disconnected from server.'); setConn('reconnecting signal...'); });
         
-        els.orb.addEventListener('click', () => {
+        els.btn.addEventListener('click', () => {
           setStatus('requesting...');
           logMsg('Sent startRecording request.');
           conn && conn.send(JSON.stringify({ type:'startRecording' }));
@@ -523,7 +481,7 @@
             if (els.status.textContent === 'STATUS: requesting...') {
               setStatus('request timed out', false);
               resetUI();
-              els.orbText.textContent = 'RETRY';
+              els.btnText.innerHTML = 'Retry';
             }
           }, 8000);
         });
