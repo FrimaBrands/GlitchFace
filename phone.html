@@ -11,17 +11,11 @@
     :root { 
       color-scheme: dark; 
       --bg-color: #000000;
-      --bg-color-rgb: 0, 0, 0;
       --text-color: #EAEAEA;
       --accent-color: #FFFFFF;
-      --accent-color-rgb: 255, 255, 255;
       --dim-color: #555555;
       --error-color: #ff4747;
-      --error-color-rgb: 255, 71, 71;
       --recording-color: #EF1818;
-      --recording-hover-color: #ff6a6a;
-      --recording-hover-color-rgb: 255, 106, 106;
-      --recording-disabled-color: #4d1515;
     }
     html, body {
       height: 100%;
@@ -52,7 +46,7 @@
       letter-spacing: 0.5em;
       text-indent: 0.5em;
       color: var(--accent-color);
-      text-shadow: 0 0 5px rgba(var(--accent-color-rgb), 0.2);
+      text-shadow: 0 0 5px rgba(255,255,255,0.2);
     }
     .instructions {
       font-size: 0.9rem;
@@ -70,7 +64,7 @@
         height: 160px;
         padding: 0;
         background-color: var(--recording-color);
-        border: 2px solid rgba(var(--bg-color-rgb), 0.5);
+        border: 2px solid rgba(0,0,0,0.5);
         border-radius: 50%;
         color: var(--accent-color);
         cursor: pointer;
@@ -80,8 +74,8 @@
         justify-content: center;
     }
     .record-button:not(:disabled):hover {
-        background-color: var(--recording-hover-color);
-        box-shadow: 0 0 0 3px var(--recording-hover-color), 0 0 35px rgba(var(--recording-hover-color-rgb), 1);
+        background-color: #ff6a6a;
+        box-shadow: 0 0 0 3px #ff6a6a, 0 0 35px rgba(255, 106, 106, 1);
         transform: scale(1.02);
     }
     .record-button:not(:disabled):active {
@@ -89,7 +83,7 @@
         transition: transform 0.1s;
     }
     .record-button:disabled {
-        background-color: var(--recording-disabled-color);
+        background-color: #4d1515;
         box-shadow: none;
         cursor: not-allowed;
     }
@@ -110,7 +104,7 @@
         letter-spacing: 0.15em;
         text-transform: uppercase;
         transition: font-size 0.2s ease;
-        text-shadow: 0 1px 3px rgba(var(--bg-color-rgb), 0.4);
+        text-shadow: 0 1px 3px rgba(0,0,0,0.4);
     }
     .record-button__subtext {
         font-size: 0.7rem;
@@ -144,7 +138,7 @@
     }
     .record-button.is-recording {
         animation: pulse 1.5s infinite;
-        background-color: var(--bg-color);
+        background-color: #000;
     }
     .record-button.is-recording .record-button__text {
         font-size: 2.8rem;
@@ -166,9 +160,9 @@
         opacity: 0.3;
     }
     @keyframes pulse {
-      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(var(--error-color-rgb), 0.5); }
-      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 40px rgba(var(--error-color-rgb), 1); }
-      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(var(--error-color-rgb), 0.5); }
+      0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
+      50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 40px rgba(255, 71, 71, 1); }
+      100% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 71, 71, 0.5); }
     }
     @keyframes text-vibrate {
         0%, 100% { transform: scale(1); }
