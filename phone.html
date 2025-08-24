@@ -95,10 +95,12 @@
         align-items: center;
         justify-content: center;
         line-height: 1.1;
+        /* UPDATED: This is the fix. It ensures the text is rendered on top of the progress ring. */
+        position: relative;
+        z-index: 2;
     }
     .record-button__text {
         font-weight: 700;
-        /* UPDATED: Larger font size and adjustments for two lines */
         font-size: 1.2rem;
         line-height: 1.2;
         letter-spacing: 0.15em;
@@ -143,7 +145,6 @@
         background-color: #000;
     }
     .record-button.is-recording .record-button__text {
-        /* UPDATED: Brighter timer */
         font-size: 2.8rem;
         letter-spacing: 0;
         color: var(--accent-color);
@@ -154,7 +155,6 @@
         display: block;
         color: var(--recording-color);
         opacity: 1;
-        /* UPDATED: Add glow to subtext */
         text-shadow: 0 0 5px var(--recording-color);
     }
     .record-button.is-recording .progress-ring__circle {
@@ -352,7 +352,6 @@
         
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
-        // UPDATED: Use innerHTML to support line break
         els.btnText.innerHTML = 'START<br>RECORDING';
         els.btnSubtext.textContent = '';
 
@@ -407,7 +406,6 @@
             setConn('connected', true);
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            // UPDATED: Use innerHTML to support line break
             els.btnText.innerHTML = 'START<br>RECORDING';
           });
 
@@ -443,7 +441,6 @@
                 setStatus(data.message || 'error', false);
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                // UPDATED: Use innerHTML to support line break
                 els.btnText.innerHTML = 'RETRY<br>RECORDING';
               }
             } else {
@@ -470,7 +467,6 @@
             if (els.status.textContent === 'STATUS: requesting...') {
               setStatus('request timed out', false);
               resetUI();
-              // UPDATED: Use innerHTML to support line break
               els.btnText.innerHTML = 'RETRY<br>RECORDING';
             }
           }, 8000);
