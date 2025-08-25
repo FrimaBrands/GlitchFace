@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controls</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'JetBrains Mono', monospace; background-color: #0a0a0a; color: #EAEAEA; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #111; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #666; }
+    input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #333; outline: none; transition: background .3s; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
+    input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
+    .tab-button { border-color: #333; transition: all 0.2s ease-in-out; }
+    .tab-button.active { border-color: #EAEAEA; color: #FFFFFF; background-color: #1a1a1a; }
+    .btn { border: 1px solid #555; transition: all 0.2s ease-in-out; }
+    .btn:hover { background-color: #EAEAEA; color: #000; border-color: #EAEAEA; }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+    .form-checkbox { appearance: none; -webkit-appearance: none; height: 14px; width: 14px; background-color: transparent; border: 1px solid #555; cursor: pointer; display: inline-block; position: relative; }
+    .form-checkbox:checked { background-color: #EAEAEA; }
+  </style>
+</head>
+<body class="w-full h-screen">
+
+  <div class="w-full h-full flex flex-col bg-[#0a0a0a]">
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h1 class="text-xl font-bold text-white tracking-widest">U N K N O W N</h1>
+        <p class="text-sm text-gray-400 font-mono">// CONTROLS</p>
+         <div id="msg" class="text-green-400 font-mono text-xs mt-2 h-4"></div>
+      </div>
+
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h2 class="font-bold text-gray-300 mb-2">// PRESET_MANAGER</h2>
+        <select id="presetList" class="w-full bg-black border border-gray-700 p-2 mb-2 text-sm focus:outline-none focus:border-gray-400"></select>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="text" id="presetName" placeholder="> Preset Name..." class="col-span-3 bg-black border border-gray-700 p-2 text-sm focus:outline-none focus:border-gray-400">
+          <button id="savePresetBtn" class="btn font-semibold py-1 text-sm">Save</button>
+          <button id="deletePresetBtn" class="btn font-semibold py-1 text-sm">Delete</button>
+          <button id="randomBtn" class="btn font-semibold py-1 text-sm">Randomize</button>
+        </div>
+      </div>
+      
+      <div class="flex border-b border-gray-800 flex-shrink-0">
+        <button id="globalsTabBtn" class="tab-button active flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 text-gray-400 hover:text-white">Globals</button>
+        <button id="effectsTabBtn" class="tab-button flex-1 py-2 px-4 text-sm font-semibold text-center border-b-2 border-transparent text-gray-400 hover:text-white">Effects</button>
+      </div>
+
+      <div class="flex-grow custom-scrollbar overflow-y-auto">
+        <div id="effects-tab-content" class="hidden p-4 space-y-4">
+             <div class="control-group bg-black/50 border border-gray-800 p-3">
+                <h3 class="font-semibold text-gray-200">// JITTER ANIMATION</h3>
+                <div class="mt-3 space-y-3">
+                    <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">ACTIVE</label><input type="checkbox" class="form-checkbox" data-type="jitter" data-key="active" checked></div></div>
+                    <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">AMOUNT</label><span class="text-sm font-mono text-gray-400">0.005</span></div><input type="range" min="0" max="0.1" step="0.001" value="0.005" data-type="jitter" data-key="amount"></div>
+                    <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SPEED</label><span class="text-sm font-mono text-gray-400">2.5</span></div><input type="range" min="0" max="10" step="0.1" value="2.5" data-type="jitter" data-key="speed"></div>
+                </div>
+            </div>
+             <div class="control-group bg-black/50 border border-gray-800 p-3"><h3 class="font-semibold text-gray-200">// DATA MOSHING</h3><div class="mt-3 space-y-3"><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">AMOUNT</label><span class="text-sm font-mono text-gray-400">0.970</span></div><input type="range" data-uniform="u_feedbackAmount" min="0.8" max="1" step="0.001" value="0.97"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">ZOOM</label><span class="text-sm font-mono text-gray-400">1.001</span></div><input type="range" data-uniform="u_feedbackZoom" min="0.9" max="1.1" step="0.001" value="1.001"></div></div></div>
+             <div class="control-group bg-black/50 border border-gray-800 p-3"><h3 class="font-semibold text-gray-200">// SIGNAL GLITCH</h3><div class="mt-3 space-y-3"><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">INTENSITY</label><span class="text-sm font-mono text-gray-400">0.10</span></div><input type="range" data-uniform="u_glitchIntensity" min="0" max="1" step="0.01" value="0.1"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">BLOCK SIZE</label><span class="text-sm font-mono text-gray-400">8</span></div><input type="range" data-uniform="u_glitchBlockSize" min="1" max="50" step="1" value="8"></div></div></div>
+             <div class="control-group bg-black/50 border border-gray-800 p-3"><h3 class="font-semibold text-gray-200">// COLOR DISTORTION</h3><div class="mt-3 space-y-3"><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">RGB SHIFT</label><span class="text-sm font-mono text-gray-400">0.010</span></div><input type="range" data-uniform="u_rgbShift" min="0" max="0.1" step="0.001" value="0.01"></div></div></div>
+             <div class="control-group bg-black/50 border border-gray-800 p-3"><h3 class="font-semibold text-gray-200">// LENS DISTORTION</h3><div class="mt-3 space-y-3"><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">NOISE AMOUNT</label><span class="text-sm font-mono text-gray-400">0.05</span></div><input type="range" data-uniform="u_noiseAmount" min="0" max="0.5" step="0.01" value="0.05"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">NOISE SPEED</label><span class="text-sm font-mono text-gray-400">1.0</span></div><input type="range" data-uniform="u_noiseSpeed" min="0" max="10" step="0.1" value="1"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">VIGNETTE</label><span class="text-sm font-mono text-gray-400">0.50</span></div><input type="range" data-uniform="u_vignette" min="0" max="2" step="0.01" value="0.5"></div></div></div>
+             <div class="control-group bg-black/50 border border-gray-800 p-3"><h3 class="font-semibold text-gray-200">// SMEARING</h3><div class="mt-3 space-y-3"><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">GLOBAL INTENSITY</label><span class="text-sm font-mono text-gray-400">30</span></div><input type="range" data-uniform="u_globalSmearIntensity" min="0" max="100" step="1" value="30"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">GLOBAL ANGLE</label><span class="text-sm font-mono text-gray-400">0</span></div><input type="range" data-uniform="u_globalSmearAngle" min="0" max="360" step="1" value="0"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SPOT INTENSITY</label><span class="text-sm font-mono text-gray-400">10</span></div><input type="range" data-uniform="u_spotSmearIntensity" min="0" max="50" step="1" value="10"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SPOT DENSITY</label><span class="text-sm font-mono text-gray-400">0.20</span></div><input type="range" data-uniform="u_spotSmearDensity" min="0" max="1" step="0.01" value="0.2"></div><div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SPOT SIZE</label><span class="text-sm font-mono text-gray-400">20</span></div><input type="range" data-uniform="u_spotSmearSize" min="5" max="50" step="1" value="20"></div></div></div>
+        </div>
+        <div id="globals-tab-content" class="p-4 space-y-4">
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+             <h3 class="font-semibold text-gray-200">// GLOBAL OPACITY</h3>
+             <div class="mt-3 space-y-3">
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">EFFECT OPACITY</label><span class="text-sm font-mono text-gray-400">1.00</span></div><input type="range" data-uniform="u_overallOpacity" min="0" max="1" step="0.01" value="1"></div>
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">FLICKERS PER SECOND</label><span class="text-sm font-mono text-gray-400">1.0</span></div><input type="range" data-uniform="u_flickerPerSecond" min="0" max="30" step="0.1" value="1"></div>
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">FLICKER OFF RATIO</label><span class="text-sm font-mono text-gray-400">0.01</span></div><input type="range" data-uniform="u_flickerDuration" min="0.01" max="1" step="0.01" value="0.01"></div>
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">FLICKER INTENSITY</label><span class="text-sm font-mono text-gray-400">1.00</span></div><input type="range" data-uniform="u_flickerIntensity" min="0" max="1" step="0.01" value="1"></div>
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">FLICKER FADE</label><span class="text-sm font-mono text-gray-400">0.30</span></div><input type="range" data-uniform="u_flickerFade" min="0" max="0.5" step="0.01" value="0.3"></div>
+             </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+             <h3 class="font-semibold text-gray-200">// EFFECT SEEP</h3>
+             <div class="mt-3 space-y-3">
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SEEP AMOUNT</label><span class="text-sm font-mono text-gray-400">2.00</span></div><input type="range" data-uniform="u_seepAmount" min="0" max="2" step="0.01" value="2"></div>
+                <div class="control-item space-y-2"><div class="flex justify-between items-center"><label class="text-sm font-medium text-gray-300">SEEP DISTANCE</label><span class="text-sm font-mono text-gray-400">20.0</span></div><input type="range" data-uniform="u_seepIntensity" min="0" max="20" step="0.1" value="20"></div>
+             </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// BACKGROUND_SOURCE</h3>
+            <div class="space-y-3">
+                <button id="bgUploadBtn" class="w-full btn font-semibold py-2 text-sm">Upload Image/Video</button>
+                <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
+                <label class="flex items-center justify-between text-sm cursor-pointer">
+                    <span class="text-gray-400">USE CUSTOM BG</span>
+                    <input type="checkbox" id="useBgChk" class="form-checkbox" data-uniform="u_useBackground" disabled>
+                </label>
+                <div class="control-item space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label for="maskFeather" class="text-sm font-medium text-gray-300">MASK FEATHER</label>
+                        <span class="text-sm font-mono text-gray-400">0.150</span>
+                    </div>
+                    <input type="range" data-uniform="u_maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
+                </div>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// SYSTEM_SETTINGS</h3>
+            <div class="space-y-3">
+              <label class="flex items-center justify-between text-sm cursor-pointer"><span class="text-gray-400">ANIMATE EFFECTS</span><input type="checkbox" class="form-checkbox" data-type="setting" data-key="animate" checked></label>
+              <label class="flex items-center justify-between text-sm cursor-pointer"><span class="text-gray-400">MIRROR CAMERA</span><input type="checkbox" class="form-checkbox" data-type="setting" data-key="mirror" checked></label>
+            </div>
+          </div>
+        </div>
+      </div>
+  </div>
+
+<script>
+(() => {
+    const opener = window.opener;
+    if (!opener) {
+        document.body.innerHTML = '<div class="w-screen h-screen flex items-center justify-center text-red-500 font-mono">ERROR: This window must be opened by index.html</div>';
+        return;
+    }
+
+    const els = {};
+    ['globalsTabBtn', 'effectsTabBtn', 'globals-tab-content', 'effects-tab-content', 'msg', 'presetList', 'presetName', 'savePresetBtn', 'deletePresetBtn', 'randomBtn', 'bgUploadBtn', 'bgUpload', 'useBgChk'].forEach(id => els[id] = document.getElementById(id));
+    const allInputs = document.querySelectorAll('input[type="range"], input[type="checkbox"]');
+
+    function post(type, payload) {
+        opener.postMessage({ type, payload }, opener.location.origin);
+    }
+    
+    function setMsg(text) { els.msg.textContent = text; setTimeout(() => els.msg.textContent = '', 3000); }
+
+    // --- Event Listeners ---
+    allInputs.forEach(input => {
+        const valueSpan = input.previousElementSibling?.querySelector('span');
+        const updateValueDisplay = () => {
+            if (valueSpan) { valueSpan.textContent = parseFloat(input.value).toFixed(String(input.step).includes('.') ? 3 : 1); }
+        };
+
+        if(input.type === 'range') {
+            input.addEventListener('input', () => {
+                updateValueDisplay();
+                const key = input.dataset.uniform || input.dataset.key;
+                const type = input.dataset.type; // 'jitter' or 'setting'
+                const value = parseFloat(input.value);
+
+                if (input.dataset.uniform) {
+                    post('UPDATE_UNIFORM', { key, value });
+                } else if (type === 'jitter') {
+                    post('UPDATE_JITTER', { key, value });
+                }
+            });
+             updateValueDisplay();
+        } else if (input.type === 'checkbox') {
+             input.addEventListener('change', () => {
+                const key = input.dataset.uniform || input.dataset.key;
+                const type = input.dataset.type; // 'jitter' or 'setting'
+                const value = input.checked;
+                
+                if (input.dataset.uniform) { // for useBgChk
+                     post('UPDATE_UNIFORM', { key, value: value ? 1.0 : 0.0 });
+                } else if (type === 'setting') {
+                    post('UPDATE_SETTING', { key, value });
+                } else if (type === 'jitter') {
+                    post('UPDATE_JITTER', { key, value });
+                }
+            });
+        }
+    });
+    
+    // Send all uniform values whenever a slider stops moving to update jitter base
+    document.body.addEventListener('change', (e) => {
+        if(e.target.type === 'range' && e.target.dataset.uniform) {
+            const allUniforms = {};
+            document.querySelectorAll('input[data-uniform]').forEach(el => {
+                allUniforms[el.dataset.uniform] = parseFloat(el.value);
+            });
+            post('UPDATE_JITTER_BASE', allUniforms);
+        }
+    });
+
+    // Tab switching
+    els.effectsTabBtn.addEventListener('click', () => { els.effectsTabBtn.classList.add('active'); els.globalsTabBtn.classList.remove('active'); els['effects-tab-content'].classList.remove('hidden'); els['globals-tab-content'].classList.add('hidden'); });
+    els.globalsTabBtn.addEventListener('click', () => { els.effectsTabBtn.classList.remove('active'); els.globalsTabBtn.classList.add('active'); els['effects-tab-content'].classList.add('hidden'); els['globals-tab-content'].classList.remove('hidden'); });
+    
+    // Background Upload
+    els.bgUploadBtn.addEventListener('click', () => els.bgUpload.click());
+    els.bgUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        els.useBgChk.disabled = false;
+        els.useBgChk.checked = true;
+        
+        post('SET_BACKGROUND', { url: url, fileType: file.type, useBg: true });
+        post('UPDATE_UNIFORM', { key: 'u_useBackground', value: 1.0 });
+
+        setMsg(`Background sent: ${file.name}`);
+    });
+    els.useBgChk.addEventListener('change', () => {
+         post('UPDATE_UNIFORM', { key: 'u_useBackground', value: els.useBgChk.checked ? 1.0 : 0.0 });
+    })
+
+
+    // --- Preset Manager ---
+    const getPresets = () => JSON.parse(localStorage.getItem('bodyGlitchV5.0Presets_TwoWindow') || '{}');
+    const savePresets = (p) => localStorage.setItem('bodyGlitchV5.0Presets_TwoWindow', JSON.stringify(p));
+
+    function collectCurrentState() {
+        const state = { uniforms: {}, settings: {}, jitter: {} };
+        document.querySelectorAll('input[data-uniform]').forEach(i => { state.uniforms[i.dataset.uniform] = i.type === 'checkbox' ? (i.checked ? 1.0 : 0.0) : parseFloat(i.value) });
+        document.querySelectorAll('input[data-type="setting"]').forEach(i => { state.settings[i.dataset.key] = i.checked; });
+        document.querySelectorAll('input[data-type="jitter"]').forEach(i => { state.jitter[i.dataset.key] = i.type === 'checkbox' ? i.checked : parseFloat(i.value); });
+        return state;
+    }
+
+    function applyState(state) {
+        if (!state) return;
+        document.querySelectorAll('input[data-uniform]').forEach(i => {
+             const val = state.uniforms[i.dataset.uniform];
+             if(val !== undefined) { i.type === 'checkbox' ? i.checked = (val > 0.5) : i.value = val; i.dispatchEvent(new Event('input')) }
+        });
+        document.querySelectorAll('input[data-type="setting"]').forEach(i => { 
+            const val = state.settings[i.dataset.key];
+            if(val !== undefined) { i.checked = val; i.dispatchEvent(new Event('change')) }
+        });
+         document.querySelectorAll('input[data-type="jitter"]').forEach(i => {
+            const val = state.jitter[i.dataset.key];
+            if(val !== undefined) { i.type === 'checkbox' ? i.checked = val : i.value = val; i.dispatchEvent(new Event('input')) }
+        });
+        post('LOAD_PRESET', state);
+    }
+
+    function populateList() {
+        const presets = getPresets();
+        const currentVal = els.presetList.value;
+        els.presetList.innerHTML = '<option value="">-- LOAD PRESET --</option>';
+        Object.keys(presets).forEach(name => { const opt = document.createElement('option'); opt.value = name; opt.textContent = name; els.presetList.appendChild(opt); });
+        els.presetList.value = currentVal;
+    }
+    
+    els.savePresetBtn.addEventListener('click', () => {
+        const name = els.presetName.value.trim();
+        if (!name) return setMsg('Enter a preset name.');
+        const presets = getPresets();
+        presets[name] = collectCurrentState();
+        savePresets(presets);
+        populateList();
+        els.presetList.value = name;
+        setMsg(`Preset '${name}' saved.`);
+    });
+    
+    els.deletePresetBtn.addEventListener('click', () => {
+        const name = els.presetList.value;
+        if (!name) return setMsg('Select a preset to delete.');
+        const presets = getPresets();
+        delete presets[name];
+        savePresets(presets);
+        populateList();
+        els.presetName.value = '';
+        setMsg(`Preset '${name}' deleted.`);
+    });
+    
+    els.presetList.addEventListener('change', () => {
+        const name = els.presetList.value;
+        if (!name) return;
+        const preset = getPresets()[name];
+        if (preset) {
+            applyState(preset);
+            els.presetName.value = name;
+            setMsg(`Preset '${name}' loaded.`);
+        }
+    });
+
+    els.randomBtn.addEventListener('click', () => {
+        document.querySelectorAll('input[type="range"][data-uniform]').forEach(el => {
+            const min = parseFloat(el.min), max = parseFloat(el.max), step = parseFloat(el.step);
+            el.value = Math.round((min + Math.random() * (max - min)) / step) * step;
+            el.dispatchEvent(new Event('input'));
+            el.dispatchEvent(new Event('change')); // to update jitter base
+        });
+        setMsg('Parameters randomized!');
+    });
+
+    populateList();
+
+})();
+</script>
+
+</body>
+</html>
