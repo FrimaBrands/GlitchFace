@@ -351,19 +351,31 @@
         init() {
             const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
             els.showQR.addEventListener('click', async () => {
-                if (!this.armed) await this.arm();
-                this.openQRWindow();
+                // This handler is updated to be more robust
+                try {
+                    if (!this.armed) {
+                        this.updateStatus(true); // Show "arming..." status
+                        await this.arm();
+                    }
+                    this.openQRWindow();
+                } catch (err) {
+                    console.error("Failed to arm remote connection:", err);
+                    this.updateStatus(false, true); // Show an error status
+                }
             });
             els.reset.addEventListener('click', () => this.disarm() );
         },
-        updateStatus() {
+        updateStatus(isArming = false, isError = false) {
             const statusEl = document.getElementById('remoteStatus');
             const count = this.connections.size; let text = 'REMOTE: idle';
-            if (this.armed) {
+            if (isError) {
+                text = 'REMOTE: connection failed';
+            } else if (isArming) {
+                text = 'REMOTE: arming...';
+            } else if (this.armed) {
                 if (this.isRecording) { text = `REMOTE: RECORDING... (${count} connected)`; }
                 else if (count > 0) { text = `REMOTE: ${count} phone(s) connected. Ready.`; }
                 else if (this.peer && this.peer.id) { text = `REMOTE: armed @ ${this.peer.id.slice(0,6)}…`; }
-                else { text = 'REMOTE: arming...'; }
             }
             statusEl.textContent = text;
         },
@@ -376,13 +388,40 @@
             });
         },
         async arm() {
+            // ** THIS FUNCTION IS REWRITTEN TO USE A PROMISE **
+            // It now correctly waits for the 'open' event from PeerJS.
             await this.lazyLoadPeerJS();
             this.sessionToken = (crypto.getRandomValues(new Uint8Array(16))).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
-            this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
-            this.peer.on('open', id => { this.updateStatus(); document.getElementById('remoteReset').disabled = false; });
-            this.peer.on('connection', conn => this.handleNewConnection(conn));
-            this.peer.on('error', err => { console.error('PeerJS error:', err); this.disarm(); });
-            this.armed = true; this.updateStatus();
+            
+            return new Promise((resolve, reject) => {
+                if (this.peer) { this.peer.destroy(); } // Clean up old peer object if it exists
+                
+                this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
+                
+                const errorTimeout = setTimeout(() => {
+                    reject('PeerJS connection timed out.');
+                    this.disarm();
+                }, 8000); // 8 second timeout
+
+                this.peer.on('open', id => {
+                    clearTimeout(errorTimeout);
+                    this.armed = true;
+                    this.updateStatus();
+                    document.getElementById('remoteReset').disabled = false;
+                    this.peer.on('connection', conn => this.handleNewConnection(conn));
+                    // Handle runtime errors after connection is established
+                    this.peer.on('error', err => { console.error('PeerJS runtime error:', err); this.disarm(); });
+                    resolve(); // The promise is resolved ONLY when the connection is open
+                });
+
+                // Handle initialization errors
+                this.peer.on('error', err => {
+                    clearTimeout(errorTimeout);
+                    console.error('PeerJS initialization error:', err);
+                    this.disarm();
+                    reject(err);
+                });
+            });
         },
         disarm() {
             this.armed = false;
@@ -443,7 +482,8 @@
         openQRWindow() {
             if (!this.peer || !this.sessionToken) return;
             const url = new URL('phone.html', location.href);
-            url.searchParams.set('host', this.peer.id); url.searchParams.set('token', this.sessionToken);
+            url.searchParams.set('host', this.peer.id);
+            url.searchParams.set('token', this.sessionToken);
             const qrUrl = new URL('remote-qr.html', location.href);
             qrUrl.searchParams.set('target', url.toString());
             window.open(qrUrl.toString(), '_blank', 'noopener,noreferrer,width=520,height=600');
