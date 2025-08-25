@@ -1343,8 +1343,8 @@
           
           // 3. Draw the top-right logo (now a video) at 50% size
           // The video element's dimensions are videoWidth/videoHeight
-          const logo2Width = logoTopRight.videoWidth * 0.5;
-          const logo2Height = logoTopRight.videoHeight * 0.5;
+          const logo2Width = logoTopRight.videoWidth;
+          const logo2Height = logoTopRight.videoHeight;
           ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
 
         } catch (e) {
