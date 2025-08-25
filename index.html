@@ -125,7 +125,7 @@
     
     <div class="main-stage flex-grow bg-black relative flex items-center justify-center overflow-hidden">
       <img id="logoTopLeft" src="FirmaLogo.png" class="absolute top-0 left-0 z-10" style="transform: scale(0.5); transform-origin: top left; pointer-events: none;">
-      <img id="logoTopRight" src="UnkownLogoLQ.gif" class="absolute top-0 right-0 z-10" style="transform: scale(0.5); transform-origin: top right; pointer-events: none;">
+      <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="absolute top-0 right-0 z-10" style="transform: scale(0.5); transform-origin: top right; pointer-events: none;"></video>
       
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
@@ -1282,14 +1282,14 @@
     updateStatus();
   }
 
-  // START MODIFICATION: Updated recording function to include overlays
+  // NO CHANGE NEEDED HERE - The existing function already handles video elements correctly.
   async function recordCanvasFiveSeconds(preferMp4 = false) {
     const glCanvas = els.canvas;
     if (!glCanvas || !glCanvas.captureStream) throw new Error('Canvas captureStream not supported');
 
     // Get logo image elements from the DOM
     const logoTopLeft = document.getElementById('logoTopLeft');
-    const logoTopRight = document.getElementById('logoTopRight');
+    const logoTopRight = document.getElementById('logoTopRight'); // This is now a <video> element
     if (!logoTopLeft || !logoTopRight) throw new Error('Logo image elements not found in the DOM');
 
     // Create a new, temporary canvas to compose the final output
@@ -1341,9 +1341,10 @@
           const logo1Height = logoTopLeft.naturalHeight * 0.5;
           ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
           
-          // 3. Draw the top-right logo (animated GIF) at 50% size
-          const logo2Width = logoTopRight.naturalWidth * 0.5;
-          const logo2Height = logoTopRight.naturalHeight * 0.5;
+          // 3. Draw the top-right logo (now a video) at 50% size
+          // The video element's dimensions are videoWidth/videoHeight
+          const logo2Width = logoTopRight.videoWidth * 0.5;
+          const logo2Height = logoTopRight.videoHeight * 0.5;
           ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
 
         } catch (e) {
@@ -1376,7 +1377,6 @@
       setTimeout(() => { try { rec.stop(); } catch {} }, 5000);
     });
   }
-  // END MODIFICATION
 
   async function onMessage(msg, conn) {
     try {
