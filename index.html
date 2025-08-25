@@ -219,9 +219,9 @@
             <div class="control-item space-y-2">
               <div class="flex justify-between items-center">
                 <label for="autoRandomizeSlider" class="text-sm font-medium text-gray-300">AUTO-RANDOMIZE</label>
-                <span id="autoRandomizeValue" class="text-sm font-mono text-gray-400">Off</span>
+                <span id="autoRandomizeValue" class="text-sm font-mono text-gray-400">1.0s</span>
               </div>
-              <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="0">
+              <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="1">
             </div>
             <div class="control-item space-y-2 mt-3">
               <div class="flex justify-between items-center">
@@ -1103,10 +1103,10 @@
             active: true,
             controls: {
                 overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 },
-                flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 },
-                flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 },
+                flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 1.0, neutral: 0 },
+                flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01, neutral: 0.1 },
                 flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 },
-                flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }
+                flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3, neutral: 0.0 }
             }
         },
         Seep: {
