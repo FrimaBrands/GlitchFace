@@ -127,8 +127,8 @@
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
       <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
-      <canvas id="glcanvas" class="hidden"></canvas>
-      <canvas id="outputCanvas" class="w-full h-full object-cover"></canvas>
+      <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
+      <canvas id="overlayCanvas" class="absolute top-0 left-0 w-full h-full object-cover pointer-events-none"></canvas>
     </div>
 
     <div class="controls-panel w-[420px] flex-shrink-0 bg-[#0a0a0a] border-l border-gray-800 flex flex-col">
@@ -247,7 +247,8 @@
     // 2. Renderer: Encapsulates all WebGL logic, including setup, shaders, and the render pipeline.
     // 3. BodySegmenter: Handles the MediaPipe Selfie Segmentation setup and result processing.
     // 4. PresetManager: Manages saving, loading, and randomizing effect presets.
-    // 5. App: The main controller that initializes all modules and runs the main loop.
+    // 5. OverlayManager: Handles drawing logos on a 2D canvas.
+    // 6. App: The main controller that initializes all modules and runs the main loop.
     
     const vertSrc = `
       attribute vec2 a_pos;
@@ -423,7 +424,7 @@
       init(definitions, globalDefinitions) {
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
-        const ids = ['video', 'glcanvas', 'outputCanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
+        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
         // Create randomized controls in the 'Effects' tab
@@ -436,8 +437,8 @@
         }
 
         // --- Event Listeners ---
-        this.elements.mirrorChk.addEventListener('change', () => this.elements.outputCanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
-        this.elements.outputCanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
+        this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
+        this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
         
         // Tab switching logic
         this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
@@ -652,13 +653,10 @@
         if (!video.videoWidth) return;
         const { videoWidth: w, videoHeight: h } = video;
         const canvas = this.gl.canvas;
-        const outputCanvas = UI.elements.outputCanvas;
         if (canvas.width === w && canvas.height === h) return;
         canvas.width = w;
         canvas.height = h;
-        outputCanvas.width = w;
-        outputCanvas.height = h;
-
+        // Don't resize background texture here, it has its own dimensions
         const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
         for (const tex of resizableTextures) {
           this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
@@ -946,14 +944,74 @@
       }
     };
 
+    const OverlayManager = {
+        ctx: null,
+        overlayCanvas: null,
+        logoTopLeft: null,
+        logoTopRight: null,
+        isReady: false,
+
+        async init() {
+            this.overlayCanvas = document.getElementById('overlayCanvas');
+            if (!this.overlayCanvas) {
+                console.error("Overlay canvas not found!");
+                return;
+            }
+            this.ctx = this.overlayCanvas.getContext('2d');
+
+            const loadImage = (src) => {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = src;
+                });
+            };
+
+            try {
+                [this.logoTopLeft, this.logoTopRight] = await Promise.all([
+                    loadImage('FirmaLogo.png'),
+                    loadImage('UnkownLogoLQ.gif')
+                ]);
+                this.isReady = true;
+            } catch (error) {
+                console.error("Failed to load overlay images:", error);
+                UI.setMsg('Error loading overlay images.');
+            }
+        },
+
+        draw(glCanvas) {
+            if (!this.isReady || !this.ctx || !glCanvas || !glCanvas.width) return;
+            
+            if (this.overlayCanvas.width !== glCanvas.width || this.overlayCanvas.height !== glCanvas.height) {
+                this.overlayCanvas.width = glCanvas.width;
+                this.overlayCanvas.height = glCanvas.height;
+            }
+
+            const w = this.overlayCanvas.width;
+            const h = this.overlayCanvas.height;
+            this.ctx.clearRect(0, 0, w, h);
+
+            const logoHeight = Math.max(40, h * 0.1); // Scalable logo height, with a minimum size
+
+            // Draw top-left logo (FirmaLogo.png)
+            const tlAspectRatio = this.logoTopLeft.naturalWidth / this.logoTopLeft.naturalHeight;
+            const tlWidth = logoHeight * tlAspectRatio;
+            this.ctx.drawImage(this.logoTopLeft, 0, 0, tlWidth, logoHeight);
+
+            // Draw top-right logo (UnkownLogoLQ.gif)
+            const trAspectRatio = this.logoTopRight.naturalWidth / this.logoTopRight.naturalHeight;
+            const trWidth = logoHeight * trAspectRatio;
+            this.ctx.drawImage(this.logoTopRight, w - trWidth, 0, trWidth, logoHeight);
+        }
+    };
+
     const App = {
       stream: null,
       rafId: null,
       shaders: {},
       definitions: {},
       globalDefinitions: {},
-      logoFirma: null,
-      logoUnknown: null,
       lastRandomizeTime: 0,
       lastPresetIterateTime: 0,
       currentPresetIndex: 0,
@@ -967,13 +1025,9 @@
           this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
           const video = UI.elements.video;
           video.srcObject = this.stream;
-
-          // Wait for the video's metadata to load before attempting to play it.
-          // This prevents a race condition that can interrupt the play() request.
           await new Promise(resolve => {
             video.onloadedmetadata = resolve;
           });
-          
           await video.play();
 
           UI.setStatus('Initializing GL...');
@@ -986,12 +1040,14 @@
           UI.setStatus('Initializing Body Segmentation...');
           if (!(await BodySegmenter.init())) return UI.setStatus('Segmentation Failed', true);
 
+          UI.setStatus('Loading overlays...');
+          await OverlayManager.init();
+
           UI.elements.startBtn.disabled = true;
           UI.elements.stopBtn.disabled = false;
           UI.setMsg('');
           UI.setStatus('Running');
 
-          // If auto-randomize is on by default, initialize its timer.
           if (parseFloat(UI.elements.autoRandomizeSlider.value) > 0) {
             this.lastRandomizeTime = performance.now();
           }
@@ -1035,7 +1091,7 @@
                 this.lastRandomizeTime = time;
             }
         } else {
-            this.lastRandomizeTime = 0; // Reset timer if disabled
+            this.lastRandomizeTime = 0;
         }
         
         // Preset Iteration Logic
@@ -1053,7 +1109,7 @@
                 this.lastPresetIterateTime = time;
             }
         } else {
-            this.lastPresetIterateTime = 0; // Reset timer if disabled
+            this.lastPresetIterateTime = 0;
         }
 
         const backgroundEl = !UI.elements.backgroundImage.classList.contains('hidden')
@@ -1070,23 +1126,7 @@
           maskFeather: parseFloat(UI.elements.maskFeather.value)
         });
         
-        // --- START: Overlay Drawing Logic ---
-        const outputCanvas = UI.elements.outputCanvas;
-        const glCanvas = UI.elements.glcanvas;
-        const ctx = outputCanvas.getContext('2d');
-        
-        // Draw the main WebGL-rendered scene
-        ctx.drawImage(glCanvas, 0, 0);
-
-        // Draw static logo if loaded
-        if (this.logoFirma && this.logoFirma.complete && this.logoFirma.naturalHeight !== 0) {
-            ctx.drawImage(this.logoFirma, 0, 0); // Top-left
-        }
-        // Draw animated GIF (current frame) if loaded
-        if (this.logoUnknown && this.logoUnknown.complete && this.logoUnknown.naturalHeight !== 0) {
-            ctx.drawImage(this.logoUnknown, outputCanvas.width - this.logoUnknown.width, 0); // Top-right
-        }
-        // --- END: Overlay Drawing Logic ---
+        OverlayManager.draw(UI.elements.glcanvas);
         
         const statusText = BodySegmenter.lastResult
           ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` 
@@ -1100,13 +1140,6 @@
         this.globalDefinitions = globalDefinitions;
         UI.init(definitions, globalDefinitions);
         PresetManager.init();
-        
-        // Load overlay images
-        this.logoFirma = new Image();
-        this.logoFirma.src = 'FirmaLogo.png';
-        this.logoUnknown = new Image();
-        this.logoUnknown.src = 'UnkownLogoLQ.gif';
-
         UI.elements.startBtn.addEventListener('click', () => this.start());
         UI.elements.stopBtn.addEventListener('click', () => this.stop());
       }
@@ -1169,7 +1202,7 @@
     showQR: document.getElementById('remoteShowQR'),
     reset: document.getElementById('remoteReset'),
     status: document.getElementById('remoteStatus'),
-    canvas: document.getElementById('outputCanvas')
+    canvas: document.getElementById('glcanvas')
   };
   if (!els.enable || !els.canvas) return; // page shape changed
 
@@ -1229,7 +1262,6 @@
     await lazyLoadPeerJS();
     sessionToken = randomToken(16);
     
-    // MODIFIED: Added iceServers config for better reliability
     peer = new window.Peer(undefined, {
       debug: 1,
       config: {
@@ -1247,22 +1279,17 @@
     });
 
     peer.on('connection', (conn) => {
-      // START >> MODIFICATION: Enforce connection limit of 3
       if (connections.size >= 3) {
-        // The Map object iterates in insertion order, so the first key is the oldest.
         const oldestPeerId = connections.keys().next().value;
         if (oldestPeerId) {
           const oldestConn = connections.get(oldestPeerId);
           if (oldestConn) {
-            // Politely inform the user why they are being disconnected.
             oldestConn.send(JSON.stringify({ type: 'error', message: 'A new user connected. Please rescan.' }));
-            // Close the connection after a short delay to allow the message to send.
             setTimeout(() => { try { oldestConn.close(); } catch {} }, 100);
           }
           connections.delete(oldestPeerId);
         }
       }
-      // END << MODIFICATION
 
       connections.set(conn.peer, conn);
       updateStatus();
@@ -1283,7 +1310,6 @@
     
     peer.on('error', (err) => {
         console.error('PeerJS error:', err);
-        // Handle peer destruction on critical errors
         if (err.type === 'peer-unavailable' || err.type === 'network') {
             disarmRemote();
             els.enable.checked = false;
@@ -1310,10 +1336,18 @@
     updateStatus();
   }
 
-  async function recordCanvasFiveSeconds(preferMp4=false) {
-    const canvas = els.canvas;
-    if (!canvas || !canvas.captureStream) throw new Error('Canvas captureStream not supported');
-    const stream = canvas.captureStream(30);
+  async function recordCanvasFiveSeconds(preferMp4 = false) {
+    const glCanvas = els.canvas;
+    const overlayCanvas = document.getElementById('overlayCanvas');
+    if (!glCanvas || !glCanvas.captureStream || !overlayCanvas) throw new Error('Canvas capture stream not supported');
+
+    const compositionCanvas = document.createElement('canvas');
+    compositionCanvas.width = glCanvas.width;
+    compositionCanvas.height = glCanvas.height;
+    const compCtx = compositionCanvas.getContext('2d');
+    if (!compCtx) throw new Error('Could not get 2D context for composition');
+
+    const stream = compositionCanvas.captureStream(30);
     const chunks = [];
     const optionsList = [
       { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
@@ -1335,13 +1369,27 @@
     }
     if (!rec) throw new Error('MediaRecorder unavailable for desired formats');
 
+    let compositionRafId;
+    const recordFrame = () => {
+        compCtx.drawImage(glCanvas, 0, 0);
+        compCtx.drawImage(overlayCanvas, 0, 0);
+        compositionRafId = requestAnimationFrame(recordFrame);
+    };
+    compositionRafId = requestAnimationFrame(recordFrame);
+
     await new Promise(res => setTimeout(res, 50));
     return await new Promise((resolve, reject) => {
       let stopped = false;
       rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onerror = e => { if (!stopped) reject(e.error || e); };
+      rec.onerror = e => {
+        if (!stopped) {
+          cancelAnimationFrame(compositionRafId);
+          reject(e.error || e);
+        }
+      };
       rec.onstop = () => {
         stopped = true;
+        cancelAnimationFrame(compositionRafId);
         try { stream.getTracks().forEach(t => t.stop()); } catch {}
         const blob = new Blob(chunks, { type: mime });
         resolve({ blob, mime });
