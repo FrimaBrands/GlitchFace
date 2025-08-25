@@ -16,18 +16,6 @@
         color: #EAEAEA;
         overflow: hidden;
     }
-    .status-indicator::after {
-        content: '■';
-        display: inline-block;
-        margin-left: 6px;
-        animation: blink 0.7s step-end infinite;
-        color: #00ff00;
-    }
-    @keyframes blink { 
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; } 
-    }
-    .status-indicator.error::after { color: #ff0000; }
   </style>
 </head>
 <body class="bg-black">
@@ -36,13 +24,9 @@
     <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
     <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
     <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
-    <div id="statusBar" class="absolute bottom-2 left-2 font-mono text-xs bg-black/70 px-2 py-1 status-indicator">
-      STATUS: STANDBY
-    </div>
   </div>
 
   <script>
-  // --- All JavaScript functionality remains unchanged, except for the UI module, which now listens for messages. ---
   (() => {
     // --- APP ARCHITECTURE ---
     const vertSrc = `
@@ -211,13 +195,14 @@
 
     const UI = {
       elements: {},
-      state: {}, // This will hold the values received from the controls panel.
+      state: {},
+      channel: null,
       
-      init(definitions, globalDefinitions) {
-        const ids = ['video', 'glcanvas', 'statusBar', 'backgroundMedia', 'backgroundImage'];
+      init(definitions, globalDefinitions, channel) {
+        this.channel = channel;
+        const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
-        // Initialize state from definitions
         this.state = {
           controls: {},
           toggles: {},
@@ -260,8 +245,12 @@
       },
 
       setStatus(text, isError = false) {
-        this.elements.statusBar.textContent = `STATUS: ${text}`;
-        this.elements.statusBar.classList.toggle('error', isError);
+        if (this.channel) {
+            this.channel.postMessage({
+                type: 'statusUpdate',
+                payload: { text, isError }
+            });
+        }
       },
     };
 
@@ -554,9 +543,9 @@
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
         
-        UI.init(definitions, globalDefinitions);
-        
         this.channel = new BroadcastChannel('unknown_controls');
+        UI.init(definitions, globalDefinitions, this.channel);
+
         this.channel.onmessage = (ev) => {
             const { type, payload, name } = ev.data;
             switch (type) {
@@ -603,8 +592,17 @@
       Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.0, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.0, neutral: 0.0 } } }
     };
     const globalDefinitions = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }}},
-        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }}}
+        Opacity: { title: 'Global Opacity', active: true, controls: { 
+            overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, 
+            flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 1.0, neutral: 0 }, 
+            flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.03, neutral: 0.1 }, 
+            flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, 
+            flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.5, neutral: 0.0 }
+        }},
+        Seep: { title: 'Effect Seep', active: true, controls: { 
+            seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, 
+            seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }
+        }}
     };
 
     App.init(definitions, globalDefinitions, { vert: vertSrc, frag: fragSrc });
