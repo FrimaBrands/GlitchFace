@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>U N K N O W N // PREVIEW</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+
+  <style>
+    body { 
+        font-family: 'JetBrains Mono', monospace; 
+        background-color: #000000;
+        color: #EAEAEA;
+        margin: 0;
+        overflow: hidden;
+    }
+    .main-stage {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="main-stage">
+    <img id="logoTopLeft" src="FirmaLogo.png" class="absolute top-0 left-0 z-10" style="transform: scale(0.75); transform-origin: top left; pointer-events: none;">
+    <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="absolute top-0 right-0 z-10" style="transform: scale(0.75);  transform-origin: top right; pointer-events: none;"></video>
+    
+    <video id="video" playsinline muted class="hidden"></video>
+    <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
+    <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
+    <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
+  </div>
+
+<script>
+(() => {
+    const elements = {};
+    const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
+    ids.forEach(id => elements[id] = document.getElementById(id));
+    
+    const vertSrc = `
+      attribute vec2 a_pos;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_pos;
+        gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
+      }`;
+
+    const fragSrc = `
+      precision highp float;
+      varying vec2 v_uv;
+      uniform sampler2D u_tex;
+      uniform sampler2D u_feedbackTex;
+      uniform sampler2D u_maskTex;
+      uniform sampler2D u_backgroundTex;
+      uniform vec2  u_resolution;
+      uniform float u_time;
+      uniform bool  u_isFeedbackPass;
+      uniform bool  u_useBackground;
+      uniform float u_maskFeather;
+      uniform float u_overallOpacity;
+      uniform float u_flickerPerSecond;
+      uniform float u_flickerDuration;
+      uniform float u_flickerIntensity;
+      uniform float u_flickerFade;
+      uniform float u_seepAmount;
+      uniform float u_seepIntensity;
+      uniform float u_feedbackAmount;
+      uniform float u_feedbackZoom;
+      uniform float u_glitchIntensity;
+      uniform float u_glitchBlockSize;
+      uniform float u_rgbShift;
+      uniform float u_noiseAmount;
+      uniform float u_noiseSpeed;
+      uniform float u_vignette;
+      uniform float u_globalSmearIntensity;
+      uniform float u_globalSmearAngle;
+      uniform float u_spotSmearIntensity;
+      uniform float u_spotSmearDensity;
+      uniform float u_spotSmearSize;
+      float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
+      vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
+        vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
+        vec4 color = vec4(0.0);
+        const int samples = 16;
+        for (int i = 0; i < samples; i++) {
+          float t = float(i) / float(samples - 1);
+          color += texture2D(tex, uv - dir * t * intensity);
+        }
+        return color / float(samples);
+      }
+      vec4 blur(sampler2D tex, vec2 uv, float radius) {
+          vec4 acc = vec4(0.0);
+          vec2 res = u_resolution.xy;
+          float count = 0.0;
+          for(float x = -2.0; x <= 2.0; x++) {
+              for(float y = -2.0; y <= 2.0; y++) {
+                  vec2 offset = vec2(x, y) * radius / res;
+                  acc += texture2D(tex, uv + offset);
+                  count += 1.0;
+              }
+          }
+          return acc / count;
+      }
+      void main() {
+        vec2 uv = v_uv;
+        vec4 videoColor = texture2D(u_tex, uv);
+        vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
+        vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
+        if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
+          vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
+          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
+        }
+        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+        effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
+        effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
+        effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
+        vec4 smearedColor = effectedColor;
+        vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
+        if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
+          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
+        }
+        float maskValue = texture2D(u_maskTex, uv).r;
+        if (maskValue > 0.1) {
+            vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
+            smearedColor = mix(smearedColor, globalSmear, 0.5);
+        }
+        float effectedGray = dot(smearedColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
+        if (u_isFeedbackPass) {
+          gl_FragColor = effectedGrayscale;
+          return;
+        }
+        float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
+        float baseMask = texture2D(u_maskTex, uv).r;
+        float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
+        float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
+        float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
+        float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
+        float flickerMultiplier = 1.0;
+        if (u_flickerPerSecond > 0.0) {
+            float flickerCycle = 1.0 / u_flickerPerSecond;
+            float flickerPhase = mod(u_time, flickerCycle);
+            float flickerEdge = flickerCycle * u_flickerDuration;
+            float fadeWidth = flickerCycle * u_flickerFade * 0.5;
+            float isFlickerOff = 1.0 - smoothstep(flickerEdge - fadeWidth, flickerEdge + fadeWidth, flickerPhase);
+            flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
+        }
+        float effectAmount = u_overallOpacity * flickerMultiplier;
+        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, effectAmount);
+        vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
+        gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
+      }`;
+
+    const Renderer = {
+      gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
+      maskCanvas: document.createElement('canvas'),
+      init(canvas, vsSrc, fsSrc, uniformKeys) {
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+        if (!this.gl) throw new Error('WebGL not available');
+        const compile = (type, src) => {
+          const s = this.gl.createShader(type); this.gl.shaderSource(s, src); this.gl.compileShader(s);
+          if (!this.gl.getShaderParameter(s, this.gl.COMPILE_STATUS)) throw new Error(`Shader compile error: ${this.gl.getShaderInfoLog(s)}`);
+          return s;
+        };
+        this.program = this.gl.createProgram();
+        this.gl.attachShader(this.program, compile(this.gl.VERTEX_SHADER, vsSrc));
+        this.gl.attachShader(this.program, compile(this.gl.FRAGMENT_SHADER, fsSrc));
+        this.gl.linkProgram(this.program);
+        if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) throw new Error(`Program link error: ${this.gl.getProgramInfoLog(this.program)}`);
+        const buffer = this.gl.createBuffer(); this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), this.gl.STATIC_DRAW);
+        const posLoc = this.gl.getAttribLocation(this.program, 'a_pos');
+        this.gl.enableVertexAttribArray(posLoc); this.gl.vertexAttribPointer(posLoc, 2, this.gl.FLOAT, false, 0, 0);
+        const createTex = () => {
+          const tex = this.gl.createTexture(); this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+          return tex;
+        };
+        this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
+        this.framebuffers.feedback = this.gl.createFramebuffer();
+        this.gl.useProgram(this.program);
+        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
+      },
+      fit(video) {
+        if (!video.videoWidth) return; const { videoWidth: w, videoHeight: h } = video; const canvas = this.gl.canvas;
+        if (canvas.width === w && canvas.height === h) return;
+        canvas.width = w; canvas.height = h;
+        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        for (const tex of resizableTextures) {
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+        }
+        this.gl.viewport(0, 0, w, h);
+      },
+      drawMask(video, segmentationMask) {
+        const { videoWidth: W, videoHeight: H } = video; const ctx = this.maskCanvas.getContext('2d');
+        if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) { this.maskCanvas.width = W; this.maskCanvas.height = H; }
+        ctx.fillStyle = 'black'; ctx.fillRect(0, 0, W, H);
+        if (segmentationMask) { ctx.drawImage(segmentationMask, 0, 0, W, H); }
+        this.gl.activeTexture(this.gl.TEXTURE2); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.mask);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.maskCanvas);
+      },
+      render(opts) {
+        const { video, t, appState, backgroundMedia } = opts; this.gl.useProgram(this.program);
+        this.gl.activeTexture(this.gl.TEXTURE0); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
+        const useBg = appState.checkboxes.useBgChk;
+        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth || backgroundMedia.width)) {
+            this.gl.activeTexture(this.gl.TEXTURE3); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
+            this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
+        }
+        this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.uniform1f(this.uniforms.u_time, t);
+
+        const definitions = App.definitions;
+        for (const [groupKey, group] of Object.entries(appState.controls)) {
+            const groupIsActive = appState.toggles[groupKey];
+            for (const [controlKey, value] of Object.entries(group)) {
+                let val = groupIsActive ? parseFloat(value) : definitions[groupKey].controls[controlKey].neutral;
+                this.gl.uniform1f(this.uniforms[`u_${controlKey}`], val);
+            }
+        }
+        for (const [groupKey, group] of Object.entries(appState.globalControls)) {
+            for (const [controlKey, value] of Object.entries(group)) {
+                this.gl.uniform1f(this.uniforms[`u_${controlKey}`], parseFloat(value));
+            }
+        }
+        
+        this.gl.uniform1i(this.uniforms.u_useBackground, useBg);
+        this.gl.uniform1f(this.uniforms.u_maskFeather, parseFloat(appState.misc.maskFeather));
+        this.gl.uniform1i(this.uniforms.u_tex, 0); this.gl.uniform1i(this.uniforms.u_feedbackTex, 1);
+        this.gl.uniform1i(this.uniforms.u_maskTex, 2); this.gl.uniform1i(this.uniforms.u_backgroundTex, 3);
+        this.gl.activeTexture(this.gl.TEXTURE1); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.feedbackA);
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 1);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffers.feedback);
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.textures.feedbackB, 0);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 0);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+        [this.textures.feedbackA, this.textures.feedbackB] = [this.textures.feedbackB, this.textures.feedbackA];
+      }
+    };
+
+    const BodySegmenter = {
+      segmenter: null, lastResult: null, isReady: false, isBusy: false, lastUpdateTime: 0, minInterval: 60,
+      async init() {
+        if (this.isReady) return true;
+        try {
+          this.segmenter = new window.SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+          this.segmenter.setOptions({ modelSelection: 1 });
+          this.segmenter.onResults(res => { this.lastResult = res.segmentationMask; this.isBusy = false; });
+          await this.segmenter.initialize(); this.isReady = true; return true;
+        } catch (err) { console.error("Selfie Segmentation initialization failed:", err); return false; }
+      },
+      update(video) {
+        const now = performance.now();
+        if (this.isReady && !this.isBusy && (now - this.lastUpdateTime) > this.minInterval) {
+          this.isBusy = true; this.lastUpdateTime = now; this.segmenter.send({ image: video });
+        }
+      }
+    };
+
+    const App = {
+      stream: null, rafId: null,
+      state: { checkboxes: { animateChk: true, mirrorChk: true, useBgChk: false }, misc: { maskFeather: '0.15' }, controls: {}, globalControls: {}, toggles: {} },
+      channel: new BroadcastChannel('unknown_signal_processor'),
+      definitions: { // Need a local copy for neutral values
+        Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { neutral: 0.0 }, jitterSpeed: { neutral: 0.0 } } },
+        Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { neutral: 0.0 }, globalSmearAngle: { neutral: 0.0 }, spotSmearIntensity: { neutral: 0.0 }, spotSmearDensity: { neutral: 0.0 }, spotSmearSize: { neutral: 0.0 } } },
+        Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { neutral: 0.0 }, feedbackZoom: { neutral: 1.0 } } },
+        Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { neutral: 0.0 }, glitchBlockSize: { neutral: 0.0 } } },
+        Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { neutral: 0.0 } } },
+        Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { neutral: 0.0 }, noiseSpeed:  { neutral: 0.0 }, vignette: { neutral: 0.0 } } }
+      },
+      sendStatus(text, isError = false) { this.channel.postMessage({ type: 'STATUS_UPDATE', text, isError }); },
+      async start() {
+        if (!navigator.mediaDevices?.getUserMedia) return this.sendStatus('getUserMedia not supported.', true);
+        try {
+          this.sendStatus('Requesting camera...');
+          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
+          elements.video.srcObject = this.stream;
+          await new Promise(resolve => { elements.video.onloadedmetadata = resolve; });
+          await elements.video.play();
+          this.sendStatus('Initializing GL...');
+          const uniformKeys = fragSrc.match(/uniform\s+\w+\s+u_\w+/g).map(s => s.split(' ').pop().replace(';', ''));
+          Renderer.init(elements.glcanvas, vertSrc, fragSrc, uniformKeys);
+          this.sendStatus('Initializing Body Segmentation...');
+          if (!(await BodySegmenter.init())) return this.sendStatus('Segmentation Failed', true);
+          this.sendStatus('Running');
+          if (this.rafId) cancelAnimationFrame(this.rafId);
+          this.loop();
+        } catch (err) { console.error(err); this.sendStatus(`Camera error: ${err.message}`, true); }
+      },
+      stop() {
+        if (this.rafId) cancelAnimationFrame(this.rafId); this.rafId = null;
+        if (this.stream) this.stream.getTracks().forEach(t => t.stop()); this.stream = null;
+        this.sendStatus('Terminated');
+      },
+      loop(time) {
+        this.rafId = requestAnimationFrame(t => this.loop(t));
+        const video = elements.video;
+        if (!video.videoWidth || !Renderer.gl) return;
+        Renderer.fit(video); BodySegmenter.update(video);
+        Renderer.drawMask(video, BodySegmenter.lastResult);
+        const t = this.state.checkboxes.animateChk ? time / 1000 : 0;
+        const backgroundEl = !elements.backgroundImage.classList.contains('hidden') ? elements.backgroundImage : elements.backgroundMedia;
+        Renderer.render({ video, t, appState: this.state, backgroundMedia: backgroundEl });
+        const statusText = BodySegmenter.lastResult ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` : `NO SIGNAL...`;
+        this.sendStatus(statusText);
+      },
+      init() {
+        this.channel.onmessage = (ev) => {
+          const msg = ev.data || {};
+          switch (msg.type) {
+            case 'START': this.start(); break;
+            case 'STOP': this.stop(); break;
+            case 'SET_STATE':
+              this.state = msg.payload;
+              elements.glcanvas.style.transform = this.state.checkboxes.mirrorChk ? 'scaleX(-1)' : 'none';
+              break;
+            case 'SET_BACKGROUND':
+                const { type, dataUrl } = msg.payload;
+                if (type.startsWith('image/')) {
+                    elements.backgroundImage.src = dataUrl;
+                    elements.backgroundImage.classList.remove('hidden');
+                    elements.backgroundMedia.classList.add('hidden');
+                    elements.backgroundMedia.pause();
+                } else if (type.startsWith('video/')) {
+                    elements.backgroundMedia.src = dataUrl;
+                    elements.backgroundMedia.play();
+                    elements.backgroundMedia.classList.remove('hidden');
+                    elements.backgroundImage.classList.add('hidden');
+                }
+                break;
+          }
+        };
+        this.sendStatus("Preview ready. Waiting for initialization.");
+      }
+    };
+    
+    App.init();
+})();
+</script>
+
+</body>
+</html>
