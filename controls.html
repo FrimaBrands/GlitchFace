@@ -37,7 +37,7 @@
         <p class="text-sm text-gray-400 font-mono">// CONTROLS</p>
         <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
         <div id="statusBar" class="font-mono text-xs status-indicator mt-2">
-          STATUS: CONNECTING...
+          STATUS: READY
         </div>
       </div>
       <div class="p-4 border-b border-gray-800 flex-shrink-0">
@@ -60,10 +60,9 @@
           <div class="control-group bg-black/50 border border-gray-800 p-3">
             <h3 class="font-semibold text-gray-200 mb-3">// REMOTE_TRIGGER</h3>
             <div class="space-y-3">
-              <label class="flex items-center justify-between text-sm cursor-pointer"><span>ARM REMOTE</span><input type="checkbox" id="remoteEnable" class="form-checkbox"></label>
               <div class="grid grid-cols-2 gap-2">
-                <button id="remoteShowQR" class="btn font-semibold py-2 text-sm" disabled>Open QR</button>
-                <button id="remoteReset" class="btn font-semibold py-2 text-sm" disabled>Reset</button>
+                <button id="remoteShowQR" class="btn font-semibold py-2 text-sm">Open QR</button>
+                <button id="remoteReset" class="btn font-semibold py-2 text-sm" disabled>Disarm</button>
               </div>
               <div id="remoteStatus" class="text-xs font-mono text-green-400">REMOTE: idle</div>
             </div>
@@ -117,8 +116,7 @@
         this.elements.maskFeather.addEventListener('input', () => { this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3); });
         this.elements.autoRandomizeSlider.addEventListener('input', () => { const val = parseFloat(this.elements.autoRandomizeSlider.value); this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
         this.elements.presetIterationSlider.addEventListener('input', () => { const val = parseFloat(this.elements.presetIterationSlider.value); this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
-        
-        // **PERFORMANCE FIX**: Event-driven broadcasting. State is now sent only when a control changes.
+        // Add change listeners to all inputs to trigger a state broadcast
         document.querySelectorAll('input, select').forEach(el => el.addEventListener('change', () => App.broadcastState()));
         document.querySelectorAll('input[type="range"]').forEach(el => el.addEventListener('input', () => App.broadcastState()));
       },
@@ -253,10 +251,6 @@
       channel: null, definitions: {}, globalDefinitions: {}, rafId: null,
       lastRandomizeTime: 0, lastPresetIterateTime: 0, currentPresetIndex: 0,
       bgObjectUrl: null,
-      // **WINDOW MANAGEMENT FIX**: State for tracking preview window connection
-      previewConnected: false,
-      lastPingTime: 0,
-      connectionCheckInterval: null,
 
       init(definitions, globalDefinitions) {
         this.definitions = definitions; this.globalDefinitions = globalDefinitions;
@@ -265,18 +259,6 @@
         UI.init(definitions, globalDefinitions);
         PresetManager.init();
         UI.elements.bgUpload.addEventListener('change', (e) => this.handleBgUpload(e));
-        
-        // **MEMORY LEAK FIX**: Clean up object URL on window close.
-        window.addEventListener('beforeunload', () => {
-            if (this.bgObjectUrl) {
-                URL.revokeObjectURL(this.bgObjectUrl);
-            }
-        });
-
-        // **WINDOW MANAGEMENT FIX**: Start checking for the preview window's presence.
-        this.lastPingTime = Date.now(); // Start with a fresh timestamp
-        this.connectionCheckInterval = setInterval(() => this.checkConnection(), 2000);
-
         this.loop();
         this.broadcastState(); // Initial broadcast
       },
@@ -286,23 +268,6 @@
             Remote.handleRecordingBlob(data.payload.blob);
         } else if (data.type === 'recording_error') {
             Remote.handleRecordingError(data.payload.message);
-        // **WINDOW MANAGEMENT FIX**: Handle ping from preview window.
-        } else if (data.type === 'preview_ping') {
-            this.lastPingTime = Date.now();
-            if (!this.previewConnected) {
-                this.previewConnected = true;
-                UI.setStatus('READY');
-            }
-        }
-      },
-
-      // **WINDOW MANAGEMENT FIX**: New function to check connection status.
-      checkConnection() {
-        if (Date.now() - this.lastPingTime > 3000) { // 3-second timeout
-            if (this.previewConnected) {
-                this.previewConnected = false;
-                UI.setStatus('PREVIEW DISCONNECTED', true);
-            }
         }
       },
 
@@ -317,9 +282,11 @@
       
       getCurrentState(forPreset = false) {
         const state = { uniforms: {}, animate: UI.elements.animateChk.checked, mirror: UI.elements.mirrorChk.checked, showLogos: UI.elements.logoChk.checked, useBg: UI.elements.useBgChk.checked };
+        // For presets, we need a different structure
         if (forPreset) {
             state.controls = {}; state.toggles = {}; state.globalControls = {}; state.checkboxes = {}; state.misc = {};
         }
+        // Process randomized controls
         for (const [groupKey, group] of Object.entries(UI.state.ui)) {
             if (forPreset) { state.controls[groupKey] = {}; state.toggles[groupKey] = this.definitions[groupKey].active; }
             const groupIsActive = this.definitions[groupKey].active;
@@ -330,6 +297,7 @@
                 if (forPreset) { state.controls[groupKey][controlKey] = control.value; }
             }
         }
+        // Process global controls
         for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
             if (forPreset) { state.globalControls[groupKey] = {}; }
             for (const [controlKey, control] of Object.entries(group)) {
@@ -337,8 +305,10 @@
                 if (forPreset) { state.globalControls[groupKey][controlKey] = control.value; }
             }
         }
+        // Add other misc values
         state.uniforms.u_maskFeather = parseFloat(UI.elements.maskFeather.value);
         if (this.bgObjectUrl) { state.bgFile = { url: this.bgObjectUrl, type: UI.elements.bgUpload.files[0].type }; }
+
         if (forPreset) {
             state.checkboxes = { animateChk: state.animate, mirrorChk: state.mirror, useBgChk: state.useBg, logoChk: state.showLogos };
             state.misc = { maskFeather: UI.elements.maskFeather.value };
@@ -348,7 +318,6 @@
       },
 
       broadcastState() {
-        if (!this.previewConnected && Date.now() - this.lastPingTime > 1000) return; // Don't broadcast if disconnected
         const payload = this.getCurrentState();
         this.channel.postMessage({ type: 'state_update', payload });
       },
@@ -357,20 +326,11 @@
         this.rafId = requestAnimationFrame(t => this.loop(t));
         const t = UI.elements.animateChk.checked ? time / 1000 : 0;
         UI.updateJitter(t);
-
-        // **PERFORMANCE FIX**: Only broadcast from the loop if automations are running or jitter is active.
-        // Manual changes are handled by event listeners.
-        let automationTriggered = false;
         const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
         if (autoRandomizeInterval > 0) {
             if (this.lastRandomizeTime === 0) this.lastRandomizeTime = time;
-            if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) {
-                PresetManager.randomize(); // This function already calls broadcastState
-                this.lastRandomizeTime = time;
-                automationTriggered = true;
-            }
+            if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) { PresetManager.randomize(); this.lastRandomizeTime = time; }
         } else { this.lastRandomizeTime = 0; }
-
         const presetIterationInterval = parseFloat(UI.elements.presetIterationSlider.value);
         if (presetIterationInterval > 0) {
             if (this.lastPresetIterateTime === 0) this.lastPresetIterateTime = time;
@@ -378,26 +338,23 @@
                 const presets = PresetManager.getPresets(); const presetNames = Object.keys(presets);
                 if (presetNames.length > 0) { this.currentPresetIndex = (this.currentPresetIndex + 1) % presetNames.length; PresetManager.load(presetNames[this.currentPresetIndex]); }
                 this.lastPresetIterateTime = time;
-                automationTriggered = true;
             }
         } else { this.lastPresetIterateTime = 0; }
-        
-        // Only broadcast from the loop for jitter animation, and only if an automation didn't just fire.
-        if (!automationTriggered && UI.definitions.Jitter.active && UI.elements.animateChk.checked) {
-            this.broadcastState();
-        }
+        this.broadcastState();
       }
     };
     
-    // --- Remote Trigger Module (No changes needed here) ---
+    // --- Remote Trigger Module ---
     const Remote = {
         peer: null, connections: new Map(), sessionToken: null, armed: false, isRecording: false,
-        activeConnection: null,
+        activeConnection: null, // Store the connection that initiated the recording
         init() {
-            const els = { enable: document.getElementById('remoteEnable'), showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
-            els.enable.addEventListener('change', async () => { if (els.enable.checked) await this.arm(); else this.disarm(); });
-            els.showQR.addEventListener('click', () => this.openQRWindow());
-            els.reset.addEventListener('click', () => { const wasEnabled = els.enable.checked; this.disarm(); if (wasEnabled) { els.enable.checked = true; this.arm(); } });
+            const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
+            els.showQR.addEventListener('click', async () => {
+                if (!this.armed) await this.arm();
+                this.openQRWindow();
+            });
+            els.reset.addEventListener('click', () => this.disarm() );
         },
         updateStatus() {
             const statusEl = document.getElementById('remoteStatus');
@@ -422,9 +379,9 @@
             await this.lazyLoadPeerJS();
             this.sessionToken = (crypto.getRandomValues(new Uint8Array(16))).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
             this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
-            this.peer.on('open', id => { this.updateStatus(); document.getElementById('remoteShowQR').disabled = false; document.getElementById('remoteReset').disabled = false; });
+            this.peer.on('open', id => { this.updateStatus(); document.getElementById('remoteReset').disabled = false; });
             this.peer.on('connection', conn => this.handleNewConnection(conn));
-            this.peer.on('error', err => { console.error('PeerJS error:', err); this.disarm(); document.getElementById('remoteEnable').checked = false; });
+            this.peer.on('error', err => { console.error('PeerJS error:', err); this.disarm(); });
             this.armed = true; this.updateStatus();
         },
         disarm() {
@@ -433,7 +390,7 @@
             this.connections.clear();
             if (this.peer) try { this.peer.destroy(); } catch {}
             this.peer = null; this.sessionToken = null;
-            document.getElementById('remoteShowQR').disabled = true; document.getElementById('remoteReset').disabled = true;
+            document.getElementById('remoteReset').disabled = true;
             this.updateStatus();
         },
         handleNewConnection(conn) {
