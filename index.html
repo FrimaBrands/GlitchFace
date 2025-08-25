@@ -984,6 +984,12 @@
           UI.elements.stopBtn.disabled = false;
           UI.setMsg('');
           UI.setStatus('Running');
+
+          // If auto-randomize is on by default, initialize its timer.
+          if (parseFloat(UI.elements.autoRandomizeSlider.value) > 0) {
+            this.lastRandomizeTime = performance.now();
+          }
+
           this.loop();
         } catch (err) {
           console.error(err);
