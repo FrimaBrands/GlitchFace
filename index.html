@@ -127,7 +127,6 @@
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
       <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
-      <canvas id="webgl_canvas" class="absolute top-0 left-0 w-full h-full object-cover -z-10"></canvas>
       <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
     </div>
 
@@ -266,6 +265,8 @@
       uniform sampler2D u_feedbackTex;
       uniform sampler2D u_maskTex;
       uniform sampler2D u_backgroundTex;
+      uniform sampler2D u_logo1Tex;
+      uniform sampler2D u_logo2Tex;
 
       // Global uniforms
       uniform vec2  u_resolution;
@@ -273,6 +274,8 @@
       uniform bool  u_isFeedbackPass;
       uniform bool  u_useBackground;
       uniform float u_maskFeather;
+      uniform vec4 u_logo1Rect; // x, y, w, h in normalized coords
+      uniform vec4 u_logo2Rect;
 
       // Opacity uniforms (not randomized)
       uniform float u_overallOpacity;
@@ -410,7 +413,29 @@
         vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
 
         // Mix the background with the calculated foreground color using the silhouette mask.
-        gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
+        vec4 finalComposite = mix(backgroundColor, foregroundColor, silhouetteMask);
+
+        // Overlay Logo 1 (Top Left)
+        if (u_logo1Rect.z > 0.0) {
+            if (v_uv.x > u_logo1Rect.x && v_uv.x < u_logo1Rect.x + u_logo1Rect.z &&
+                v_uv.y > u_logo1Rect.y && v_uv.y < u_logo1Rect.y + u_logo1Rect.w) {
+              vec2 logoUV = (v_uv - u_logo1Rect.xy) / u_logo1Rect.zw;
+              vec4 logoColor = texture2D(u_logo1Tex, logoUV);
+              finalComposite = mix(finalComposite, logoColor, logoColor.a);
+            }
+        }
+
+        // Overlay Logo 2 (Top Right)
+        if (u_logo2Rect.z > 0.0) {
+            if (v_uv.x > u_logo2Rect.x && v_uv.x < u_logo2Rect.x + u_logo2Rect.z &&
+                v_uv.y > u_logo2Rect.y && v_uv.y < u_logo2Rect.y + u_logo2Rect.w) {
+              vec2 logoUV = (v_uv - u_logo2Rect.xy) / u_logo2Rect.zw;
+              vec4 logoColor = texture2D(u_logo2Tex, logoUV);
+              finalComposite = mix(finalComposite, logoColor, logoColor.a);
+            }
+        }
+
+        gl_FragColor = finalComposite;
       }`;
 
     const UI = {
@@ -642,10 +667,16 @@
           return tex;
         };
         this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
+        this.textures.logo1 = createTex();
+        this.textures.logo2 = createTex();
         this.framebuffers.feedback = this.gl.createFramebuffer();
         
         this.gl.useProgram(this.program);
         uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
+        this.uniforms.u_logo1Tex = this.gl.getUniformLocation(this.program, 'u_logo1Tex');
+        this.uniforms.u_logo2Tex = this.gl.getUniformLocation(this.program, 'u_logo2Tex');
+        this.uniforms.u_logo1Rect = this.gl.getUniformLocation(this.program, 'u_logo1Rect');
+        this.uniforms.u_logo2Rect = this.gl.getUniformLocation(this.program, 'u_logo2Rect');
       },
 
       fit(video) {
@@ -685,9 +716,39 @@
       },
 
       render(appState) {
-        const { video, t, uiState, globalUiState, backgroundMedia, useBg, maskFeather } = appState;
+        const { video, t, uiState, globalUiState, backgroundMedia, useBg, maskFeather, logo1, logo2, logosLoaded } = appState;
         this.gl.useProgram(this.program);
         
+        // Handle logo overlays
+        if (logosLoaded) {
+            const gl = this.gl;
+            const canvas = gl.canvas;
+            const scale = 0.5;
+
+            // Logo 1 (Top Left)
+            const logo1W = logo1.naturalWidth * scale;
+            const logo1H = logo1.naturalHeight * scale;
+            gl.uniform4f(this.uniforms.u_logo1Rect, 0, 0, logo1W / canvas.width, logo1H / canvas.height);
+
+            gl.activeTexture(gl.TEXTURE4);
+            gl.bindTexture(gl.TEXTURE_2D, this.textures.logo1);
+            gl.uniform1i(this.uniforms.u_logo1Tex, 4);
+
+            // Logo 2 (Top Right)
+            const logo2W = logo2.naturalWidth * scale;
+            const logo2H = logo2.naturalHeight * scale;
+            const logo2X = 1.0 - (logo2W / canvas.width);
+            gl.uniform4f(this.uniforms.u_logo2Rect, logo2X, 0, logo2W / canvas.width, logo2H / canvas.height);
+            
+            gl.activeTexture(gl.TEXTURE5);
+            gl.bindTexture(gl.TEXTURE_2D, this.textures.logo2);
+            gl.uniform1i(this.uniforms.u_logo2Tex, 5);
+        } else {
+            // Send empty rects if not loaded
+            this.gl.uniform4f(this.uniforms.u_logo1Rect, 0, 0, 0, 0);
+            this.gl.uniform4f(this.uniforms.u_logo2Rect, 0, 0, 0, 0);
+        }
+
         // Main video texture
         this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
@@ -949,14 +1010,51 @@
       shaders: {},
       definitions: {},
       globalDefinitions: {},
+      logo1: new Image(),
+      logo2: new Image(),
+      logosLoaded: false,
       lastRandomizeTime: 0,
       lastPresetIterateTime: 0,
       currentPresetIndex: 0,
-      // MODIFIED: Added properties for overlay images and compositing canvas
-      firmaLogo: null,
-      unknownLogo: null,
-      compositeCanvas: null,
-      compositeCtx: null,
+
+      loadLogos() {
+        return new Promise(resolve => {
+            let loadedCount = 0;
+            const totalLogos = 2;
+            const onLogoLoad = () => {
+                loadedCount++;
+                if (loadedCount >= totalLogos) {
+                    this.logosLoaded = true;
+                    // Upload to GPU
+                    const gl = Renderer.gl;
+                    gl.activeTexture(gl.TEXTURE4);
+                    gl.bindTexture(gl.TEXTURE_2D, Renderer.textures.logo1);
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // Logos are not flipped
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.logo1);
+
+                    gl.activeTexture(gl.TEXTURE5);
+                    gl.bindTexture(gl.TEXTURE_2D, Renderer.textures.logo2);
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.logo2);
+                    
+                    // Restore flip setting for video texture
+                    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                    
+                    console.log('Logos loaded and uploaded to GPU.');
+                    resolve();
+                }
+            };
+
+            this.logo1.onload = onLogoLoad;
+            this.logo2.onload = onLogoLoad;
+            this.logo1.onerror = () => { console.error("Failed to load FirmaLogo.png"); onLogoLoad(); };
+            this.logo2.onerror = () => { console.error("Failed to load UnkownLogoLQ.gif"); onLogoLoad(); };
+
+            this.logo1.src = 'FirmaLogo.png';
+            // Note: Animated GIF will only display its first frame in WebGL this way.
+            this.logo2.src = 'UnkownLogoLQ.gif';
+        });
+      },
 
       async start() {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -980,10 +1078,11 @@
           const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather'];
           Object.values(this.definitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
           Object.values(this.globalDefinitions).forEach(def => uniformKeys.push(...Object.keys(def.controls).map(c => `u_${c}`)));
+          Renderer.init(UI.elements.glcanvas, this.shaders.vert, this.shaders.frag, uniformKeys);
           
-          // MODIFIED: Initialize Renderer with the hidden webgl canvas
-          const webglCanvas = document.getElementById('webgl_canvas');
-          Renderer.init(webglCanvas, this.shaders.vert, this.shaders.frag, uniformKeys);
+          UI.setStatus('Loading overlays...');
+          await this.loadLogos();
+
           Renderer.fit(UI.elements.video);
 
           UI.setStatus('Initializing Body Segmentation...');
@@ -1070,33 +1169,12 @@
           globalUiState: UI.globalState,
           backgroundMedia: backgroundEl,
           useBg: UI.elements.useBgChk.checked,
-          maskFeather: parseFloat(UI.elements.maskFeather.value)
+          maskFeather: parseFloat(UI.elements.maskFeather.value),
+          logo1: this.logo1,
+          logo2: this.logo2,
+          logosLoaded: this.logosLoaded
         });
         
-        // --- MODIFIED: Compositing Logic ---
-        const glCanvas = Renderer.gl.canvas; // The hidden webgl canvas
-
-        // Ensure composite canvas has the same size as the render canvas
-        if (this.compositeCanvas.width !== glCanvas.width) {
-            this.compositeCanvas.width = glCanvas.width;
-        }
-        if (this.compositeCanvas.height !== glCanvas.height) {
-            this.compositeCanvas.height = glCanvas.height;
-        }
-
-        // 1. Draw the WebGL canvas result onto the visible 2D canvas
-        this.compositeCtx.drawImage(glCanvas, 0, 0, this.compositeCanvas.width, this.compositeCanvas.height);
-
-        // 2. Draw the overlay images on top
-        if (this.firmaLogo && this.firmaLogo.complete && this.firmaLogo.naturalWidth > 0) {
-            this.compositeCtx.drawImage(this.firmaLogo, 0, 0);
-        }
-        if (this.unknownLogo && this.unknownLogo.complete && this.unknownLogo.naturalWidth > 0) {
-            this.compositeCtx.drawImage(this.unknownLogo, this.compositeCanvas.width - this.unknownLogo.width, 0);
-        }
-        // --- End of Compositing Logic ---
-
-
         const statusText = BodySegmenter.lastResult
           ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` 
           : `NO SIGNAL...`;
@@ -1109,16 +1187,6 @@
         this.globalDefinitions = globalDefinitions;
         UI.init(definitions, globalDefinitions);
         PresetManager.init();
-
-        // MODIFIED: Initialize overlay images and compositing canvas context
-        this.firmaLogo = new Image();
-        this.firmaLogo.src = 'FirmaLogo.png';
-        this.unknownLogo = new Image();
-        this.unknownLogo.src = 'UnkownLogoLQ.gif';
-        
-        this.compositeCanvas = UI.elements.glcanvas;
-        this.compositeCtx = this.compositeCanvas.getContext('2d');
-
         UI.elements.startBtn.addEventListener('click', () => this.start());
         UI.elements.stopBtn.addEventListener('click', () => this.stop());
       }
