@@ -25,6 +25,18 @@
     .btn-primary:hover { background-color: #000; color: #EAEAEA; }
     .form-checkbox { appearance: none; -webkit-appearance: none; height: 14px; width: 14px; background-color: transparent; border: 1px solid #555; cursor: pointer; }
     .form-checkbox:checked { background-color: #EAEAEA; }
+    .status-indicator::after {
+        content: '■';
+        display: inline-block;
+        margin-left: 6px;
+        animation: blink 0.7s step-end infinite;
+        color: #00ff00;
+    }
+    @keyframes blink { 
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; } 
+    }
+    .status-indicator.error::after { color: #ff0000; }
   </style>
 </head>
 <body class="p-2">
@@ -38,6 +50,9 @@
         <button id="stopBtn" class="flex-1 btn font-bold py-2 px-4">Terminate</button>
       </div>
       <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
+      <div id="statusBar" class="font-mono text-xs text-gray-400 mt-2 status-indicator">
+        STATUS: Awaiting Connection...
+      </div>
     </div>
 
     <div class="p-4 border-b border-gray-800 flex-shrink-0">
@@ -98,7 +113,7 @@
               <label for="autoRandomizeSlider" class="text-sm font-medium text-gray-300">AUTO-RANDOMIZE</label>
               <span id="autoRandomizeValue" class="text-sm font-mono text-gray-400">Off</span>
             </div>
-            <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="0">
+            <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="1.0">
           </div>
           <div class="control-item space-y-2 mt-3">
             <div class="flex justify-between items-center">
@@ -122,7 +137,7 @@
 
       init(definitions, globalDefinitions, channel) {
         this.channel = channel;
-        const ids = ['startBtn', 'stopBtn', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
+        const ids = ['startBtn', 'stopBtn', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue', 'statusBar'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
         for (const [key, definition] of Object.entries(definitions)) {
@@ -132,21 +147,15 @@
             this.createControlGroup(key, definition, this.elements['globals-tab-content'], false);
         }
 
-        // --- Event Listeners ---
         const debouncedStateUpdate = this.debounce(() => {
             this.channel.postMessage({ type: 'stateUpdate', payload: this.getState() });
         }, 100);
 
-        // This listener will be added to all sliders and toggles
-        const genericInputListener = () => {
-            this.updateJitterBase(); // Update jitter base values on manual input
-            debouncedStateUpdate();
-        };
+        const genericInputListener = () => debouncedStateUpdate();
 
         document.querySelectorAll('input[type="range"]').forEach(el => el.addEventListener('input', genericInputListener));
         document.querySelectorAll('.form-checkbox.toggle').forEach(el => el.addEventListener('change', genericInputListener));
 
-        // System Checkboxes
         ['animateChk', 'mirrorChk', 'useBgChk'].forEach(id => {
             this.elements[id].addEventListener('change', () => {
                 const payload = { [id]: this.elements[id].checked };
@@ -154,14 +163,12 @@
             });
         });
 
-        // Misc controls
         this.elements.maskFeather.addEventListener('input', () => {
             const val = parseFloat(this.elements.maskFeather.value);
             this.elements.maskFeatherValue.textContent = val.toFixed(3);
             this.channel.postMessage({ type: 'miscUpdate', payload: { maskFeather: val } });
         });
         
-        // Automation
         const automationListener = () => {
             const autoRandomizeInterval = parseFloat(this.elements.autoRandomizeSlider.value);
             const presetIterationInterval = parseFloat(this.elements.presetIterationSlider.value);
@@ -172,16 +179,13 @@
         this.elements.autoRandomizeSlider.addEventListener('input', automationListener);
         this.elements.presetIterationSlider.addEventListener('input', automationListener);
 
-        // Tab switching logic
         this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
         this.elements.globalsTabBtn.addEventListener('click', () => this.switchTab('globals'));
 
-        // Action Buttons
         this.elements.startBtn.addEventListener('click', () => this.channel.postMessage({ type: 'triggerAction', name: 'start' }));
         this.elements.stopBtn.addEventListener('click', () => this.channel.postMessage({ type: 'triggerAction', name: 'stop' }));
         this.elements.randomBtn.addEventListener('click', () => this.channel.postMessage({ type: 'triggerAction', name: 'randomize' }));
         
-        // Preset Buttons
         this.elements.savePresetBtn.addEventListener('click', () => {
             const name = this.elements.presetName.value.trim();
             if (!name) return this.setMsg('Enter a preset name.');
@@ -201,8 +205,10 @@
             this.setMsg(`Preset '${name}' loaded.`);
         });
         
-        // Request initial state from the preview window
         this.channel.postMessage({ type: 'requestState' });
+        
+        // Trigger initial automation values
+        automationListener();
       },
 
       debounce(func, wait) {
@@ -238,11 +244,6 @@
               });
           });
           return state;
-      },
-      
-      updateJitterBase() {
-        // This function is no longer needed here, as jitter is computed in the preview window.
-        // We just send the base values.
       },
 
       setState(newState) {
@@ -385,14 +386,16 @@
         container.append(labelContainer, input);
         return { container, input };
       },
-      setMsg(text) { this.elements.msg.textContent = text; }
+      setMsg(text) { this.elements.msg.textContent = text; },
+      setStatus(text, isError = false) {
+        if (this.elements.statusBar) {
+            this.elements.statusBar.textContent = `STATUS: ${text}`;
+            this.elements.statusBar.classList.toggle('error', isError);
+        }
+      }
     };
     
     // --- Entry Point ---
-    const definitions = { /* Same as index.html */ };
-    const globalDefinitions = { /* Same as index.html */ };
-    
-    // Omitted definitions for brevity - they are identical to the ones in index.html
     const defs = {
       Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.0, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
       Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 0, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 0, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.0, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
@@ -402,8 +405,17 @@
       Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.0, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.0, neutral: 0.0 } } }
     };
     const gDefs = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }}},
-        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }}}
+        Opacity: { title: 'Global Opacity', active: true, controls: { 
+            overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, 
+            flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 1.0, neutral: 0 }, 
+            flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.03, neutral: 0.1 }, 
+            flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, 
+            flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.5, neutral: 0.0 }
+        }},
+        Seep: { title: 'Effect Seep', active: true, controls: { 
+            seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, 
+            seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }
+        }}
     };
 
     const channel = new BroadcastChannel('unknown_controls');
@@ -413,6 +425,8 @@
             UI.setState(payload);
         } else if (type === 'updatePresetList') {
             UI.populatePresetList(payload);
+        } else if (type === 'statusUpdate') {
+            UI.setStatus(payload.text, payload.isError);
         }
     };
     UI.init(defs, gDefs, channel);
