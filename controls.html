@@ -113,7 +113,7 @@
               <label for="autoRandomizeSlider" class="text-sm font-medium text-gray-300">AUTO-RANDOMIZE</label>
               <span id="autoRandomizeValue" class="text-sm font-mono text-gray-400">Off</span>
             </div>
-            <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="1.0">
+            <input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="0">
           </div>
           <div class="control-item space-y-2 mt-3">
             <div class="flex justify-between items-center">
@@ -206,9 +206,6 @@
         });
         
         this.channel.postMessage({ type: 'requestState' });
-        
-        // Trigger initial automation values
-        automationListener();
       },
 
       debounce(func, wait) {
@@ -396,6 +393,7 @@
     };
     
     // --- Entry Point ---
+    // Omitted definitions for brevity - they are identical to the ones in index.html
     const defs = {
       Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.0, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
       Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 0, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 0, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.0, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
@@ -405,17 +403,8 @@
       Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.0, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.0, neutral: 0.0 } } }
     };
     const gDefs = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { 
-            overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, 
-            flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 1.0, neutral: 0 }, 
-            flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.03, neutral: 0.1 }, 
-            flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, 
-            flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.5, neutral: 0.0 }
-        }},
-        Seep: { title: 'Effect Seep', active: true, controls: { 
-            seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, 
-            seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }
-        }}
+        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 1.0 }, flickerPerSecond: { label: 'Flickers per Second', min: 0, max: 30, step: 0.1, value: 0, neutral: 0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.1, neutral: 0.1 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0, neutral: 0.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }}},
+        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 0.0, neutral: 0.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 0.0, neutral: 0.0 }}}
     };
 
     const channel = new BroadcastChannel('unknown_controls');
