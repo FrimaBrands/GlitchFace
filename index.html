@@ -117,14 +117,6 @@
     .form-checkbox:checked {
         background-color: #EAEAEA;
     }
-    
-    /* ADDED: Styles for overlay logos */
-    .overlay-logo {
-        position: absolute;
-        z-index: 10;
-        pointer-events: none;
-        display: none; /* Hidden by default, shown via JS */
-    }
   </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4">
@@ -135,10 +127,8 @@
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden absolute w-full h-full object-cover"></video>
       <img id="backgroundImage" class="hidden absolute w-full h-full object-cover" />
-      <canvas id="glcanvas" class="w-full h-full object-cover"></canvas>
-      
-      <img id="logoTopLeft" src="FirmaLogo.png" class="overlay-logo" style="top: 0; left: 0;">
-      <img id="logoTopRight" src="UnkownLogoLQ.gif" class="overlay-logo" style="top: 0; right: 0;">
+      <canvas id="glcanvas" class="hidden"></canvas>
+      <canvas id="outputCanvas" class="w-full h-full object-cover"></canvas>
     </div>
 
     <div class="controls-panel w-[420px] flex-shrink-0 bg-[#0a0a0a] border-l border-gray-800 flex flex-col">
@@ -433,7 +423,7 @@
       init(definitions, globalDefinitions) {
         this.definitions = definitions;
         this.globalDefinitions = globalDefinitions;
-        const ids = ['video', 'glcanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
+        const ids = ['video', 'glcanvas', 'outputCanvas', 'startBtn', 'stopBtn', 'statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'backgroundMedia', 'backgroundImage', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
         
         // Create randomized controls in the 'Effects' tab
@@ -446,8 +436,8 @@
         }
 
         // --- Event Listeners ---
-        this.elements.mirrorChk.addEventListener('change', () => this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
-        this.elements.glcanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
+        this.elements.mirrorChk.addEventListener('change', () => this.elements.outputCanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none');
+        this.elements.outputCanvas.style.transform = this.elements.mirrorChk.checked ? 'scaleX(-1)' : 'none';
         
         // Tab switching logic
         this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
@@ -662,10 +652,13 @@
         if (!video.videoWidth) return;
         const { videoWidth: w, videoHeight: h } = video;
         const canvas = this.gl.canvas;
+        const outputCanvas = UI.elements.outputCanvas;
         if (canvas.width === w && canvas.height === h) return;
         canvas.width = w;
         canvas.height = h;
-        // Don't resize background texture here, it has its own dimensions
+        outputCanvas.width = w;
+        outputCanvas.height = h;
+
         const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
         for (const tex of resizableTextures) {
           this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
@@ -959,6 +952,8 @@
       shaders: {},
       definitions: {},
       globalDefinitions: {},
+      logoFirma: null,
+      logoUnknown: null,
       lastRandomizeTime: 0,
       lastPresetIterateTime: 0,
       currentPresetIndex: 0,
@@ -995,10 +990,6 @@
           UI.elements.stopBtn.disabled = false;
           UI.setMsg('');
           UI.setStatus('Running');
-          
-          // MODIFIED: Show logos now that the app is running
-          document.getElementById('logoTopLeft').style.display = 'block';
-          document.getElementById('logoTopRight').style.display = 'block';
 
           // If auto-randomize is on by default, initialize its timer.
           if (parseFloat(UI.elements.autoRandomizeSlider.value) > 0) {
@@ -1021,10 +1012,6 @@
         UI.elements.startBtn.disabled = false;
         UI.elements.stopBtn.disabled = true;
         UI.setStatus('Terminated');
-        
-        // MODIFIED: Hide logos when app is stopped
-        document.getElementById('logoTopLeft').style.display = 'none';
-        document.getElementById('logoTopRight').style.display = 'none';
       },
 
       loop(time) {
@@ -1083,6 +1070,24 @@
           maskFeather: parseFloat(UI.elements.maskFeather.value)
         });
         
+        // --- START: Overlay Drawing Logic ---
+        const outputCanvas = UI.elements.outputCanvas;
+        const glCanvas = UI.elements.glcanvas;
+        const ctx = outputCanvas.getContext('2d');
+        
+        // Draw the main WebGL-rendered scene
+        ctx.drawImage(glCanvas, 0, 0);
+
+        // Draw static logo if loaded
+        if (this.logoFirma && this.logoFirma.complete && this.logoFirma.naturalHeight !== 0) {
+            ctx.drawImage(this.logoFirma, 0, 0); // Top-left
+        }
+        // Draw animated GIF (current frame) if loaded
+        if (this.logoUnknown && this.logoUnknown.complete && this.logoUnknown.naturalHeight !== 0) {
+            ctx.drawImage(this.logoUnknown, outputCanvas.width - this.logoUnknown.width, 0); // Top-right
+        }
+        // --- END: Overlay Drawing Logic ---
+        
         const statusText = BodySegmenter.lastResult
           ? `BODY DETECTED [${Renderer.gl.canvas.width}x${Renderer.gl.canvas.height}]` 
           : `NO SIGNAL...`;
@@ -1095,6 +1100,13 @@
         this.globalDefinitions = globalDefinitions;
         UI.init(definitions, globalDefinitions);
         PresetManager.init();
+        
+        // Load overlay images
+        this.logoFirma = new Image();
+        this.logoFirma.src = 'FirmaLogo.png';
+        this.logoUnknown = new Image();
+        this.logoUnknown.src = 'UnkownLogoLQ.gif';
+
         UI.elements.startBtn.addEventListener('click', () => this.start());
         UI.elements.stopBtn.addEventListener('click', () => this.stop());
       }
@@ -1157,10 +1169,7 @@
     showQR: document.getElementById('remoteShowQR'),
     reset: document.getElementById('remoteReset'),
     status: document.getElementById('remoteStatus'),
-    canvas: document.getElementById('glcanvas'),
-    // MODIFIED: Added logo elements
-    logoTopLeft: document.getElementById('logoTopLeft'),
-    logoTopRight: document.getElementById('logoTopRight')
+    canvas: document.getElementById('outputCanvas')
   };
   if (!els.enable || !els.canvas) return; // page shape changed
 
@@ -1301,45 +1310,10 @@
     updateStatus();
   }
 
-  // MODIFIED: This function now composites the glcanvas and logos onto a new canvas for recording.
   async function recordCanvasFiveSeconds(preferMp4=false) {
-    const glCanvas = els.canvas;
-    const logo1 = els.logoTopLeft;
-    const logo2 = els.logoTopRight;
-
-    if (!glCanvas || !glCanvas.captureStream) throw new Error('Canvas captureStream not supported');
-    if (!logo1 || !logo2) throw new Error('Overlay logos not found in the DOM');
-
-    // Create a new canvas to composite the final frame for recording.
-    const compositeCanvas = document.createElement('canvas');
-    const ctx = compositeCanvas.getContext('2d');
-    compositeCanvas.width = glCanvas.width;
-    compositeCanvas.height = glCanvas.height;
-
-    // This function draws the glCanvas and then the logos on top.
-    const drawCompositeFrame = () => {
-      try {
-        ctx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-        // Draw the main WebGL canvas content
-        ctx.drawImage(glCanvas, 0, 0);
-        // Draw the top-left logo
-        if (logo1.naturalWidth > 0) ctx.drawImage(logo1, 0, 0);
-        // Draw the top-right logo
-        if (logo2.naturalWidth > 0) {
-          const logo2X = compositeCanvas.width - logo2.naturalWidth;
-          ctx.drawImage(logo2, logo2X, 0);
-        }
-      } catch (e) {
-        console.error("Error drawing frame for recording:", e);
-      }
-    };
-    
-    // Set up an interval to continuously update the composite canvas.
-    const frameInterval = setInterval(drawCompositeFrame, 1000 / 30); // ~30fps
-
-    // Capture the stream from our composite canvas, not the original glCanvas.
-    const stream = compositeCanvas.captureStream(30);
-
+    const canvas = els.canvas;
+    if (!canvas || !canvas.captureStream) throw new Error('Canvas captureStream not supported');
+    const stream = canvas.captureStream(30);
     const chunks = [];
     const optionsList = [
       { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
@@ -1359,21 +1333,14 @@
         }
       } catch (e) { /* try next */ }
     }
-    if (!rec) {
-        clearInterval(frameInterval); // Clean up interval on error
-        throw new Error('MediaRecorder unavailable for desired formats');
-    }
+    if (!rec) throw new Error('MediaRecorder unavailable for desired formats');
 
     await new Promise(res => setTimeout(res, 50));
     return await new Promise((resolve, reject) => {
       let stopped = false;
       rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onerror = e => {
-        clearInterval(frameInterval); // Clean up interval on error
-        if (!stopped) reject(e.error || e);
-      };
+      rec.onerror = e => { if (!stopped) reject(e.error || e); };
       rec.onstop = () => {
-        clearInterval(frameInterval); // IMPORTANT: Clean up the drawing interval
         stopped = true;
         try { stream.getTracks().forEach(t => t.stop()); } catch {}
         const blob = new Blob(chunks, { type: mime });
@@ -1383,7 +1350,6 @@
       setTimeout(() => { try { rec.stop(); } catch {} }, 5000);
     });
   }
-
 
   async function onMessage(msg, conn) {
     try {
@@ -1457,7 +1423,7 @@
     if (!peer || !sessionToken) return;
     const url = new URL(PHONE_URL, location.href);
     url.searchParams.set('host', peer.id);
-    url.search_params.set('token', sessionToken);
+    url.searchParams.set('token', sessionToken);
     const qrUrl = new URL(QR_URL, location.href);
     qrUrl.searchParams.set('target', url.toString());
     window.open(qrUrl.toString(), '_blank', 'noopener,noreferrer,width=520,height=600');
