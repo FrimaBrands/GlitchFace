@@ -176,7 +176,7 @@
     
     /* --- Status and Progress --- */
     .status-area {
-      min-height: 60px;
+      min-height: 40px; /* Reduced height */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -220,36 +220,43 @@
         text-indent: 0.2em;
     }
     video { width: 100%; border: 1px solid var(--dim-color); }
+    
+    /* UPDATED: Download button is now white */
     a.dl {
       display: inline-block;
       width: 100%;
       box-sizing: border-box;
-      padding: 10px 16px;
-      border: 1px solid var(--dim-color);
-      color: var(--text-color);
+      padding: 12px 16px;
+      border: 1px solid var(--accent-color);
+      background: var(--accent-color);
+      color: var(--bg-color);
+      text-align: center;
       text-decoration: none;
       font-size: 0.9rem;
+      font-weight: 700;
       transition: all 0.2s ease-in-out;
     }
     a.dl:hover {
-      background: var(--accent-color);
-      color: var(--bg-color);
+      background: transparent;
+      color: var(--accent-color);
     }
+    
+    /* UPDATED: Reset button is now black/transparent */
     .reset-button {
         width: 100%;
-        padding: 12px 16px;
-        border: 1px solid var(--accent-color);
-        background: var(--accent-color);
-        color: var(--bg-color);
+        padding: 10px 16px;
+        border: 1px solid var(--dim-color);
+        background: transparent;
+        color: var(--text-color);
         font-family: inherit;
         font-size: 0.9rem;
-        font-weight: 700;
         cursor: pointer;
         transition: all 0.2s ease-in-out;
     }
     .reset-button:hover {
-        background: transparent;
-        color: var(--accent-color);
+        background: var(--accent-color);
+        color: var(--bg-color);
+        border-color: var(--accent-color);
     }
     #debugLog { display: none; }
   </style>
@@ -273,8 +280,7 @@
     </div>
     
     <div class="status-area">
-      <div id="connState" class="status-text">initializing…</div>
-      <div id="status" class="status-text">—</div>
+      <div id="statusLine" class="status-text">Initializing…</div>
       <div id="progress-container">
         <progress id="progress" value="0" max="100"></progress>
       </div>
@@ -298,8 +304,7 @@
       btnText: document.getElementById('startBtnText'),
       btnSubtext: document.getElementById('startBtnSubtext'),
       progressRing: document.querySelector('.progress-ring__circle'),
-      conn: document.getElementById('connState'),
-      status: document.getElementById('status'),
+      statusLine: document.getElementById('statusLine'),
       progress: document.getElementById('progress'),
       progressContainer: document.getElementById('progress-container'),
       dl: document.getElementById('download'),
@@ -353,7 +358,7 @@
         
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
-        els.btnText.innerHTML = 'START<br>RECORDING';
+        els.btnText.textContent = 'START';
         els.btnSubtext.textContent = '';
 
 
@@ -361,7 +366,7 @@
         els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
         setRingProgress(0);
         
-        setStatus('ready');
+        updateStatus('Connected. Ready to capture.');
         els.progressContainer.style.display = 'none';
         els.progress.value = 0;
     }
@@ -369,6 +374,11 @@
     function logMsg(msg) {
         console.log(msg);
         if (els.debug) els.debug.textContent = `${new Date().toLocaleTimeString()}: ${msg}\n${els.debug.textContent}`;
+    }
+    
+    function updateStatus(text, isError = false) {
+        els.statusLine.textContent = text;
+        els.statusLine.className = isError ? 'status-text bad' : 'status-text';
     }
 
     logMsg('DOM is ready. Starting script.');
@@ -379,13 +389,10 @@
         const token = new URLSearchParams(location.search).get('token');
 
         if (!hostId || !token) {
-          els.status.textContent = 'ERROR: Invalid Link'; els.status.className='status-text bad';
+          updateStatus('ERROR: Invalid link. Please re-scan the QR code.', true);
           logMsg('Error: Missing host or token in URL.');
           return;
         }
-
-        function setConn(txt, ok=false){ els.conn.textContent = `CONNECTION: ${txt}`; els.conn.className = ok?'status-text ok':'status-text'; }
-        function setStatus(txt, ok=true){ els.status.textContent = `STATUS: ${txt}`; els.status.className = ok?'status-text ok':'status-text bad'; }
 
         const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
         const chunks = [];
@@ -399,29 +406,28 @@
 
         peer.on('open', (id) => {
           logMsg(`PeerJS client is open with ID: ${id}`);
-          setConn('connecting...');
+          updateStatus('Connecting to installation…');
           conn = peer.connect(hostId, { reliable: true });
 
           conn.on('open', () => {
             logMsg('Connection established with host!');
-            setConn('connected', true);
+            updateStatus('Connected. Ready to capture.');
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            els.btnText.innerHTML = 'START<br>RECORDING';
+            els.btnText.textContent = 'START';
           });
 
           conn.on('data', (msg) => {
             if (typeof msg === 'string') {
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
-                setStatus('ready');
                 logMsg('Handshake acknowledged. Ready.');
               } else if (data.type === 'recordingMeta') {
                 mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
                 chunks.length = 0; received = 0;
                 els.progressContainer.style.display = 'block';
                 els.progress.value = 0;
-                setStatus('receiving…');
+                updateStatus('Receiving capture…');
                 logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
               } else if (data.type === 'recordingEnd') {
                 if (recordingTimer) clearInterval(recordingTimer);
@@ -436,13 +442,16 @@
                 
                 els.progress.value = 100;
                 setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
-                setStatus('complete', true);
+                updateStatus('Capture complete.');
                 logMsg('File received successfully.');
               } else if (data.type === 'error') {
-                setStatus(data.message || 'error', false);
+                let message = data.message || 'An unknown error occurred.';
+                if (message === 'Invalid token.') message = 'Invalid session. Please scan the QR code again.';
+                if (message === 'New user connected.') message = 'Disconnected: A new user has connected.';
+                updateStatus(message, true);
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                els.btnText.innerHTML = 'RETRY<br>RECORDING';
+                els.btnText.textContent = 'RETRY';
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -451,31 +460,30 @@
             }
           });
 
-          conn.on('close', () => { logMsg('Connection closed.'); setConn('disconnected'); setStatus('disconnected', false); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
-          conn.on('error', (err) => { logMsg(`Connection error: ${err}`); setConn('connection error', false); });
+          conn.on('close', () => { logMsg('Connection closed.'); updateStatus('Disconnected.', true); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
+          conn.on('error', (err) => { logMsg(`Connection error: ${err}`); updateStatus('Connection error.', true); });
         });
         
-        peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); setConn(`peer error: ${err.type}`, false); setStatus('Error', false); });
-        peer.on('disconnected', () => { logMsg('Disconnected from server.'); setConn('reconnecting signal...'); });
+        peer.on('error', (err) => { logMsg(`Peer error: ${err.type}`); updateStatus(`Error: ${err.type}`, true); });
+        peer.on('disconnected', () => { logMsg('Disconnected from server.'); updateStatus('Reconnecting to server…'); });
         
         els.btn.addEventListener('click', () => {
-          setStatus('requesting...');
+          updateStatus('Requesting capture…');
           logMsg('Sent startRecording request.');
           conn && conn.send(JSON.stringify({ type:'startRecording' }));
           startRecordingAnimation();
 
           setTimeout(() => { 
-            if (els.status.textContent === 'STATUS: requesting...') {
-              setStatus('request timed out', false);
+            if (els.statusLine.textContent === 'Requesting capture…') {
+              updateStatus('Request timed out. Please try again.', true);
               resetUI();
-              els.btnText.innerHTML = 'RETRY<br>RECORDING';
+              els.btnText.textContent = 'RETRY';
             }
           }, 8000);
         });
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.message}.`);
-        setConn('Script Error', false);
-        setStatus(e.message, false);
+        updateStatus(`Script Error: ${e.message}`, true);
     }
   });
   </script>
