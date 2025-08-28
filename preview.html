@@ -21,16 +21,24 @@
         align-items: center;
         justify-content: center;
     }
-    /* All visual elements are absolutely positioned to layer correctly */
-    #backgroundMedia, #backgroundImage, #glcanvas {
+    /* UPDATED: Background media now covers the entire viewport */
+    #backgroundMedia, #backgroundImage {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
         object-fit: cover;
+        z-index: 1;
     }
-    /* Logos are positioned at the corners */
+    /* UPDATED: Canvas is now a centered block element that scales to fit the viewport */
+    #glcanvas {
+        display: block;
+        max-width: 100vw;
+        max-height: 100vh;
+        z-index: 5;
+    }
+    /* Logos are positioned at the corners of the viewport */
     #logoTopLeft, #logoTopRight {
         position: absolute;
         z-index: 10;
@@ -46,13 +54,15 @@
 </head>
 <body>
   <div class="main-stage">
+    <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
+    <img id="backgroundImage" class="hidden" />
+    
+    <canvas id="glcanvas"></canvas>
+    
     <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
     <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
     
     <video id="video" playsinline muted class="hidden"></video>
-    <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
-    <img id="backgroundImage" class="hidden" />
-    <canvas id="glcanvas"></canvas>
   </div>
 
 <script>
@@ -76,6 +86,7 @@
       uniform sampler2D u_maskTex;
       uniform sampler2D u_backgroundTex;
       uniform vec2  u_resolution;
+      uniform vec2  u_videoResolution; // ADDED: To handle video aspect ratio
       uniform float u_time;
       uniform bool  u_isFeedbackPass;
       uniform bool  u_useBackground;
@@ -126,15 +137,29 @@
       }
       void main() {
         vec2 uv = v_uv;
-        vec4 videoColor = texture2D(u_tex, uv);
+        // --- START: Video UV Correction for Aspect Ratio ("cover" effect) ---
+        vec2 main_res = u_resolution;
+        vec2 video_res = u_videoResolution;
+        float main_aspect = main_res.x / main_res.y;
+        float video_aspect = video_res.x / video_res.y;
+        vec2 video_uv = v_uv;
+        if (video_aspect > main_aspect) {
+            float new_height = main_aspect / video_aspect;
+            video_uv.y = video_uv.y * new_height + (1.0 - new_height) / 2.0;
+        } else {
+            float new_width = video_aspect / main_aspect;
+            video_uv.x = video_uv.x * new_width + (1.0 - new_width) / 2.0;
+        }
+        // --- END: Video UV Correction ---
+        vec4 videoColor = texture2D(u_tex, video_uv);
         vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
         vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
         if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
           vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
-          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
+          effectedColor = texture2D(u_tex, video_uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
         }
-        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
-        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+        float r = texture2D(u_tex, video_uv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, video_uv - vec2(u_rgbShift, 0.0)).b;
         effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
         effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
         effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
@@ -206,28 +231,26 @@
           return tex;
         };
         this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
-        this.framebuffers.feedback = this.gl.createFramebuffer();
-        this.gl.useProgram(this.program);
-        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
-      },
-      fit(video) {
-        if (!video.videoWidth) return;
-        const { videoWidth: w, videoHeight: h } = video;
-        const canvas = this.gl.canvas;
-        if (canvas.width === w && canvas.height === h) return;
-        canvas.width = w; canvas.height = h;
-        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        // UPDATED: Create textures at the fixed 1080x1920 resolution
+        const { width: w, height: h } = canvas;
+        const resizableTextures = [this.textures.feedbackA, this.textures.feedbackB];
         for (const tex of resizableTextures) {
           this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
           this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
         }
+        this.framebuffers.feedback = this.gl.createFramebuffer();
+        this.gl.useProgram(this.program);
+        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
         this.gl.viewport(0, 0, w, h);
       },
       drawMask(video, segmentationMask) {
-        const { videoWidth: W, videoHeight: H } = video;
+        // UPDATED: The mask canvas is now fixed at the target resolution (1080x1920)
+        const W = this.gl.canvas.width;
+        const H = this.gl.canvas.height;
         const ctx = this.maskCanvas.getContext('2d');
         if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) { this.maskCanvas.width = W; this.maskCanvas.height = H; }
         ctx.fillStyle = 'black'; ctx.fillRect(0, 0, W, H);
+        // The segmentation mask (from camera resolution) is stretched to fill the target canvas
         if (segmentationMask) { ctx.drawImage(segmentationMask, 0, 0, W, H); }
         this.gl.activeTexture(this.gl.TEXTURE2); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.mask);
         this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
@@ -245,6 +268,7 @@
             this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
         }
         this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.uniform2f(this.uniforms.u_videoResolution, video.videoWidth, video.videoHeight); // ADDED
         this.gl.uniform1f(this.uniforms.u_time, t);
         for (const key in uniforms) {
             if (this.uniforms[key]) {
@@ -305,16 +329,21 @@
         // Request camera and start processing
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
-          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1080, height: 1920 }, audio: false });
+          // UPDATED: Request a vertical-aspect-ratio video stream
+          const constraints = { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+          this.stream = await navigator.mediaDevices.getUserMedia(constraints);
           this.elements.video.srcObject = this.stream;
           await new Promise(resolve => { this.elements.video.onloadedmetadata = resolve; });
           await this.elements.video.play();
+          
+          // UPDATED: Set canvas to fixed 1080x1920 resolution
+          this.elements.glcanvas.width = 1080;
+          this.elements.glcanvas.height = 1920;
 
           // Initialize WebGL Renderer
-          const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
+          const uniformKeys = ['u_resolution', 'u_videoResolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
           Renderer.init(this.elements.glcanvas, uniformKeys);
-          Renderer.fit(this.elements.video);
-
+          
           // Initialize Body Segmenter
           await BodySegmenter.init();
 
@@ -375,7 +404,7 @@
         const video = this.elements.video;
         if (!video.videoWidth || !Renderer.gl) return;
         
-        Renderer.fit(video);
+        // REMOVED: Renderer.fit(video) is no longer needed as canvas size is fixed.
         BodySegmenter.update(video);
         Renderer.drawMask(video, BodySegmenter.lastResult);
         
@@ -392,20 +421,20 @@
         });
       },
       
-      // Recording function, adapted to be in this window
       async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
         const logoTopRight = this.elements.logoTopRight;
         const compositeCanvas = document.createElement('canvas');
-        compositeCanvas.width = glCanvas.width;
-        compositeCanvas.height = glCanvas.height;
+        // UPDATED: Recording canvas is now fixed to 1080x1920
+        compositeCanvas.width = 1080;
+        compositeCanvas.height = 1920;
         const ctx = compositeCanvas.getContext('2d');
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
         const optionsList = [
-          { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
-          { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
+          { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 5_000_000 },
+          { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 5_000_000 },
         ];
         if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codeacs=h264' });
         let rec = null, mime = '';
