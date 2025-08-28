@@ -278,17 +278,17 @@
       </button>
     </div>
     
+    <div id="result-area" class="result-area">
+      <a id="download" class="dl" href="#" download>Download Video</a>
+      <video id="preview" controls playsinline></video>
+      <button id="resetBtn" class="reset-button">Record Another</button>
+    </div>
+
     <div class="status-area">
       <div id="statusLine" class="status-text">Initializing…</div>
       <div id="progress-container">
         <progress id="progress" value="0" max="100"></progress>
       </div>
-    </div>
-
-    <div id="result-area" class="result-area">
-      <video id="preview" controls playsinline></video>
-      <a id="download" class="dl" href="#" download>Download Video</a>
-      <button id="resetBtn" class="reset-button">Record Another</button>
     </div>
 
     <pre id="debugLog"></pre>
@@ -412,7 +412,7 @@
             updateStatus('Connected. Ready to capture.');
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            els.btnText.textContent = 'START';
+            els.btnText.textContent = 'START RECORDING';
           });
 
           conn.on('data', (msg) => {
