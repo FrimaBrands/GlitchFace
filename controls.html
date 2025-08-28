@@ -445,33 +445,21 @@
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
                     this.isRecording = true; this.activeConnection = conn; this.updateStatus();
-                    // --- MODIFICATION START ---
-                    // No longer need to specify format, it will be handled by transcoding.
-                    App.channel.postMessage({ type: 'start_recording', payload: {} });
-                    // --- MODIFICATION END ---
+                    const preferMp4 = true;
+                    App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
-        },
-        // --- MODIFICATION START ---
-        // Added a robust FFmpeg loader and transcoder.
-        async loadFFmpeg() {
+        },async function loadFFmpeg() {
             if (window.__ffmpegLoaded) return window.__ffmpeg;
-            UI.setStatus('Loading transcoder...', false);
             await new Promise((res, rej) => {
               const s = document.createElement('script');
-              s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/ffmpeg.min.js';
-              s.crossOrigin = "anonymous";
+              s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.8/dist/ffmpeg.min.js';
               s.onload = res; s.onerror = () => rej(new Error('Failed to load ffmpeg'));
               document.body.appendChild(s);
             });
-            const { createFFmpeg, fetchFile } = FFmpeg;
-            const ffmpeg = createFFmpeg({ 
-                log: false,
-                corePath: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js',
-            });
-            UI.setStatus('Initializing transcoder...', false);
+            const { createFFmpeg, fetchFile } = window.FFmpeg;
+            const ffmpeg = createFFmpeg({ log: false });
             await ffmpeg.load();
-            UI.setStatus('READY', false);
             window.__ffmpegLoaded = true;
             window.__ffmpeg = { ffmpeg, fetchFile };
             return window.__ffmpeg;
@@ -479,59 +467,18 @@
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
             if (!conn) { this.isRecording = false; this.updateStatus(); return; }
-            
-            let finalBlob = blob;
-            let mimeType = blob.type;
-
-            // Transcode to MP4 if the recording is not already in that format.
-            if (!mimeType.includes('mp4')) {
-                try {
-                    conn.send(JSON.stringify({ type: 'status', message: 'Processing video...' }));
-                    const { ffmpeg, fetchFile } = await this.loadFFmpeg();
-                    const inputFilename = 'input.webm';
-                    const outputFilename = 'output.mp4';
-
-                    ffmpeg.FS('writeFile', inputFilename, await fetchFile(blob));
-                    // Run ffmpeg. -preset ultrafast is used for speed.
-                    await ffmpeg.run('-i', inputFilename, '-preset', 'ultrafast', outputFilename);
-                    const data = ffmpeg.FS('readFile', outputFilename);
-                    
-                    finalBlob = new Blob([data.buffer], { type: 'video/mp4' });
-                    mimeType = 'video/mp4';
-
-                    ffmpeg.FS('unlink', inputFilename);
-                    ffmpeg.FS('unlink', outputFilename);
-                } catch (e) {
-                    console.error('Transcoding failed:', e);
-                    this.handleRecordingError('Failed to process video.');
-                    return;
-                }
-            }
-
-            const arrayBuf = await finalBlob.arrayBuffer();
-            const total = arrayBuf.byteLength;
-            const filename = `unknown_${Date.now()}.mp4`; // Always send as .mp4
-
-            conn.send(JSON.stringify({ type:'recordingMeta', mime: mimeType, totalBytes: total, filename }));
-            
-            const CHUNK = 64 * 1024; 
-            let sent = 0; 
-            const channel = conn.dataChannel;
-
+            const { type: mime } = blob;
+            const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
+            const filename = `unknown_${Date.now()}.${mime.includes('mp4')?'mp4':'webm'}`;
+            conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
+            const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
             while (sent < total) {
-                if (channel && channel.bufferedAmount > 1024 * 1024) { 
-                    await new Promise(r => { channel.onbufferedamountlow = r; }); 
-                }
-                const end = Math.min(total, sent + CHUNK); 
-                conn.send(arrayBuf.slice(sent, end)); 
-                sent = end;
+                if (channel && channel.bufferedAmount > 1024 * 1024) { await new Promise(r => { channel.onbufferedamountlow = r; }); }
+                const end = Math.min(total, sent + CHUNK); conn.send(arrayBuf.slice(sent, end)); sent = end;
             }
             conn.send(JSON.stringify({ type:'recordingEnd' }));
-            this.isRecording = false; 
-            this.activeConnection = null; 
-            this.updateStatus();
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
         },
-        // --- MODIFICATION END ---
         handleRecordingError(message) {
             if (this.activeConnection) {
                 this.activeConnection.send(JSON.stringify({ type: 'error', message }));
