@@ -450,6 +450,11 @@
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
                 els.btnText.textContent = 'RETRY';
+              // --- MODIFICATION START ---
+              // Handles status updates during transcoding.
+              } else if (data.type === 'status') {
+                updateStatus(data.message);
+              // --- MODIFICATION END ---
               }
             } else {
               chunks.push(new Uint8Array(msg));
