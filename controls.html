@@ -414,7 +414,7 @@
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
                     this.isRecording = true; this.activeConnection = conn; this.updateStatus();
-                    const preferMp4 = true; // Always prefer MP4
+                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
                     App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
