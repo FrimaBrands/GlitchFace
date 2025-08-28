@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js" async></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js" async></script>
   <style>
     body { font-family: 'JetBrains Mono', monospace; background-color: #0a0a0a; color: #EAEAEA; }
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
@@ -96,7 +98,6 @@
       </div>
     </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
 <script>
 // --- This script is for the CONTROLS window only ---
 // It manages the UI, presets, and remote connections. It broadcasts state changes.
@@ -117,7 +118,6 @@
         this.elements.maskFeather.addEventListener('input', () => { this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3); });
         this.elements.autoRandomizeSlider.addEventListener('input', () => { const val = parseFloat(this.elements.autoRandomizeSlider.value); this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
         this.elements.presetIterationSlider.addEventListener('input', () => { const val = parseFloat(this.elements.presetIterationSlider.value); this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
-        // Add change listeners to all inputs to trigger a state broadcast
         document.querySelectorAll('input, select').forEach(el => el.addEventListener('change', () => App.broadcastState()));
         document.querySelectorAll('input[type="range"]').forEach(el => el.addEventListener('input', () => App.broadcastState()));
       },
@@ -189,7 +189,6 @@
       },
       getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV5.0Presets') || '{}'),
       savePresets: (p) => localStorage.setItem('bodyGlitchV5.0Presets', JSON.stringify(p)),
-      getAppState() { /* This is now handled by App.getCurrentState() */ },
       setAppState(state) {
         if (!state) return;
         if (state.controls) {
@@ -202,16 +201,10 @@
           }
         }
         if (state.toggles) { for (const [groupKey, isChecked] of Object.entries(state.toggles)) { const def = UI.definitions[groupKey]; if (def && def.toggleElement) { def.toggleElement.checked = isChecked; def.toggleElement.dispatchEvent(new Event('change')); } } }
-        if (state.globalControls) {
-            for (const [groupKey, group] of Object.entries(state.globalControls)) {
-                if (UI.globalState.ui[groupKey]) { for (const [controlKey, value] of Object.entries(group)) { const el = UI.globalState.ui[groupKey][controlKey]; if (el) { el.value = value; el.dispatchEvent(new Event('input')); } } }
-            }
-        }
-        if (state.checkboxes) {
-          UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true; UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true; UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false; UI.elements.logoChk.checked = state.checkboxes.logoChk ?? true;
-        }
+        if (state.globalControls) { for (const [groupKey, group] of Object.entries(state.globalControls)) { if (UI.globalState.ui[groupKey]) { for (const [controlKey, value] of Object.entries(group)) { const el = UI.globalState.ui[groupKey][controlKey]; if (el) { el.value = value; el.dispatchEvent(new Event('input')); } } } } }
+        if (state.checkboxes) { UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true; UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true; UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false; UI.elements.logoChk.checked = state.checkboxes.logoChk ?? true; }
         if (state.misc) { const featherSlider = UI.elements.maskFeather; if (featherSlider) { featherSlider.value = state.misc.maskFeather ?? '0.15'; featherSlider.dispatchEvent(new Event('input')); } }
-        App.broadcastState(); // Broadcast after loading a preset
+        App.broadcastState();
       },
       populateList() {
         const presets = this.getPresets(); const { presetList } = UI.elements; const currentVal = presetList.value;
@@ -248,6 +241,53 @@
       }
     };
 
+    const Converter = {
+        ffmpeg: null,
+        async load() {
+            if (this.ffmpeg) return true;
+            UI.setStatus('Loading encoder...');
+            try {
+                if (!window.FFMPEG || !window.FFMPEG.FFmpeg) {
+                    throw new Error('FFMPEG library not found. It may be blocked or failed to load.');
+                }
+                const ffmpeg = new window.FFMPEG.FFmpeg();
+                ffmpeg.on('log', ({ message }) => console.log(`[ffmpeg] ${message}`));
+                await ffmpeg.load({
+                    coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js",
+                });
+                this.ffmpeg = ffmpeg;
+                UI.setStatus('Encoder ready.');
+                return true;
+            } catch (e) {
+                console.error("Failed to load FFMPEG:", e);
+                UI.setStatus('Encoder failed to load.', true);
+                return false;
+            }
+        },
+        async convertWebMtoMP4(webmBlob) {
+            if (!(await this.load())) {
+                throw new Error("Converter is not available.");
+            }
+            UI.setStatus('Encoding MP4...');
+            const inputName = 'input.webm';
+            const outputName = 'output.mp4';
+            const { fetchFile } = window.FFMPEG.util;
+
+            await this.ffmpeg.writeFile(inputName, await fetchFile(webmBlob));
+            
+            // Execute the ffmpeg command. -c:v copy would be faster but isn't always compatible.
+            // Using libx264 ensures a standard MP4 file. -preset ultrafast prioritizes speed.
+            await this.ffmpeg.exec(['-i', inputName, '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', outputName]);
+
+            const data = await this.ffmpeg.readFile(outputName);
+            await this.ffmpeg.deleteFile(inputName);
+            await this.ffmpeg.deleteFile(outputName);
+            UI.setStatus('Encoding complete.');
+
+            return new Blob([data.buffer], { type: 'video/mp4' });
+        }
+    };
+
     const App = {
       channel: null, definitions: {}, globalDefinitions: {}, rafId: null,
       lastRandomizeTime: 0, lastPresetIterateTime: 0, currentPresetIndex: 0,
@@ -261,12 +301,24 @@
         PresetManager.init();
         UI.elements.bgUpload.addEventListener('change', (e) => this.handleBgUpload(e));
         this.loop();
-        this.broadcastState(); // Initial broadcast
+        this.broadcastState();
       },
       
-      handleMessage(data) {
+      async handleMessage(data) {
         if (data.type === 'recording_complete') {
-            Remote.handleRecordingBlob(data.payload.blob);
+            try {
+                let finalBlob = data.payload.blob;
+                // If the recording is WebM, convert it to MP4
+                if (finalBlob.type.includes('webm')) {
+                    UI.setMsg('Original format is WebM, converting to MP4...');
+                    finalBlob = await Converter.convertWebMtoMP4(finalBlob);
+                    UI.setMsg('Conversion successful.');
+                }
+                Remote.handleRecordingBlob(finalBlob);
+            } catch (e) {
+                console.error("Conversion or handling failed:", e);
+                Remote.handleRecordingError(`Failed to process video: ${e.message}`);
+            }
         } else if (data.type === 'recording_error') {
             Remote.handleRecordingError(data.payload.message);
         }
@@ -283,11 +335,7 @@
       
       getCurrentState(forPreset = false) {
         const state = { uniforms: {}, animate: UI.elements.animateChk.checked, mirror: UI.elements.mirrorChk.checked, showLogos: UI.elements.logoChk.checked, useBg: UI.elements.useBgChk.checked };
-        // For presets, we need a different structure
-        if (forPreset) {
-            state.controls = {}; state.toggles = {}; state.globalControls = {}; state.checkboxes = {}; state.misc = {};
-        }
-        // Process randomized controls
+        if (forPreset) { state.controls = {}; state.toggles = {}; state.globalControls = {}; state.checkboxes = {}; state.misc = {}; }
         for (const [groupKey, group] of Object.entries(UI.state.ui)) {
             if (forPreset) { state.controls[groupKey] = {}; state.toggles[groupKey] = this.definitions[groupKey].active; }
             const groupIsActive = this.definitions[groupKey].active;
@@ -298,7 +346,6 @@
                 if (forPreset) { state.controls[groupKey][controlKey] = control.value; }
             }
         }
-        // Process global controls
         for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
             if (forPreset) { state.globalControls[groupKey] = {}; }
             for (const [controlKey, control] of Object.entries(group)) {
@@ -306,10 +353,8 @@
                 if (forPreset) { state.globalControls[groupKey][controlKey] = control.value; }
             }
         }
-        // Add other misc values
         state.uniforms.u_maskFeather = parseFloat(UI.elements.maskFeather.value);
         if (this.bgObjectUrl) { state.bgFile = { url: this.bgObjectUrl, type: UI.elements.bgUpload.files[0].type }; }
-
         if (forPreset) {
             state.checkboxes = { animateChk: state.animate, mirrorChk: state.mirror, useBgChk: state.useBg, logoChk: state.showLogos };
             state.misc = { maskFeather: UI.elements.maskFeather.value };
@@ -328,26 +373,12 @@
         const t = UI.elements.animateChk.checked ? time / 1000 : 0;
         UI.updateJitter(t);
 
-        // --- START: CORRECTED AUTOMATION LOGIC ---
         const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
         if (autoRandomizeInterval > 0) {
-            // If the timer is 0, it means the feature was just activated.
-            // Randomize immediately and set the timer for the next cycle.
-            if (this.lastRandomizeTime === 0) {
-                PresetManager.randomize();
-                // Set the time, using `|| 1` as a safeguard in case time is 0 on the first frame.
-                this.lastRandomizeTime = time || 1; 
-            } else if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) {
-                // Otherwise, if the interval has passed, randomize and reset the timer.
-                PresetManager.randomize();
-                this.lastRandomizeTime = time;
-            }
-        } else {
-            // If the slider is at 0, reset the timer.
-            this.lastRandomizeTime = 0;
-        }
-        // --- END: CORRECTED AUTOMATION LOGIC ---
-
+            if (this.lastRandomizeTime === 0) { PresetManager.randomize(); this.lastRandomizeTime = time || 1; } 
+            else if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) { PresetManager.randomize(); this.lastRandomizeTime = time; }
+        } else { this.lastRandomizeTime = 0; }
+        
         const presetIterationInterval = parseFloat(UI.elements.presetIterationSlider.value);
         if (presetIterationInterval > 0) {
             if (this.lastPresetIterateTime === 0) this.lastPresetIterateTime = time;
@@ -361,18 +392,12 @@
       }
     };
     
-    // --- Remote Trigger Module ---
     const Remote = {
         peer: null, connections: new Map(), sessionToken: null, armed: false, isRecording: false,
         activeConnection: null,
-        ffmpegInstance: null,
-        ffmpegLoading: false,
         init() {
             const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
-            els.showQR.addEventListener('click', async () => {
-                if (!this.armed) await this.arm();
-                this.openQRWindow();
-            });
+            els.showQR.addEventListener('click', async () => { if (!this.armed) await this.arm(); this.openQRWindow(); });
             els.reset.addEventListener('click', () => this.disarm() );
         },
         updateStatus() {
@@ -397,24 +422,16 @@
         async arm() {
             await this.lazyLoadPeerJS();
             this.sessionToken = (crypto.getRandomValues(new Uint8Array(16))).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
-            
             return new Promise((resolve, reject) => {
                 this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
-
                 this.peer.on('open', id => {
                     console.log('PeerJS connection established with ID:', id);
-                    this.armed = true;
-                    this.updateStatus();
+                    this.armed = true; this.updateStatus();
                     document.getElementById('remoteReset').disabled = false;
                     this.peer.on('connection', conn => this.handleNewConnection(conn));
                     resolve();
                 });
-
-                this.peer.on('error', err => {
-                    console.error('PeerJS error:', err);
-                    this.disarm();
-                    reject(err);
-                });
+                this.peer.on('error', err => { console.error('PeerJS error:', err); this.disarm(); reject(err); });
             });
         },
         disarm() {
@@ -423,8 +440,7 @@
             this.connections.clear();
             if (this.peer) try { this.peer.destroy(); } catch {}
             this.peer = null; this.sessionToken = null;
-            document.getElementById('remoteReset').disabled = true;
-            this.updateStatus();
+            document.getElementById('remoteReset').disabled = true; this.updateStatus();
         },
         handleNewConnection(conn) {
             if (this.connections.size >= 3) {
@@ -441,97 +457,34 @@
                 const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
                 if (data.type === 'hello') {
                     if (data.token !== this.sessionToken) { conn.send(JSON.stringify({ type:'error', message: 'Invalid token.' })); setTimeout(() => { try { conn.close(); } catch {} }, 100); return; }
-                    conn.capabilities = { supportsWebM: !!data.supportsWebM };
                     conn.send(JSON.stringify({ type:'helloAck', ok:true }));
                 } else if (data.type === 'startRecording') {
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
                     this.isRecording = true; this.activeConnection = conn; this.updateStatus();
-                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
-                    App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
+                    App.channel.postMessage({ type: 'start_recording' }); // Payload removed
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
-        },
-        getFFmpeg: async function() {
-            if (this.ffmpegInstance) return this.ffmpegInstance;
-            if (this.ffmpegLoading) {
-                await new Promise(resolve => {
-                    const interval = setInterval(() => {
-                        if (this.ffmpegInstance) { clearInterval(interval); resolve(); }
-                    }, 100);
-                });
-                return this.ffmpegInstance;
-            }
-            this.ffmpegLoading = true;
-            UI.setStatus('LOADING CONVERTER...');
-            try {
-                const { FFmpeg } = FFmpegWASM;
-                const ffmpeg = new FFmpeg();
-                ffmpeg.on('log', ({ message }) => { console.log('[ffmpeg]', message); });
-                await ffmpeg.load({
-                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
-                });
-                this.ffmpegInstance = ffmpeg;
-            } catch (e) {
-                console.error("Failed to load FFmpeg:", e);
-                UI.setStatus('CONVERTER FAILED TO LOAD', true);
-                throw e;
-            } finally {
-                this.ffmpegLoading = false;
-            }
-            UI.setStatus('CONVERTER READY.');
-            return this.ffmpegInstance;
         },
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
             if (!conn) { this.isRecording = false; this.updateStatus(); return; }
-            let finalBlob = blob;
-            let finalMime = blob.type;
-            if (blob.type.includes('webm')) {
-                UI.setStatus('CONVERTING TO MP4...');
-                try {
-                    const ffmpeg = await this.getFFmpeg();
-                    const inputName = 'input.webm';
-                    const outputName = 'output.mp4';
-                    await ffmpeg.writeFile(inputName, new Uint8Array(await blob.arrayBuffer()));
-                    await ffmpeg.exec(['-i', inputName, outputName]);
-                    const data = await ffmpeg.readFile(outputName);
-                    finalBlob = new Blob([data.buffer], { type: 'video/mp4' });
-                    finalMime = 'video/mp4';
-                    UI.setStatus('CONVERSION COMPLETE.');
-                } catch (e) {
-                    console.error('FFmpeg conversion error:', e);
-                    this.handleRecordingError('Failed to convert video to MP4.');
-                    return;
-                }
-            }
-            const arrayBuf = await finalBlob.arrayBuffer();
-            const total = arrayBuf.byteLength;
+            const { type: mime } = blob;
+            const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
+            // Filename is now always mp4
             const filename = `unknown_${Date.now()}.mp4`;
-            conn.send(JSON.stringify({ type:'recordingMeta', mime: finalMime, totalBytes: total, filename }));
-            const CHUNK = 64 * 1024;
-            let sent = 0;
-            const channel = conn.dataChannel;
+            conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
+            const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
             while (sent < total) {
-                if (channel && channel.bufferedAmount > 1024 * 1024) {
-                    await new Promise(r => { channel.onbufferedamountlow = r; });
-                }
-                const end = Math.min(total, sent + CHUNK);
-                conn.send(arrayBuf.slice(sent, end));
-                sent = end;
+                if (channel && channel.bufferedAmount > 1024 * 1024) { await new Promise(r => { channel.onbufferedamountlow = r; }); }
+                const end = Math.min(total, sent + CHUNK); conn.send(arrayBuf.slice(sent, end)); sent = end;
             }
             conn.send(JSON.stringify({ type:'recordingEnd' }));
-            this.isRecording = false;
-            this.activeConnection = null;
-            this.updateStatus();
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
         },
         handleRecordingError(message) {
-            if (this.activeConnection) {
-                this.activeConnection.send(JSON.stringify({ type: 'error', message }));
-            }
-            this.isRecording = false;
-            this.activeConnection = null;
-            this.updateStatus();
+            if (this.activeConnection) { this.activeConnection.send(JSON.stringify({ type: 'error', message })); }
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
         },
         openQRWindow() {
             if (!this.peer || !this.sessionToken) return;
@@ -543,25 +496,10 @@
         }
     };
 
-    // --- DEFINITIONS ---
-    const definitions = {
-      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
-      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
-      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
-      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
-      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
-      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
-    };
-    const globalDefinitions = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerPerSecond: { label: 'Flickers/Sec', min: 0, max: 30, step: 0.1, value: 1.0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3 } } },
-        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } }
-    };
+    const definitions = { Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } }, Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } }, Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } }, Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } }, Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } }, Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } } };
+    const globalDefinitions = { Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerPerSecond: { label: 'Flickers/Sec', min: 0, max: 30, step: 0.1, value: 1.0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3 } } }, Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } } };
 
-    // --- Entry Point ---
-    window.addEventListener('load', () => {
-        App.init(definitions, globalDefinitions);
-        Remote.init();
-    });
+    window.addEventListener('load', () => { App.init(definitions, globalDefinitions); Remote.init(); });
 })();
 </script>
 </body>
