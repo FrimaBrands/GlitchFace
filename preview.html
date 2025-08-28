@@ -46,11 +46,9 @@
 </head>
 <body>
   <div class="main-stage">
-    <!-- Logo and media elements -->
     <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
     <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
     
-    <!-- Core video and canvas elements -->
     <video id="video" playsinline muted class="hidden"></video>
     <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
     <img id="backgroundImage" class="hidden" />
@@ -307,7 +305,7 @@
         // Request camera and start processing
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
-          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 }, audio: false });
+          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 1080, height: 1920 }, audio: false });
           this.elements.video.srcObject = this.stream;
           await new Promise(resolve => { this.elements.video.onloadedmetadata = resolve; });
           await this.elements.video.play();
