@@ -445,24 +445,10 @@
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
                     this.isRecording = true; this.activeConnection = conn; this.updateStatus();
-                    const preferMp4 = true;
+                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
                     App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
-        },async function loadFFmpeg() {
-            if (window.__ffmpegLoaded) return window.__ffmpeg;
-            await new Promise((res, rej) => {
-              const s = document.createElement('script');
-              s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.8/dist/ffmpeg.min.js';
-              s.onload = res; s.onerror = () => rej(new Error('Failed to load ffmpeg'));
-              document.body.appendChild(s);
-            });
-            const { createFFmpeg, fetchFile } = window.FFmpeg;
-            const ffmpeg = createFFmpeg({ log: false });
-            await ffmpeg.load();
-            window.__ffmpegLoaded = true;
-            window.__ffmpeg = { ffmpeg, fetchFile };
-            return window.__ffmpeg;
         },
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
