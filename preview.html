@@ -16,28 +16,28 @@
     .main-stage {
         width: 100vw;
         height: 100vh;
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
     }
-    #video-container {
+    /* New container to hold the 9x16 display area */
+    #display-container {
         position: relative;
-        aspect-ratio: 9 / 16;
-        width: auto;
-        height: auto;
-        max-width: 100%;
-        max-height: 100%;
+        /* Width and height will be set by JS to maintain 9:16 aspect ratio */
     }
-    /* All visual elements are absolutely positioned to layer correctly */
+    /* All visual elements are absolutely positioned to layer correctly within the container */
     #backgroundMedia, #backgroundImage, #glcanvas {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
+    }
+    #backgroundMedia, #backgroundImage {
         object-fit: cover;
     }
-    /* Logos are positioned at the corners of the video container */
+    /* Logos are positioned at the corners of the display-container */
     #logoTopLeft, #logoTopRight {
         position: absolute;
         z-index: 10;
@@ -53,16 +53,17 @@
 </head>
 <body>
   <div class="main-stage">
-    <div id="video-container">
+    <div id="display-container">
         <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
         <img id="backgroundImage" class="hidden" />
         <canvas id="glcanvas"></canvas>
+
         <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
         <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
     </div>
+    
+    <video id="video" playsinline muted class="hidden"></video>
   </div>
-
-  <video id="video" playsinline muted class="hidden"></video>
 
 <script>
 // --- This script is for the PREVIEW window only ---
@@ -72,33 +73,8 @@
     const vertSrc = `
       attribute vec2 a_pos;
       varying vec2 v_uv;
-      uniform vec2 u_videoResolution;
-      uniform vec2 u_outputResolution;
-
       void main() {
-        // Calculate aspect ratios
-        float videoAspect = u_videoResolution.x / u_videoResolution.y;
-        float outputAspect = u_outputResolution.x / u_outputResolution.y;
-
-        // Determine UV scaling to crop the video (cover mode)
-        float scaleX = 1.0;
-        float scaleY = 1.0;
-        float offsetX = 0.0;
-        float offsetY = 0.0;
-
-        if (videoAspect > outputAspect) {
-          // Video is wider than output, crop sides
-          scaleX = outputAspect / videoAspect;
-          offsetX = (1.0 - scaleX) / 2.0;
-        } else {
-          // Video is taller than output, crop top/bottom
-          scaleY = videoAspect / outputAspect;
-          offsetY = (1.0 - scaleY) / 2.0;
-        }
-
-        // Apply scale and offset to texture coordinates
-        v_uv = vec2(a_pos.x * scaleX + offsetX, a_pos.y * scaleY + offsetY);
-        
+        v_uv = a_pos;
         gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
       }`;
 
@@ -113,6 +89,7 @@
       uniform float u_time;
       uniform bool  u_isFeedbackPass;
       uniform bool  u_useBackground;
+      uniform vec2  u_videoUvTransform; // {scaleX, offsetX} to crop video
       uniform float u_maskFeather;
       uniform float u_overallOpacity;
       uniform float u_flickerPerSecond;
@@ -160,15 +137,18 @@
       }
       void main() {
         vec2 uv = v_uv;
-        vec4 videoColor = texture2D(u_tex, uv);
+        // Create UVs to sample the center-cropped 9:16 area from the 16:9 camera feed
+        vec2 videoUv = vec2(uv.x * u_videoUvTransform.x + u_videoUvTransform.y, uv.y);
+
+        vec4 videoColor = texture2D(u_tex, videoUv);
         vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
         vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
         if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
           vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
-          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
+          effectedColor = texture2D(u_tex, videoUv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
         }
-        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
-        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+        float r = texture2D(u_tex, videoUv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, videoUv - vec2(u_rgbShift, 0.0)).b;
         effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
         effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
         effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
@@ -177,7 +157,7 @@
         if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
           smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
         }
-        float maskValue = texture2D(u_maskTex, uv).r;
+        float maskValue = texture2D(u_maskTex, videoUv).r;
         if (maskValue > 0.1) {
             vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
             smearedColor = mix(smearedColor, globalSmear, 0.5);
@@ -190,8 +170,8 @@
         }
         float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
         vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
-        float baseMask = texture2D(u_maskTex, uv).r;
-        float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
+        float baseMask = texture2D(u_maskTex, videoUv).r;
+        float blurredMask = blur(u_maskTex, videoUv, u_seepIntensity).r;
         float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
         float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
         float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
@@ -246,26 +226,24 @@
       },
       fit(video) {
         if (!video.videoWidth) return;
-        const { videoHeight: h } = video;
-        const canvas = this.gl.canvas;
-        const targetAspect = 9.0 / 16.0;
-        const newWidth = Math.floor(h * targetAspect);
-        const newHeight = h;
+        // Set canvas to a 9:16 aspect ratio based on video height
+        const h = video.videoHeight;
+        const w = Math.round(h * 9 / 16);
 
-        if (canvas.width === newWidth && canvas.height === newHeight) return;
-        
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        
-        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        const canvas = this.gl.canvas;
+        if (canvas.width === w && canvas.height === h) return;
+        canvas.width = w; canvas.height = h;
+
+        const resizableTextures = [this.textures.feedbackA, this.textures.feedbackB];
         for (const tex of resizableTextures) {
           this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
-          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, newWidth, newHeight, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
         }
-        this.gl.viewport(0, 0, newWidth, newHeight);
+        // Video and mask textures do not need resizing here as they get data from source video
+        this.gl.viewport(0, 0, w, h);
       },
       drawMask(video, segmentationMask) {
-        const { width: W, height: H } = this.gl.canvas; // Use canvas dimensions
+        const { videoWidth: W, videoHeight: H } = video;
         const ctx = this.maskCanvas.getContext('2d');
         if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) { this.maskCanvas.width = W; this.maskCanvas.height = H; }
         ctx.fillStyle = 'black'; ctx.fillRect(0, 0, W, H);
@@ -277,18 +255,28 @@
       render(appState) {
         const { video, t, uniforms, backgroundMedia, useBg } = appState;
         this.gl.useProgram(this.program);
+
+        // Upload full video frame to texture
         this.gl.activeTexture(this.gl.TEXTURE0); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
         this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
         this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
+        
         if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth || backgroundMedia.width)) {
             this.gl.activeTexture(this.gl.TEXTURE3); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
             this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
             this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
         }
-        this.gl.uniform2f(this.uniforms.u_videoResolution, video.videoWidth, video.videoHeight);
-        this.gl.uniform2f(this.uniforms.u_outputResolution, this.gl.canvas.width, this.gl.canvas.height);
+        
+        // Calculate transform to crop 16:9 video to 9:16 in the shader
+        const sourceAspect = video.videoWidth / video.videoHeight;
+        const targetAspect = this.gl.canvas.width / this.gl.canvas.height;
+        const scaleX = targetAspect / sourceAspect;
+        const offsetX = (1.0 - scaleX) / 2.0;
+
+        this.gl.uniform2f(this.uniforms.u_videoUvTransform, scaleX, offsetX);
         this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
         this.gl.uniform1f(this.uniforms.u_time, t);
+
         for (const key in uniforms) {
             if (this.uniforms[key]) {
                 this.gl.uniform1f(this.uniforms[key], uniforms[key]);
@@ -338,8 +326,12 @@
 
       async init() {
         // Get all DOM elements
-        const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
+        const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight', 'display-container'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
+        
+        // Add resize listener to fit the display area
+        window.addEventListener('resize', () => this.resizeDisplay());
+        this.resizeDisplay();
 
         // Setup communication channel
         this.channel = new BroadcastChannel('unknown_signal');
@@ -354,7 +346,7 @@
           await this.elements.video.play();
 
           // Initialize WebGL Renderer
-          const uniformKeys = ['u_videoResolution', 'u_outputResolution', 'u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
+          const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_videoUvTransform', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
           Renderer.init(this.elements.glcanvas, uniformKeys);
           Renderer.fit(this.elements.video);
 
@@ -367,6 +359,24 @@
           console.error(err);
           alert(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
         }
+      },
+
+      resizeDisplay() {
+        const display = this.elements['display-container'];
+        const { clientWidth, clientHeight } = document.body;
+        const targetAspectRatio = 9 / 16;
+        const windowAspectRatio = clientWidth / clientHeight;
+
+        let newWidth, newHeight;
+        if (windowAspectRatio > targetAspectRatio) {
+            newHeight = clientHeight;
+            newWidth = newHeight * targetAspectRatio;
+        } else {
+            newWidth = clientWidth;
+            newHeight = newWidth / targetAspectRatio;
+        }
+        display.style.width = `${newWidth}px`;
+        display.style.height = `${newHeight}px`;
       },
 
       handleMessage(data) {
@@ -389,8 +399,8 @@
       },
 
       updateUI() {
-        // Update canvas mirroring
-        this.elements.glcanvas.style.transform = this.state.mirror ? 'scaleX(-1)' : 'none';
+        // Mirroring is applied to the container, so logos mirror too
+        this.elements['display-container'].style.transform = this.state.mirror ? 'scaleX(-1)' : 'none';
         
         // Update background media
         if (this.state.bgFile && this.state.bgFile.url) {
@@ -441,9 +451,15 @@
         const logoTopLeft = this.elements.logoTopLeft;
         const logoTopRight = this.elements.logoTopRight;
         const compositeCanvas = document.createElement('canvas');
+        // Composite canvas will have the same 9:16 resolution as glCanvas
         compositeCanvas.width = glCanvas.width;
         compositeCanvas.height = glCanvas.height;
         const ctx = compositeCanvas.getContext('2d');
+        // If mirrored, we flip the context for the recording
+        if (this.state.mirror) {
+            ctx.translate(compositeCanvas.width, 0);
+            ctx.scale(-1, 1);
+        }
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
         const optionsList = [
