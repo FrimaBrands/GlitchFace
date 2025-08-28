@@ -96,6 +96,7 @@
       </div>
     </div>
 
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
 <script>
 // --- This script is for the CONTROLS window only ---
 // It manages the UI, presets, and remote connections. It broadcasts state changes.
@@ -363,7 +364,9 @@
     // --- Remote Trigger Module ---
     const Remote = {
         peer: null, connections: new Map(), sessionToken: null, armed: false, isRecording: false,
-        activeConnection: null, // Store the connection that initiated the recording
+        activeConnection: null,
+        ffmpegInstance: null,
+        ffmpegLoading: false,
         init() {
             const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
             els.showQR.addEventListener('click', async () => {
@@ -395,7 +398,6 @@
             await this.lazyLoadPeerJS();
             this.sessionToken = (crypto.getRandomValues(new Uint8Array(16))).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
             
-            // Return a promise that resolves only when the peer is open and has an ID
             return new Promise((resolve, reject) => {
                 this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
 
@@ -405,13 +407,13 @@
                     this.updateStatus();
                     document.getElementById('remoteReset').disabled = false;
                     this.peer.on('connection', conn => this.handleNewConnection(conn));
-                    resolve(); // The promise is fulfilled here
+                    resolve();
                 });
 
                 this.peer.on('error', err => {
                     console.error('PeerJS error:', err);
                     this.disarm();
-                    reject(err); // The promise is rejected on an error
+                    reject(err);
                 });
             });
         },
@@ -450,26 +452,86 @@
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
         },
+        getFFmpeg: async function() {
+            if (this.ffmpegInstance) return this.ffmpegInstance;
+            if (this.ffmpegLoading) {
+                await new Promise(resolve => {
+                    const interval = setInterval(() => {
+                        if (this.ffmpegInstance) { clearInterval(interval); resolve(); }
+                    }, 100);
+                });
+                return this.ffmpegInstance;
+            }
+            this.ffmpegLoading = true;
+            UI.setStatus('LOADING CONVERTER...');
+            try {
+                const { FFmpeg } = FFmpegWASM;
+                const ffmpeg = new FFmpeg();
+                ffmpeg.on('log', ({ message }) => { console.log('[ffmpeg]', message); });
+                await ffmpeg.load({
+                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
+                });
+                this.ffmpegInstance = ffmpeg;
+            } catch (e) {
+                console.error("Failed to load FFmpeg:", e);
+                UI.setStatus('CONVERTER FAILED TO LOAD', true);
+                throw e;
+            } finally {
+                this.ffmpegLoading = false;
+            }
+            UI.setStatus('CONVERTER READY.');
+            return this.ffmpegInstance;
+        },
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
             if (!conn) { this.isRecording = false; this.updateStatus(); return; }
-            const { type: mime } = blob;
-            const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
+            let finalBlob = blob;
+            let finalMime = blob.type;
+            if (blob.type.includes('webm')) {
+                UI.setStatus('CONVERTING TO MP4...');
+                try {
+                    const ffmpeg = await this.getFFmpeg();
+                    const inputName = 'input.webm';
+                    const outputName = 'output.mp4';
+                    await ffmpeg.writeFile(inputName, new Uint8Array(await blob.arrayBuffer()));
+                    await ffmpeg.exec(['-i', inputName, outputName]);
+                    const data = await ffmpeg.readFile(outputName);
+                    finalBlob = new Blob([data.buffer], { type: 'video/mp4' });
+                    finalMime = 'video/mp4';
+                    UI.setStatus('CONVERSION COMPLETE.');
+                } catch (e) {
+                    console.error('FFmpeg conversion error:', e);
+                    this.handleRecordingError('Failed to convert video to MP4.');
+                    return;
+                }
+            }
+            const arrayBuf = await finalBlob.arrayBuffer();
+            const total = arrayBuf.byteLength;
             const filename = `unknown_${Date.now()}.mp4`;
-            conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
-            const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
+            conn.send(JSON.stringify({ type:'recordingMeta', mime: finalMime, totalBytes: total, filename }));
+            const CHUNK = 64 * 1024;
+            let sent = 0;
+            const channel = conn.dataChannel;
             while (sent < total) {
-                if (channel && channel.bufferedAmount > 1024 * 1024) { await new Promise(r => { channel.onbufferedamountlow = r; }); }
-                const end = Math.min(total, sent + CHUNK); conn.send(arrayBuf.slice(sent, end)); sent = end;
+                if (channel && channel.bufferedAmount > 1024 * 1024) {
+                    await new Promise(r => { channel.onbufferedamountlow = r; });
+                }
+                const end = Math.min(total, sent + CHUNK);
+                conn.send(arrayBuf.slice(sent, end));
+                sent = end;
             }
             conn.send(JSON.stringify({ type:'recordingEnd' }));
-            this.isRecording = false; this.activeConnection = null; this.updateStatus();
+            this.isRecording = false;
+            this.activeConnection = null;
+            this.updateStatus();
         },
         handleRecordingError(message) {
             if (this.activeConnection) {
                 this.activeConnection.send(JSON.stringify({ type: 'error', message }));
             }
-            this.isRecording = false; this.activeConnection = null; this.updateStatus();
+            this.isRecording = false;
+            this.activeConnection = null;
+            this.updateStatus();
         },
         openQRWindow() {
             if (!this.peer || !this.sessionToken) return;
