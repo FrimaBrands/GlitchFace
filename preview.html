@@ -339,19 +339,25 @@
           this.state = { ...this.state, ...data.payload };
           this.updateUI();
         } else if (data.type === 'start_recording') {
-            this.record(data.payload);
+            // --- MODIFICATION START ---
+            // Removed payload from the call as it's no longer needed.
+            this.record();
+            // --- MODIFICATION END ---
         }
       },
       
-      async record({ preferMp4 }) {
+      // --- MODIFICATION START ---
+      // Removed payload from the function signature.
+      async record() {
           try {
-              const { blob } = await this.recordCanvasFiveSeconds(preferMp4);
+              const { blob } = await this.recordCanvasFiveSeconds();
               this.channel.postMessage({ type: 'recording_complete', payload: { blob } });
           } catch(e) {
               console.error("Recording failed:", e);
               this.channel.postMessage({ type: 'recording_error', payload: { message: String(e) } });
           }
       },
+      // --- MODIFICATION END ---
 
       updateUI() {
         // Update canvas mirroring
@@ -400,9 +406,11 @@
         });
       },
       
-      // Recording function, adapted to be in this window
-      async recordCanvasFiveSeconds(preferMp4 = false) {
+      // --- MODIFICATION START ---
+      // Removed the `preferMp4` parameter.
+      async recordCanvasFiveSeconds() {
         const glCanvas = this.elements.glcanvas;
+        // --- MODIFICATION END ---
         const logoTopLeft = this.elements.logoTopLeft;
         const logoTopRight = this.elements.logoTopRight;
         const compositeCanvas = document.createElement('canvas');
@@ -411,11 +419,14 @@
         const ctx = compositeCanvas.getContext('2d');
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
+        // --- MODIFICATION START ---
+        // Simplified options list as transcoding will handle the final format.
+        // It will now reliably record in WebM format.
         const optionsList = [
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=h264' });
+        // --- MODIFICATION END ---
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
