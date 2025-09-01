@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-t" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
   <title>U N K N O W N</title>
   <style>
@@ -75,6 +75,7 @@
       max-width: 320px;
       height: auto;
       margin: 0 auto;
+      cursor: pointer; /* Added cursor to indicate it's clickable */
     }
 
     /* --- Record Button & Animation --- */
@@ -144,8 +145,10 @@
     }
     .progress-ring {
         position: absolute;
-        top: -4px;
-        left: -4px;
+        /* FIXED: Replaced top/left positioning with transform for better centering */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         width: 168px;
         height: 168px;
     }
@@ -200,7 +203,8 @@
     /* --- Status and Progress --- */
     .status-area {
       min-height: 40px; /* Reduced height */
-      display: flex;
+      /* CHANGED: Status area is now hidden by default */
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
@@ -335,6 +339,23 @@
       recordArea: document.getElementById('record-button-area'),
       resetBtn: document.getElementById('resetBtn')
     };
+
+    // ADDED: Secret toggle for the status area
+    const logo = document.querySelector('.title-logo');
+    let clickCount = 0;
+    let clickTimer = null;
+    logo.addEventListener('click', () => {
+        clickCount++;
+        if (clickTimer) clearTimeout(clickTimer);
+        if (clickCount === 5) {
+            const statusArea = document.querySelector('.status-area');
+            const isCurrentlyHidden = getComputedStyle(statusArea).display === 'none';
+            statusArea.style.display = isCurrentlyHidden ? 'flex' : 'none';
+            clickCount = 0;
+        } else {
+            clickTimer = setTimeout(() => { clickCount = 0; }, 500);
+        }
+    });
 
     let recordingTimer = null;
     const radius = els.progressRing.r.baseVal.value;
