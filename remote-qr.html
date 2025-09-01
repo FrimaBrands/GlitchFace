@@ -25,6 +25,10 @@
       align-items: center;
       gap: 20px;
     }
+    .hebrew-prompt {
+      font-size: 1.2rem;
+      margin-bottom: -10px; /* Adjust spacing */
+    }
     .qr-container {
       position: relative;
       padding: 20px;
@@ -72,16 +76,25 @@
       margin-top: 12px;
       color: #555; 
     }
+    .bottom-left-logo {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        width: 100px; /* Adjust size as needed */
+        height: auto;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="hebrew-prompt">מה יקרה כשתסרקו?</div>
     <div class="qr-container">
       <div id="q"></div>
     </div>
-    <div class="muted">// SCAN TO CONNECT</div>
     <div id="small" class="link"></div>
   </div>
+
+  <img src="WIFIQR.png" alt="WiFi QR Logo" class="bottom-left-logo">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
