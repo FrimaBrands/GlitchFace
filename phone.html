@@ -295,7 +295,6 @@
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.min.js"></script>
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
@@ -403,48 +402,6 @@
           config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
         });
 
-        // START: FFmpeg Transcoding Logic
-        let ffmpeg = null;
-        const loadFFmpeg = async () => {
-          if (ffmpeg) return ffmpeg;
-          updateStatus('Loading converter...');
-          logMsg('Loading FFmpeg.wasm');
-          ffmpeg = new FFmpeg.FFmpeg();
-          ffmpeg.on('log', ({ message }) => logMsg(`FFmpeg: ${message}`));
-          const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-          await ffmpeg.load({
-            coreURL: await FFmpeg.toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-            wasmURL: await FFmpeg.toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-          });
-          logMsg('FFmpeg.wasm loaded.');
-          updateStatus('Converter ready.');
-          return ffmpeg;
-        };
-        
-        const transcodeToMp4 = async (inputBlob, originalFilename) => {
-            const converter = await loadFFmpeg();
-            updateStatus('Converting to MP4…');
-            els.progressContainer.style.display = 'block';
-            els.progress.value = 0; // Reset progress for conversion
-            converter.on('progress', ({ progress }) => {
-                els.progress.value = Math.round(progress * 100);
-            });
-
-            const inputFilename = 'input.webm';
-            const outputFilename = originalFilename.replace(/\.webm$/, '.mp4').replace(/\.mp4$/, '.mp4');
-            
-            await converter.writeFile(inputFilename, new Uint8Array(await inputBlob.arrayBuffer()));
-            await converter.exec(['-i', inputFilename, '-c:v', 'libx264', outputFilename]);
-            const data = await converter.readFile(outputFilename);
-            
-            converter.off('progress');
-            return {
-                blob: new Blob([data.buffer], { type: 'video/mp4' }),
-                filename: outputFilename
-            };
-        };
-        // END: FFmpeg Transcoding Logic
-
         peer.on('open', (id) => {
           logMsg(`PeerJS client is open with ID: ${id}`);
           updateStatus('Connecting to installation…');
@@ -458,7 +415,7 @@
             els.btnText.textContent = 'START RECORDING';
           });
 
-          conn.on('data', async (msg) => { // Made this function async
+          conn.on('data', (msg) => {
             if (typeof msg === 'string') {
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
@@ -472,32 +429,19 @@
                 logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
               } else if (data.type === 'recordingEnd') {
                 if (recordingTimer) clearInterval(recordingTimer);
+                const blob = new Blob(chunks, { type: mime });
+                const url = URL.createObjectURL(blob);
+                els.dl.href = url; els.dl.download = filename;
+                els.video.src = url; 
                 
-                const receivedBlob = new Blob(chunks, { type: mime });
+                els.recordArea.style.display = 'none';
+                els.instructions.style.display = 'none';
+                els.resultArea.style.display = 'flex';
                 
-                // START: MODIFIED to handle transcoding
-                try {
-                    const { blob: finalBlob, filename: finalFilename } = await transcodeToMp4(receivedBlob, filename);
-                    
-                    const url = URL.createObjectURL(finalBlob);
-                    els.dl.href = url; els.dl.download = finalFilename;
-                    els.video.src = url; 
-                    
-                    els.recordArea.style.display = 'none';
-                    els.instructions.style.display = 'none';
-                    els.resultArea.style.display = 'flex';
-                    
-                    els.progress.value = 100;
-                    setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
-                    updateStatus('Capture complete.');
-                    logMsg('File received and converted successfully.');
-                } catch(err) {
-                    logMsg(`Conversion failed: ${err}`);
-                    updateStatus('Error during conversion.', true);
-                    resetUI();
-                }
-                // END: MODIFIED to handle transcoding
-
+                els.progress.value = 100;
+                setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
+                updateStatus('Capture complete.');
+                logMsg('File received successfully.');
               } else if (data.type === 'error') {
                 let message = data.message || 'An unknown error occurred.';
                 if (message === 'Invalid token.') message = 'Invalid session. Please scan the QR code again.';
