@@ -6,8 +6,8 @@
   <title>U N K N O W N // Preview</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js" crossorigin="anonymous"></script>
+  <script src="ffmpeg.js"></script>
+  <script src="ffmpeg-util.js"></script>
 
   <style>
     body, html {
@@ -291,7 +291,7 @@
       }
     };
 
-    // --- MAIN APP LOGIC (Modified) ---
+    // --- MAIN APP LOGIC (Final Version) ---
     const App = {
       stream: null, rafId: null, channel: null,
       elements: {},
@@ -304,9 +304,6 @@
 
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
-        
-        // This now happens lazily inside the record() function to ensure scripts are loaded
-        // this.loadFFmpeg(); 
 
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
@@ -327,16 +324,14 @@
           alert(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
         }
       },
-
-      // MODIFIED: This function is now more robust and includes error checking
+      
       async loadFFmpeg() {
         if (this.ffmpeg) return;
 
-        // Check if the global FFmpeg object exists. This is the crucial fix.
         if (!window.FFmpeg || !window.FFmpegUtil) {
-            const errorMsg = "FFmpeg library failed to load from the CDN. This may be due to a network issue or a content blocker (like an ad-blocker). Please check your internet connection and disable any blockers that may be interfering with unpkg.com.";
+            const errorMsg = "FFmpeg library failed to load. This may be due to a network issue or a content blocker (like an ad-blocker). Please check your internet connection and disable any blockers.";
             console.error(errorMsg);
-            alert(errorMsg); // Also alert the operator
+            alert(errorMsg);
             throw new Error(errorMsg);
         }
 
@@ -345,7 +340,9 @@
         
         this.ffmpeg = new FFmpeg();
         
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        // MODIFIED: baseURL now points to the local folder
+        const baseURL = '.'; 
+        
         this.ffmpeg.on('log', ({ message }) => {
             console.log('[FFMPEG]', message);
         });
@@ -369,7 +366,6 @@
       
       async record() {
           try {
-              // Load FFmpeg on demand, right before it's needed. This is safer.
               if (!this.ffmpeg) {
                   console.log("Loading FFmpeg on demand...");
                   await this.loadFFmpeg();
