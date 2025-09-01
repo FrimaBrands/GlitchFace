@@ -16,7 +16,7 @@
     input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #333; outline: none; }
     input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
     input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
-    .status-indicator::after { content: '■ '; display: inline-block; margin-left: 6px; animation: blink 0.7s step-end infinite; color: #00ff00; }
+    .status-indicator::after { content: '■'; display: inline-block; margin-left: 6px; animation: blink 0.7s step-end infinite; color: #00ff00; }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
     .status-indicator.error::after { color: #ff0000; }
     .tab-button { border-color: #333; transition: all 0.2s ease-in-out; }
@@ -178,30 +178,6 @@
       setMsg(text) { this.elements.msg.textContent = text; }
     };
 
-    // --- DEFINITIONS ---
-    const definitions = {
-      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
-      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
-      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
-      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
-      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
-      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
-    };
-    const globalDefinitions = {
-        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerPerSecond: { label: 'Flickers/Sec', min: 0, max: 30, step: 0.1, value: 1.0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3 } } },
-        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } }
-    };
-
-    // --- Entry Point ---
-    window.addEventListener('load', () => {
-        App.init(definitions, globalDefinitions);
-        Remote.init();
-    });
-})();
-</script>
-</body>
-</html>
-
     const PresetManager = {
       init() {
         this.populateList();
@@ -351,7 +327,7 @@
         const t = UI.elements.animateChk.checked ? time / 1000 : 0;
         UI.updateJitter(t);
 
-        // --- CORRECTED AUTOMATION LOGIC ---
+        // --- START: CORRECTED AUTOMATION LOGIC ---
         const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
         if (autoRandomizeInterval > 0) {
             // If the timer is 0, it means the feature was just activated.
@@ -462,93 +438,69 @@
             try {
                 const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
                 if (data.type === 'hello') {
-                    if (data.token !== this.sessionToken) { 
-                        conn.send(JSON.stringify({ type:'error', message: 'Invalid token.' })); 
-                        setTimeout(() => { try { conn.close(); } catch {} }, 100); 
-                        return; 
-                    }
-                    // Store capability but always prefer MP4
-                    conn.capabilities = { supportsWebM: !!data.supportsWebM, supportsMp4: true };
+                    if (data.token !== this.sessionToken) { conn.send(JSON.stringify({ type:'error', message: 'Invalid token.' })); setTimeout(() => { try { conn.close(); } catch {} }, 100); return; }
+                    conn.capabilities = { supportsWebM: !!data.supportsWebM };
                     conn.send(JSON.stringify({ type:'helloAck', ok:true }));
                 } else if (data.type === 'startRecording') {
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
-                    this.isRecording = true; 
-                    this.activeConnection = conn; 
-                    this.updateStatus();
-                    
-                    // Always prefer MP4
-                    const preferMp4 = true;
-                    App.channel.postMessage({ 
-                        type: 'start_recording', 
-                        payload: { preferMp4 } 
-                    });
+                    this.isRecording = true; this.activeConnection = conn; this.updateStatus();
+                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
+                    App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
                 }
-            } catch (e) { 
-                console.error('Remote message error', e); 
-                this.isRecording = false; 
-                this.updateStatus(); 
-            }
+            } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
         },
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
-            if (!conn) { 
-                this.isRecording = false; 
-                this.updateStatus(); 
-                return; 
-            }
-            
+            if (!conn) { this.isRecording = false; this.updateStatus(); return; }
             const { type: mime } = blob;
-            const arrayBuf = await blob.arrayBuffer(); 
-            const total = arrayBuf.byteLength;
-            
-            // Always use .mp4 extension if MP4 was successfully used, otherwise fallback to .webm
-            const fileExt = mime.includes('mp4') ? 'mp4' : 'webm';
-            const filename = `unknown_${Date.now()}.${fileExt}`;
-            
-            console.log(`Sending file: ${filename}, MIME: ${mime}, Size: ${total} bytes`);
-            
-            conn.send(JSON.stringify({ 
-                type: 'recordingMeta', 
-                mime, 
-                totalBytes: total, 
-                filename 
-            }));
-            
-            const CHUNK = 64 * 1024; 
-            let sent = 0; 
-            const channel = conn.dataChannel;
-            
+            const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
+            const filename = `unknown_${Date.now()}.${mime.includes('mp4')?'mp4':'webm'}`;
+            conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
+            const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
             while (sent < total) {
-                if (channel && channel.bufferedAmount > 1024 * 1024) { 
-                    await new Promise(r => { 
-                        channel.onbufferedamountlow = r; 
-                    }); 
-                }
-                const end = Math.min(total, sent + CHUNK); 
-                conn.send(arrayBuf.slice(sent, end)); 
-                sent = end;
+                if (channel && channel.bufferedAmount > 1024 * 1024) { await new Promise(r => { channel.onbufferedamountlow = r; }); }
+                const end = Math.min(total, sent + CHUNK); conn.send(arrayBuf.slice(sent, end)); sent = end;
             }
-            
-            conn.send(JSON.stringify({ type: 'recordingEnd' }));
-            this.isRecording = false; 
-            this.activeConnection = null; 
-            this.updateStatus();
+            conn.send(JSON.stringify({ type:'recordingEnd' }));
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
         },
         handleRecordingError(message) {
             if (this.activeConnection) {
                 this.activeConnection.send(JSON.stringify({ type: 'error', message }));
             }
-            this.isRecording = false; 
-            this.activeConnection = null; 
-            this.updateStatus();
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
         },
         openQRWindow() {
             if (!this.peer || !this.sessionToken) return;
             const url = new URL('phone.html', location.href);
-            url.searchParams.set('host', this.peer.id); 
-            url.searchParams.set('token', this.sessionToken);
+            url.searchParams.set('host', this.peer.id); url.searchParams.set('token', this.sessionToken);
             const qrUrl = new URL('remote-qr.html', location.href);
             qrUrl.searchParams.set('target', url.toString());
             window.open(qrUrl.toString(), '_blank', 'noopener,noreferrer,width=520,height=600');
         }
+    };
+
+    // --- DEFINITIONS ---
+    const definitions = {
+      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
+      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
+      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
+      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
+      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
+      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
+    };
+    const globalDefinitions = {
+        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerPerSecond: { label: 'Flickers/Sec', min: 0, max: 30, step: 0.1, value: 1.0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3 } } },
+        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } }
+    };
+
+    // --- Entry Point ---
+    window.addEventListener('load', () => {
+        App.init(definitions, globalDefinitions);
+        Remote.init();
+    });
+})();
+</script>
+</body>
+</html>
