@@ -4,213 +4,503 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>U N K N O W N // Controls</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#0a0a0a;--fg:#eaeaea;--muted:#9a9a9a;--accent:#fff;--border:#2a2a2a;
-      --ok:#33d17a;--warn:#f6c945;--err:#ff6464;
-    }
-    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--fg);font-family:'JetBrains Mono',monospace}
-    .wrap{max-width:1100px;margin:0 auto;padding:18px}
-    .row{display:flex;gap:12px;flex-wrap:wrap}
-    .card{background:#0e0e0e;border:1px solid var(--border);border-radius:12px;padding:12px}
-    .btn{background:#111;border:1px solid #333;color:var(--fg);border-radius:8px;padding:6px 10px;cursor:pointer}
-    .btn:hover{background:#1b1b1b}
-    .small{font-size:12px;color:var(--muted)}
-    .status{padding:6px 10px;border-radius:8px;background:#111;border:1px solid #333}
-    input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:2px;background:#333}
-    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;background:#fff;border-radius:50%;cursor:pointer}
+    body { font-family: 'JetBrains Mono', monospace; background-color: #0a0a0a; color: #EAEAEA; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #111; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #444; }
+    input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #333; outline: none; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
+    input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: #EAEAEA; cursor: pointer; border: none; border-radius: 0; }
+    .status-indicator::after { content: '■'; display: inline-block; margin-left: 6px; animation: blink 0.7s step-end infinite; color: #00ff00; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .status-indicator.error::after { color: #ff0000; }
+    .tab-button { border-color: #333; transition: all 0.2s ease-in-out; }
+    .tab-button.active { border-color: #EAEAEA; color: #FFFFFF; background-color: #1a1a1a; }
+    .btn { border: 1px solid #555; transition: all 0.2s ease-in-out; }
+    .btn:hover { background-color: #EAEAEA; color: #000; border-color: #EAEAEA; }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+    .btn-primary { background-color: #EAEAEA; color: #000; border-color: #EAEAEA; }
+    .btn-primary:hover { background-color: #000; color: #EAEAEA; }
+    .form-checkbox { appearance: none; -webkit-appearance: none; height: 14px; width: 14px; background-color: transparent; border: 1px solid #555; cursor: pointer; }
+    .form-checkbox:checked { background-color: #EAEAEA; }
   </style>
-
-  <!-- ffmpeg.wasm loader for WebM->MP4 conversion -->
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
-  <script>
-    /* Ensure WebM -> MP4 conversion on host before sending to phone */
-    async function transcodeToMp4IfNeeded(inputBlob, onProgress) {
-      try {
-        if (inputBlob && inputBlob.type && inputBlob.type.includes('mp4')) {
-          if (onProgress) onProgress(100);
-          return inputBlob;
-        }
-        if (typeof FFmpeg === 'undefined') throw new Error('FFmpeg.wasm not loaded');
-
-        const { createFFmpeg, fetchFile } = FFmpeg;
-        const ffmpeg = createFFmpeg({
-          log: true,
-          corePath: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
-        });
-
-        if (onProgress) {
-          ffmpeg.setProgress(({ ratio }) => {
-            const pct = Math.max(0, Math.min(100, Math.round((ratio || 0) * 100)));
-            onProgress(pct);
-          });
-        }
-
-        await ffmpeg.load();
-        ffmpeg.FS('writeFile', 'in.webm', await fetchFile(inputBlob));
-        await ffmpeg.run(
-          '-i', 'in.webm',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart',
-          'out.mp4'
-        );
-        const out = ffmpeg.FS('readFile', 'out.mp4');
-        const mp4Blob = new Blob([out.buffer], { type: 'video/mp4' });
-        if (onProgress) onProgress(100);
-        return mp4Blob;
-      } catch (err) {
-        console.error('Transcode failed; returning original blob', err);
-        return inputBlob; // fall back rather than failing the session
-      }
-    }
-  </script>
 </head>
-<body>
-  <div class="wrap">
-    <h1>U N K N O W N // Controls</h1>
-
-    <div class="row">
-      <div class="card" style="flex:1 1 320px">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <button id="remoteShowQR" class="btn">Show Pair QR</button>
-          <button id="remoteReset" class="btn">Reset</button>
-          <span id="remoteStatus" class="status">REMOTE: idle</span>
-        </div>
-
-        <div class="small">
-          Open this on desktop (host). Use QR to connect your phone page to receive recordings.
+<body class="h-screen flex flex-col">
+    <div class="controls-panel w-full h-full flex flex-col bg-[#0a0a0a]">
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h1 class="text-xl font-bold text-white tracking-widest">U N K N O W N</h1>
+        <p class="text-sm text-gray-400 font-mono">// CONTROLS</p>
+        <div id="msg" class="text-red-400 font-mono text-xs mt-2 h-4"></div>
+        <div id="statusBar" class="font-mono text-xs status-indicator mt-2">
+          STATUS: READY
         </div>
       </div>
-
-      <div class="card" style="flex:1 1 300px">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <button id="startBtn" class="btn">Start Recording</button>
-          <button id="stopBtn" class="btn">Stop</button>
-          <span id="status" class="status">idle</span>
+      <div class="p-4 border-b border-gray-800 flex-shrink-0">
+        <h2 class="font-bold text-gray-300 mb-2">// PRESET_MANAGER</h2>
+        <select id="presetList" class="w-full bg-black border border-gray-700 p-2 mb-2 text-sm"></select>
+        <div class="grid grid-cols-3 gap-2">
+          <input type="text" id="presetName" placeholder="> Preset Name..." class="col-span-3 bg-black border border-gray-700 p-2 text-sm">
+          <button id="savePresetBtn" class="btn font-semibold py-1 text-sm">Save</button>
+          <button id="deletePresetBtn" class="btn font-semibold py-1 text-sm">Delete</button>
+          <button id="randomBtn" class="btn font-semibold py-1 text-sm">Randomize</button>
         </div>
-        <div class="small">Host records the preview and sends the video to the phone after conversion to MP4.</div>
+      </div>
+      <div class="flex border-b border-gray-800 flex-shrink-0">
+        <button id="globalsTabBtn" class="tab-button active flex-1 py-2 text-sm font-semibold">Globals</button>
+        <button id="effectsTabBtn" class="tab-button flex-1 py-2 text-sm font-semibold">Effects</button>
+      </div>
+      <div class="flex-grow custom-scrollbar overflow-y-auto">
+        <div id="effects-tab-content" class="hidden p-4 space-y-4"></div>
+        <div id="globals-tab-content" class="p-4 space-y-4">
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// REMOTE_TRIGGER</h3>
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-2">
+                <button id="remoteShowQR" class="btn font-semibold py-2 text-sm">Open QR</button>
+                <button id="remoteReset" class="btn font-semibold py-2 text-sm" disabled>Disarm</button>
+              </div>
+              <div id="remoteStatus" class="text-xs font-mono text-green-400">REMOTE: idle</div>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// BACKGROUND_SOURCE</h3>
+            <div class="space-y-3">
+                <button id="bgUploadBtn" class="w-full btn font-semibold py-2 text-sm">Upload Image/Video</button>
+                <input type="file" id="bgUpload" accept="image/*,video/*" class="hidden">
+                <label class="flex items-center justify-between text-sm cursor-pointer"><span>USE CUSTOM BG</span><input type="checkbox" id="useBgChk" class="form-checkbox" disabled></label>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center"><label class="text-sm">MASK FEATHER</label><span id="maskFeatherValue" class="text-sm font-mono">0.150</span></div>
+                    <input type="range" id="maskFeather" min="0.01" max="0.5" step="0.001" value="0.15">
+                </div>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// SYSTEM_SETTINGS</h3>
+            <div class="space-y-3">
+              <label class="flex items-center justify-between text-sm cursor-pointer"><span>ANIMATE EFFECTS</span><input type="checkbox" id="animateChk" class="form-checkbox" checked></label>
+              <label class="flex items-center justify-between text-sm cursor-pointer"><span>MIRROR PREVIEW</span><input type="checkbox" id="mirrorChk" class="form-checkbox" checked></label>
+              <label class="flex items-center justify-between text-sm cursor-pointer"><span>SHOW LOGOS</span><input type="checkbox" id="logoChk" class="form-checkbox" checked></label>
+            </div>
+          </div>
+          <div class="control-group bg-black/50 border border-gray-800 p-3">
+            <h3 class="font-semibold text-gray-200 mb-3">// AUTOMATION_MODULE</h3>
+            <div class="space-y-2"><div class="flex justify-between items-center"><label class="text-sm">AUTO-RANDOMIZE</label><span id="autoRandomizeValue" class="text-sm font-mono">1.0s</span></div><input type="range" id="autoRandomizeSlider" min="0" max="30" step="0.5" value="1"></div>
+            <div class="space-y-2 mt-3"><div class="flex justify-between items-center"><label class="text-sm">PRESET-ITERATION</label><span id="presetIterationValue" class="text-sm font-mono">Off</span></div><input type="range" id="presetIterationSlider" min="0" max="30" step="0.5" value="0"></div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- (Your existing effect/UI controls would remain here; omitted for brevity) -->
-  </div>
-
-  <script>
-  (() => {
-    // ---- UI (minimal skeleton; keep your existing UI here) ----
+<script>
+// --- This script is for the CONTROLS window only ---
+// It manages the UI, presets, and remote connections. It broadcasts state changes.
+(() => {
+    // --- MODULES ---
     const UI = {
-      elements: {}, state: { checkboxes: { logoChk:true } },
-      init() {
-        this.elements.remoteShowQR = document.getElementById('remoteShowQR');
-        this.elements.remoteReset = document.getElementById('remoteReset');
-        this.elements.remoteStatus = document.getElementById('remoteStatus');
-        this.elements.startBtn = document.getElementById('startBtn');
-        this.elements.stopBtn = document.getElementById('stopBtn');
-        this.elements.status = document.getElementById('status');
-      }
-    };
-
-    // ---- Remote / pairing / data channel (simplified — keep your implementation) ----
-    const Remote = {
-      armed:false, isRecording:false, activeConnection:null,
-      init(){
-        document.getElementById('remoteShowQR').addEventListener('click', async ()=>{
-          if(!this.armed) await this.arm();
-          this.openQRWindow();
-        });
-        document.getElementById('remoteReset').addEventListener('click', ()=> this.disarm());
+      elements: {}, state: { ui: {}, jitter: {} }, globalState: { ui: {} },
+      definitions: {}, globalDefinitions: {},
+      init(definitions, globalDefinitions) {
+        this.definitions = definitions; this.globalDefinitions = globalDefinitions;
+        const ids = ['statusBar', 'msg', 'savePresetBtn', 'deletePresetBtn', 'presetName', 'presetList', 'randomBtn', 'animateChk', 'mirrorChk', 'logoChk', 'bgUploadBtn', 'bgUpload', 'useBgChk', 'maskFeather', 'maskFeatherValue', 'effectsTabBtn', 'globalsTabBtn', 'effects-tab-content', 'globals-tab-content', 'autoRandomizeSlider', 'autoRandomizeValue', 'presetIterationSlider', 'presetIterationValue'];
+        ids.forEach(id => this.elements[id] = document.getElementById(id));
+        for (const [key, definition] of Object.entries(this.definitions)) { this.createControlGroup(key, definition, this.state, this.elements['effects-tab-content'], true); }
+        for (const [key, definition] of Object.entries(this.globalDefinitions)) { this.createControlGroup(key, definition, this.globalState, this.elements['globals-tab-content'], false); }
+        this.elements.effectsTabBtn.addEventListener('click', () => this.switchTab('effects'));
+        this.elements.globalsTabBtn.addEventListener('click', () => this.switchTab('globals'));
+        this.elements.bgUploadBtn.addEventListener('click', () => this.elements.bgUpload.click());
+        this.elements.maskFeather.addEventListener('input', () => { this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3); });
+        this.elements.autoRandomizeSlider.addEventListener('input', () => { const val = parseFloat(this.elements.autoRandomizeSlider.value); this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
+        this.elements.presetIterationSlider.addEventListener('input', () => { const val = parseFloat(this.elements.presetIterationSlider.value); this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
+        // Add change listeners to all inputs to trigger a state broadcast
+        document.querySelectorAll('input, select').forEach(el => el.addEventListener('change', () => App.broadcastState()));
+        document.querySelectorAll('input[type="range"]').forEach(el => el.addEventListener('input', () => App.broadcastState()));
       },
-      async arm(){
-        this.armed = true;
-        this.updateStatus();
-        // (pairing/peer setup goes here in your project)
+      switchTab(tabName) {
+        const isEffects = tabName === 'effects';
+        this.elements.effectsTabBtn.classList.toggle('active', isEffects);
+        this.elements.globalsTabBtn.classList.toggle('active', !isEffects);
+        this.elements['effects-tab-content'].classList.toggle('hidden', !isEffects);
+        this.elements['globals-tab-content'].classList.toggle('hidden', isEffects);
       },
-      disarm(){ this.armed=false; this.activeConnection=null; this.updateStatus(); },
-      openQRWindow(){ window.open('remote-qr.html','_blank','width=480,height=600'); },
-      updateStatus(){
-        const el=document.getElementById('remoteStatus');
-        el.textContent = this.isRecording ? 'REMOTE: recording…' : (this.armed ? 'REMOTE: armed' : 'REMOTE: idle');
-      },
-
-      // 🔴 REPLACED: always send MP4 to the phone
-      async handleRecordingBlob(blob) {
-        const conn = this.activeConnection;
-        if (!conn) { this.isRecording = false; this.updateStatus(); return; }
-
-        const setStatus = (p) => {
-          const el = document.getElementById('remoteStatus');
-          if (el && typeof p === 'number') el.textContent = `REMOTE: transcoding ${p}%`;
-        };
-
-        const mp4Blob = await transcodeToMp4IfNeeded(blob, setStatus);
-
-        const mime = 'video/mp4';
-        const arrayBuf = await mp4Blob.arrayBuffer();
-        const total = arrayBuf.byteLength;
-        const filename = `unknown_${Date.now()}.mp4`;
-
-        conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
-        const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
-        while (sent < total) {
-          if (channel && channel.bufferedAmount > 1024 * 1024) {
-            await new Promise(r => { channel.onbufferedamountlow = r; });
-          }
-          const end = Math.min(total, sent + CHUNK);
-          conn.send(arrayBuf.slice(sent, end));
-          sent = end;
+      createControlGroup(key, definition, stateObject, parentElement, withToggle) {
+        const group = document.createElement('div'); group.className = 'control-group bg-black/50 border border-gray-800 p-3';
+        const header = document.createElement('div'); header.className = 'flex items-center justify-between';
+        const title = document.createElement('h3'); title.className = 'font-semibold text-gray-200'; title.textContent = `// ${definition.title.toUpperCase()}`; header.appendChild(title);
+        const content = document.createElement('div'); content.className = 'mt-3 space-y-3';
+        if (withToggle) {
+            header.classList.add('cursor-pointer'); const toggle = document.createElement('input'); toggle.type = 'checkbox'; toggle.checked = definition.active; toggle.className = 'form-checkbox';
+            if (!definition.active) content.classList.add('hidden');
+            toggle.addEventListener('change', () => { definition.active = toggle.checked; App.broadcastState(); });
+            header.addEventListener('click', (e) => { if(e.target !== toggle) { toggle.checked = !toggle.checked; toggle.dispatchEvent(new Event('change')); } content.classList.toggle('hidden', !toggle.checked); });
+            definition.toggleElement = toggle; header.appendChild(toggle);
         }
-        conn.send(JSON.stringify({ type:'recordingEnd' }));
-        this.isRecording = false; this.activeConnection = null; this.updateStatus();
+        stateObject.ui[key] = {}; if (stateObject.jitter) { stateObject.jitter[key] = {}; }
+        for (const [controlKey, controlDef] of Object.entries(definition.controls)) {
+          const slider = this.createSlider(controlKey, controlDef); content.appendChild(slider.container);
+          stateObject.ui[key][controlKey] = slider.input;
+          if (stateObject.jitter) {
+              stateObject.jitter[key][controlKey] = { base: controlDef.value, current: controlDef.value };
+              slider.input.addEventListener('input', () => { stateObject.jitter[key][controlKey].base = parseFloat(slider.input.value); });
+          }
+        }
+        group.append(header, content); parentElement.appendChild(group);
       },
+      createSlider(id, def) {
+        const container = document.createElement('div'); container.className = 'space-y-2';
+        const labelContainer = document.createElement('div'); labelContainer.className = 'flex justify-between items-center';
+        const label = document.createElement('label'); label.className = 'text-sm'; label.textContent = def.label.toUpperCase();
+        const valueSpan = document.createElement('span'); valueSpan.className = 'text-sm font-mono';
+        const input = document.createElement('input'); input.type = 'range'; Object.assign(input, { min: def.min, max: def.max, step: def.step, value: def.value });
+        const updateValue = () => valueSpan.textContent = parseFloat(input.value).toFixed(String(def.step).includes('.') ? 3 : 0);
+        input.addEventListener('input', updateValue); updateValue();
+        labelContainer.append(label, valueSpan); container.append(labelContainer, input);
+        return { container, input };
+      },
+      updateJitter(t) {
+        if (!this.definitions.Jitter.active) return;
+        const { jitterAmount, jitterSpeed } = this.state.ui.Jitter;
+        const amount = parseFloat(jitterAmount.value); const speed = parseFloat(jitterSpeed.value);
+        for (const [groupKey, group] of Object.entries(this.state.jitter)) {
+          if (groupKey === 'Jitter' || !this.definitions[groupKey].active) continue;
+          for (const [controlKey, state] of Object.entries(group)) {
+            const slider = this.state.ui[groupKey][controlKey]; const range = parseFloat(slider.max) - parseFloat(slider.min);
+            const offset = (Math.sin(t * speed + controlKey.length) * Math.cos(t * speed * 0.7 + groupKey.length)) * amount * range;
+            state.current = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), state.base + offset));
+          }
+        }
+      },
+      setStatus(text, isError = false) { this.elements.statusBar.textContent = `STATUS: ${text}`; this.elements.statusBar.classList.toggle('error', isError); },
+      setMsg(text) { this.elements.msg.textContent = text; }
+    };
 
-      handleRecordingError(message) {
-        try { this.activeConnection?.send(JSON.stringify({ type: 'error', message })); } catch {}
-        this.isRecording = false; this.activeConnection = null; this.updateStatus();
+    const PresetManager = {
+      init() {
+        this.populateList();
+        UI.elements.savePresetBtn.addEventListener('click', () => this.save());
+        UI.elements.deletePresetBtn.addEventListener('click', () => this.delete());
+        UI.elements.presetList.addEventListener('change', () => this.load());
+        UI.elements.randomBtn.addEventListener('click', () => this.randomize());
+      },
+      getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV5.0Presets') || '{}'),
+      savePresets: (p) => localStorage.setItem('bodyGlitchV5.0Presets', JSON.stringify(p)),
+      getAppState() { /* This is now handled by App.getCurrentState() */ },
+      setAppState(state) {
+        if (!state) return;
+        if (state.controls) {
+          for (const [groupKey, group] of Object.entries(state.controls)) {
+            if (UI.state.ui[groupKey]) {
+              for (const [controlKey, value] of Object.entries(group)) {
+                const el = UI.state.ui[groupKey][controlKey]; if (el) { el.value = value; el.dispatchEvent(new Event('input')); if (UI.state.jitter[groupKey]?.[controlKey]) UI.state.jitter[groupKey][controlKey].base = parseFloat(el.value); }
+              }
+            }
+          }
+        }
+        if (state.toggles) { for (const [groupKey, isChecked] of Object.entries(state.toggles)) { const def = UI.definitions[groupKey]; if (def && def.toggleElement) { def.toggleElement.checked = isChecked; def.toggleElement.dispatchEvent(new Event('change')); } } }
+        if (state.globalControls) {
+            for (const [groupKey, group] of Object.entries(state.globalControls)) {
+                if (UI.globalState.ui[groupKey]) { for (const [controlKey, value] of Object.entries(group)) { const el = UI.globalState.ui[groupKey][controlKey]; if (el) { el.value = value; el.dispatchEvent(new Event('input')); } } }
+            }
+        }
+        if (state.checkboxes) {
+          UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true; UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true; UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false; UI.elements.logoChk.checked = state.checkboxes.logoChk ?? true;
+        }
+        if (state.misc) { const featherSlider = UI.elements.maskFeather; if (featherSlider) { featherSlider.value = state.misc.maskFeather ?? '0.15'; featherSlider.dispatchEvent(new Event('input')); } }
+        App.broadcastState(); // Broadcast after loading a preset
+      },
+      populateList() {
+        const presets = this.getPresets(); const { presetList } = UI.elements; const currentVal = presetList.value;
+        presetList.innerHTML = '<option value="">-- LOAD PRESET --</option>';
+        for (const name in presets) { const opt = document.createElement('option'); opt.value = name; opt.textContent = name; presetList.appendChild(opt); }
+        presetList.value = currentVal;
+      },
+      save() {
+        const { presetName } = UI.elements; const name = presetName.value.trim();
+        if (!name) return UI.setMsg('Enter a preset name.');
+        const presets = this.getPresets(); presets[name] = App.getCurrentState(true); this.savePresets(presets);
+        this.populateList(); UI.elements.presetList.value = name; UI.setMsg(`Preset '${name}' saved.`);
+      },
+      delete() {
+        const { presetList, presetName } = UI.elements; const name = presetList.value;
+        if (!name) return UI.setMsg('Select a preset to delete.');
+        const presets = this.getPresets(); delete presets[name]; this.savePresets(presets);
+        this.populateList(); presetName.value = ''; UI.setMsg(`Preset '${name}' deleted.`);
+      },
+      load(name) {
+        const { presetList, presetName } = UI.elements; const presetToLoad = name || presetList.value;
+        if (!presetToLoad) return; const presets = this.getPresets();
+        if (presets[presetToLoad]) { this.setAppState(presets[presetToLoad]); presetName.value = presetToLoad; presetList.value = presetToLoad; UI.setMsg(`Preset '${presetToLoad}' loaded.`); }
+      },
+      randomize() {
+        for (const groupKey in UI.state.ui) {
+          const def = UI.definitions[groupKey]; if(def && def.toggleElement){ def.toggleElement.checked = Math.random() > 0.3; def.toggleElement.dispatchEvent(new Event('change')); }
+          for (const controlKey in UI.state.ui[groupKey]) {
+            const el = UI.state.ui[groupKey][controlKey]; const min = parseFloat(el.min), max = parseFloat(el.max), step = parseFloat(el.step);
+            el.value = Math.round((min + Math.random() * (max - min)) / step) * step; el.dispatchEvent(new Event('input'));
+          }
+        }
+        UI.setMsg('Parameters randomized!'); App.broadcastState();
       }
     };
 
-    // ---- App glue ----
     const App = {
-      channel: null,
-      init(){
-        UI.init();
-        Remote.init();
+      channel: null, definitions: {}, globalDefinitions: {}, rafId: null,
+      lastRandomizeTime: 0, lastPresetIterateTime: 0, currentPresetIndex: 0,
+      bgObjectUrl: null,
 
+      init(definitions, globalDefinitions) {
+        this.definitions = definitions; this.globalDefinitions = globalDefinitions;
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
-
-        document.getElementById('startBtn').addEventListener('click', ()=>{
-          document.getElementById('status').textContent='recording…';
-          Remote.isRecording=true; Remote.updateStatus();
-          this.channel.postMessage({ type:'record_start' });
-        });
-        document.getElementById('stopBtn').addEventListener('click', ()=>{
-          document.getElementById('status').textContent='stopping…';
-          this.channel.postMessage({ type:'record_stop' });
-        });
+        UI.init(definitions, globalDefinitions);
+        PresetManager.init();
+        UI.elements.bgUpload.addEventListener('change', (e) => this.handleBgUpload(e));
+        this.loop();
+        this.broadcastState(); // Initial broadcast
+      },
+      
+      handleMessage(data) {
+        if (data.type === 'recording_complete') {
+            Remote.handleRecordingBlob(data.payload.blob);
+        } else if (data.type === 'recording_error') {
+            Remote.handleRecordingError(data.payload.message);
+        }
       },
 
-      handleMessage(data){
-        if (data.type === 'recording_complete') {
-          Remote.handleRecordingBlob(data.payload.blob);
-          document.getElementById('status').textContent='sending to phone…';
-        } else if (data.type === 'recording_error') {
-          Remote.handleRecordingError(data.payload.message);
-          document.getElementById('status').textContent='error';
-        } else if (data.type === 'record_stop_ack') {
-          document.getElementById('status').textContent='stopped';
-          Remote.isRecording=false; Remote.updateStatus();
+      handleBgUpload(e) {
+        const file = e.target.files[0]; if (!file) return;
+        if (this.bgObjectUrl) URL.revokeObjectURL(this.bgObjectUrl);
+        this.bgObjectUrl = URL.createObjectURL(file);
+        UI.elements.useBgChk.disabled = false; UI.elements.useBgChk.checked = true;
+        UI.setMsg(`Loaded background: ${file.name}`);
+        this.broadcastState();
+      },
+      
+      getCurrentState(forPreset = false) {
+        const state = { uniforms: {}, animate: UI.elements.animateChk.checked, mirror: UI.elements.mirrorChk.checked, showLogos: UI.elements.logoChk.checked, useBg: UI.elements.useBgChk.checked };
+        // For presets, we need a different structure
+        if (forPreset) {
+            state.controls = {}; state.toggles = {}; state.globalControls = {}; state.checkboxes = {}; state.misc = {};
         }
+        // Process randomized controls
+        for (const [groupKey, group] of Object.entries(UI.state.ui)) {
+            if (forPreset) { state.controls[groupKey] = {}; state.toggles[groupKey] = this.definitions[groupKey].active; }
+            const groupIsActive = this.definitions[groupKey].active;
+            for (const [controlKey, control] of Object.entries(group)) {
+                let val = groupIsActive ? parseFloat(control.value) : this.definitions[groupKey].controls[controlKey].neutral;
+                if (groupIsActive && this.definitions.Jitter.active && UI.state.jitter[groupKey]?.[controlKey]) { val = UI.state.jitter[groupKey][controlKey].current; }
+                state.uniforms[`u_${controlKey}`] = val;
+                if (forPreset) { state.controls[groupKey][controlKey] = control.value; }
+            }
+        }
+        // Process global controls
+        for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
+            if (forPreset) { state.globalControls[groupKey] = {}; }
+            for (const [controlKey, control] of Object.entries(group)) {
+                state.uniforms[`u_${controlKey}`] = parseFloat(control.value);
+                if (forPreset) { state.globalControls[groupKey][controlKey] = control.value; }
+            }
+        }
+        // Add other misc values
+        state.uniforms.u_maskFeather = parseFloat(UI.elements.maskFeather.value);
+        if (this.bgObjectUrl) { state.bgFile = { url: this.bgObjectUrl, type: UI.elements.bgUpload.files[0].type }; }
+
+        if (forPreset) {
+            state.checkboxes = { animateChk: state.animate, mirrorChk: state.mirror, useBgChk: state.useBg, logoChk: state.showLogos };
+            state.misc = { maskFeather: UI.elements.maskFeather.value };
+            delete state.uniforms; delete state.animate; delete state.mirror; delete state.useBg; delete state.bgFile; delete state.showLogos;
+        }
+        return state;
+      },
+
+      broadcastState() {
+        const payload = this.getCurrentState();
+        this.channel.postMessage({ type: 'state_update', payload });
+      },
+
+      loop(time) {
+        this.rafId = requestAnimationFrame(t => this.loop(t));
+        const t = UI.elements.animateChk.checked ? time / 1000 : 0;
+        UI.updateJitter(t);
+
+        // --- START: CORRECTED AUTOMATION LOGIC ---
+        const autoRandomizeInterval = parseFloat(UI.elements.autoRandomizeSlider.value);
+        if (autoRandomizeInterval > 0) {
+            // If the timer is 0, it means the feature was just activated.
+            // Randomize immediately and set the timer for the next cycle.
+            if (this.lastRandomizeTime === 0) {
+                PresetManager.randomize();
+                // Set the time, using `|| 1` as a safeguard in case time is 0 on the first frame.
+                this.lastRandomizeTime = time || 1; 
+            } else if ((time - this.lastRandomizeTime) > autoRandomizeInterval * 1000) {
+                // Otherwise, if the interval has passed, randomize and reset the timer.
+                PresetManager.randomize();
+                this.lastRandomizeTime = time;
+            }
+        } else {
+            // If the slider is at 0, reset the timer.
+            this.lastRandomizeTime = 0;
+        }
+        // --- END: CORRECTED AUTOMATION LOGIC ---
+
+        const presetIterationInterval = parseFloat(UI.elements.presetIterationSlider.value);
+        if (presetIterationInterval > 0) {
+            if (this.lastPresetIterateTime === 0) this.lastPresetIterateTime = time;
+            if ((time - this.lastPresetIterateTime) > presetIterationInterval * 1000) {
+                const presets = PresetManager.getPresets(); const presetNames = Object.keys(presets);
+                if (presetNames.length > 0) { this.currentPresetIndex = (this.currentPresetIndex + 1) % presetNames.length; PresetManager.load(presetNames[this.currentPresetIndex]); }
+                this.lastPresetIterateTime = time;
+            }
+        } else { this.lastPresetIterateTime = 0; }
+        this.broadcastState();
       }
     };
+    
+    // --- Remote Trigger Module ---
+    const Remote = {
+        peer: null, connections: new Map(), sessionToken: null, armed: false, isRecording: false,
+        activeConnection: null, // Store the connection that initiated the recording
+        init() {
+            const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
+            els.showQR.addEventListener('click', async () => {
+                if (!this.armed) await this.arm();
+                this.openQRWindow();
+            });
+            els.reset.addEventListener('click', () => this.disarm() );
+        },
+        updateStatus() {
+            const statusEl = document.getElementById('remoteStatus');
+            const count = this.connections.size; let text = 'REMOTE: idle';
+            if (this.armed) {
+                if (this.isRecording) { text = `REMOTE: RECORDING... (${count} connected)`; }
+                else if (count > 0) { text = `REMOTE: ${count} phone(s) connected. Ready.`; }
+                else if (this.peer && this.peer.id) { text = `REMOTE: armed @ ${this.peer.id.slice(0,6)}…`; }
+                else { text = 'REMOTE: arming...'; }
+            }
+            statusEl.textContent = text;
+        },
+        lazyLoadPeerJS() {
+            return new Promise((resolve, reject) => {
+                if (window.Peer) return resolve();
+                const s = document.createElement('script'); s.src = 'https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js';
+                s.onload = resolve; s.onerror = e => reject(new Error('Failed to load PeerJS'));
+                document.body.appendChild(s);
+            });
+        },
+        async arm() {
+            await this.lazyLoadPeerJS();
+            this.sessionToken = (crypto.getRandomValues(new Uint8Array(16))).reduce((s, b) => s + b.toString(16).padStart(2, '0'), '');
+            
+            // Return a promise that resolves only when the peer is open and has an ID
+            return new Promise((resolve, reject) => {
+                this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
 
-    window.addEventListener('load', ()=> App.init());
-  })();
-  </script>
+                this.peer.on('open', id => {
+                    console.log('PeerJS connection established with ID:', id);
+                    this.armed = true;
+                    this.updateStatus();
+                    document.getElementById('remoteReset').disabled = false;
+                    this.peer.on('connection', conn => this.handleNewConnection(conn));
+                    resolve(); // The promise is fulfilled here
+                });
+
+                this.peer.on('error', err => {
+                    console.error('PeerJS error:', err);
+                    this.disarm();
+                    reject(err); // The promise is rejected on an error
+                });
+            });
+        },
+        disarm() {
+            this.armed = false;
+            for (const conn of this.connections.values()) { try { conn.close(); } catch {} }
+            this.connections.clear();
+            if (this.peer) try { this.peer.destroy(); } catch {}
+            this.peer = null; this.sessionToken = null;
+            document.getElementById('remoteReset').disabled = true;
+            this.updateStatus();
+        },
+        handleNewConnection(conn) {
+            if (this.connections.size >= 3) {
+                const oldestPeerId = this.connections.keys().next().value;
+                if (oldestPeerId) { const oldestConn = this.connections.get(oldestPeerId); if (oldestConn) { oldestConn.send(JSON.stringify({ type: 'error', message: 'New user connected.' })); setTimeout(() => { try { oldestConn.close(); } catch {} }, 100); } this.connections.delete(oldestPeerId); }
+            }
+            this.connections.set(conn.peer, conn); this.updateStatus();
+            conn.on('data', msg => this.onMessage(msg, conn));
+            conn.on('close', () => { this.connections.delete(conn.peer); this.updateStatus(); });
+            conn.on('error', e => { console.error('Peer connection error:', e); this.connections.delete(conn.peer); this.updateStatus(); });
+        },
+        async onMessage(msg, conn) {
+            try {
+                const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
+                if (data.type === 'hello') {
+                    if (data.token !== this.sessionToken) { conn.send(JSON.stringify({ type:'error', message: 'Invalid token.' })); setTimeout(() => { try { conn.close(); } catch {} }, 100); return; }
+                    conn.capabilities = { supportsWebM: !!data.supportsWebM };
+                    conn.send(JSON.stringify({ type:'helloAck', ok:true }));
+                } else if (data.type === 'startRecording') {
+                    if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
+                    if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
+                    this.isRecording = true; this.activeConnection = conn; this.updateStatus();
+                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
+                    App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
+                }
+            } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
+        },
+        async handleRecordingBlob(blob) {
+            const conn = this.activeConnection;
+            if (!conn) { this.isRecording = false; this.updateStatus(); return; }
+            const { type: mime } = blob;
+            const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
+            const filename = `unknown_${Date.now()}.${mime.includes('mp4')?'mp4':'webm'}`;
+            conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
+            const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
+            while (sent < total) {
+                if (channel && channel.bufferedAmount > 1024 * 1024) { await new Promise(r => { channel.onbufferedamountlow = r; }); }
+                const end = Math.min(total, sent + CHUNK); conn.send(arrayBuf.slice(sent, end)); sent = end;
+            }
+            conn.send(JSON.stringify({ type:'recordingEnd' }));
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
+        },
+        handleRecordingError(message) {
+            if (this.activeConnection) {
+                this.activeConnection.send(JSON.stringify({ type: 'error', message }));
+            }
+            this.isRecording = false; this.activeConnection = null; this.updateStatus();
+        },
+        openQRWindow() {
+            if (!this.peer || !this.sessionToken) return;
+            const url = new URL('phone.html', location.href);
+            url.searchParams.set('host', this.peer.id); url.searchParams.set('token', this.sessionToken);
+            const qrUrl = new URL('remote-qr.html', location.href);
+            qrUrl.searchParams.set('target', url.toString());
+            window.open(qrUrl.toString(), '_blank', 'noopener,noreferrer,width=520,height=600');
+        }
+    };
+
+    // --- DEFINITIONS ---
+    const definitions = {
+      Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
+      Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
+      Feedback: { title: 'Data Moshing', active: true, controls: { feedbackAmount: { label: 'Amount', min: 0.8, max: 1.0, step: 0.001, value: 0.97, neutral: 0.0 }, feedbackZoom: { label: 'Zoom', min: 0.9, max: 1.1, step: 0.001, value: 1.001, neutral: 1.0 } } },
+      Glitch: { title: 'Signal Glitch', active: true, controls: { glitchIntensity: { label: 'Intensity', min: 0, max: 1, step: 0.01, value: 0.1, neutral: 0.0 }, glitchBlockSize: { label: 'Block Size', min: 1, max: 50, step: 1, value: 8, neutral: 0.0 } } },
+      Color: { title: 'Color Distortion', active: true, controls: { rgbShift: { label: 'RGB Shift', min: 0, max: 0.1, step: 0.001, value: 0.01, neutral: 0.0 } } },
+      Distortion: { title: 'Lens Distortion', active: true, controls: { noiseAmount: { label: 'Noise Amount', min: 0, max: 0.5, step: 0.01, value: 0.05, neutral: 0.0 }, noiseSpeed:  { label: 'Noise Speed',  min: 0, max: 10, step: 0.1, value: 1, neutral: 0.0 }, vignette:    { label: 'Vignette',     min: 0, max: 2,  step: 0.01, value: 0.5, neutral: 0.0 } } }
+    };
+    const globalDefinitions = {
+        Opacity: { title: 'Global Opacity', active: true, controls: { overallOpacity: { label: 'Effect Opacity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerPerSecond: { label: 'Flickers/Sec', min: 0, max: 30, step: 0.1, value: 1.0 }, flickerDuration: { label: 'Flicker Off Ratio', min: 0.01, max: 1, step: 0.01, value: 0.01 }, flickerIntensity: { label: 'Flicker Intensity', min: 0, max: 1, step: 0.01, value: 1.0 }, flickerFade: { label: 'Flicker Fade', min: 0.0, max: 0.5, step: 0.01, value: 0.3 } } },
+        Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } }
+    };
+
+    // --- Entry Point ---
+    window.addEventListener('load', () => {
+        App.init(definitions, globalDefinitions);
+        Remote.init();
+    });
+})();
+</script>
 </body>
 </html>

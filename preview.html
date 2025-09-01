@@ -4,196 +4,475 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>U N K N O W N // Preview</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   <style>
-    :root{
-      --bg:#000;--fg:#eaeaea;--muted:#888;--accent:#fff;--panel:#0a0a0a;
-      --border:#2a2a2a;--ok:#33d17a;--warn:#f6c945;--err:#ff6464;
+    /* Basic styles to ensure the canvas fills the window */
+    body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #000;
     }
-    html,body{margin:0;padding:0;height:100%;background:#000;color:#eaeaea;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .stage{position:fixed;inset:0;display:grid;grid-template-rows:1fr;grid-template-columns:1fr;place-items:center;background:#000}
-    canvas{display:block;max-width:100%;max-height:100%}
-    .hud{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;padding:10px 12px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.45))}
-    .hud .btn{background:#111;border:1px solid #333;color:#eaeaea;border-radius:8px;padding:6px 10px}
-    .hud .btn:hover{background:#1b1b1b}
-    .hud .k{color:#aaa}
-    .logos{position:fixed;inset:0;pointer-events:none}
-    .logos img{position:absolute;opacity:.85;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4))}
+    .main-stage {
+        width: 100vw;
+        height: 100vh;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .video-container {
+        position: relative;
+        aspect-ratio: 9 / 16;
+        height: 100%;
+        max-width: 100%;
+    }
+    /* All visual elements are absolutely positioned to layer correctly inside the container */
+    #backgroundMedia, #backgroundImage, #glcanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    /* Logos are positioned at the corners of the video container */
+    #logoTopLeft, #logoTopRight {
+        position: absolute;
+        z-index: 10;
+        transform-origin: top left;
+        transform: scale(0.5); /* Adjusted scale to match recording */
+        pointer-events: none;
+    }
+    #logoTopLeft { top: 0; left: 0; }
+    #logoTopRight { top: 0; right: 0; transform-origin: top right; }
+    /* Hidden video element for camera input */
+    .hidden { display: none; }
   </style>
 </head>
 <body>
-  <div class="stage">
-    <canvas id="glcanvas" width="720" height="1280"></canvas>
+  <div class="main-stage">
+    <div class="video-container">
+      <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
+      <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
+      
+      <video id="video" playsinline muted class="hidden"></video>
+      <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
+      <img id="backgroundImage" class="hidden" />
+      <canvas id="glcanvas"></canvas>
+    </div>
   </div>
 
-  <div class="logos">
-    <img id="logoTopLeft" style="top:16px;left:16px;width:200px;height:auto" src="assets/logo1.png" alt="">
-    <img id="logoTopRight" style="top:16px;right:16px;width:200px;height:auto" src="assets/logo2.png" alt="">
-  </div>
+<script>
+// --- This script is for the PREVIEW window only ---
+// It handles rendering, body segmentation, and listens for state updates.
+(() => {
+    // --- SHADER DEFINITIONS ---
+    const vertSrc = `
+      attribute vec2 a_pos;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_pos;
+        gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
+      }`;
 
-  <div class="hud">
-    <button id="btnStart" class="btn">Start Recording</button>
-    <button id="btnStop" class="btn">Stop</button>
-    <span id="status" class="k">idle</span>
-  </div>
+    const fragSrc = `
+      precision highp float;
+      varying vec2 v_uv;
+      uniform sampler2D u_tex;
+      uniform sampler2D u_feedbackTex;
+      uniform sampler2D u_maskTex;
+      uniform sampler2D u_backgroundTex;
+      uniform vec2  u_resolution;
+      uniform float u_time;
+      uniform bool  u_isFeedbackPass;
+      uniform bool  u_useBackground;
+      uniform float u_maskFeather;
+      uniform float u_overallOpacity;
+      uniform float u_flickerPerSecond;
+      uniform float u_flickerDuration;
+      uniform float u_flickerIntensity;
+      uniform float u_flickerFade;
+      uniform float u_seepAmount;
+      uniform float u_seepIntensity;
+      uniform float u_feedbackAmount;
+      uniform float u_feedbackZoom;
+      uniform float u_glitchIntensity;
+      uniform float u_glitchBlockSize;
+      uniform float u_rgbShift;
+      uniform float u_noiseAmount;
+      uniform float u_noiseSpeed;
+      uniform float u_vignette;
+      uniform float u_globalSmearIntensity;
+      uniform float u_globalSmearAngle;
+      uniform float u_spotSmearIntensity;
+      uniform float u_spotSmearDensity;
+      uniform float u_spotSmearSize;
+      float rand(vec2 co){ return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453); }
+      vec4 smear(sampler2D tex, vec2 uv, float intensity, float angle) {
+        vec2 dir = vec2(cos(angle), sin(angle)) / u_resolution;
+        vec4 color = vec4(0.0);
+        const int samples = 16;
+        for (int i = 0; i < samples; i++) {
+          float t = float(i) / float(samples - 1);
+          color += texture2D(tex, uv - dir * t * intensity);
+        }
+        return color / float(samples);
+      }
+      vec4 blur(sampler2D tex, vec2 uv, float radius) {
+          vec4 acc = vec4(0.0);
+          vec2 res = u_resolution.xy;
+          float count = 0.0;
+          for(float x = -2.0; x <= 2.0; x++) {
+              for(float y = -2.0; y <= 2.0; y++) {
+                  vec2 offset = vec2(x, y) * radius / res;
+                  acc += texture2D(tex, uv + offset);
+                  count += 1.0;
+              }
+          }
+          return acc / count;
+      }
+      void main() {
+        vec2 uv = v_uv;
+        vec4 videoColor = texture2D(u_tex, uv);
+        vec4 feedbackColor = texture2D(u_feedbackTex, (uv - 0.5) * u_feedbackZoom + 0.5);
+        vec4 effectedColor = mix(videoColor, feedbackColor, u_feedbackAmount);
+        if (rand(vec2(floor(u_time * 15.0), 0.0)) < u_glitchIntensity) {
+          vec2 block_uv = floor(uv * u_resolution.y / u_glitchBlockSize) / (u_resolution.y / u_glitchBlockSize);
+          effectedColor = texture2D(u_tex, uv + vec2((rand(block_uv) - 0.5) * 0.1, 0.0));
+        }
+        float r = texture2D(u_tex, uv + vec2(u_rgbShift, 0.0)).r;
+        float b = texture2D(u_tex, uv - vec2(u_rgbShift, 0.0)).b;
+        effectedColor = vec4(r, effectedColor.g, b, effectedColor.a);
+        effectedColor += (rand(uv + u_time * u_noiseSpeed) - 0.5) * u_noiseAmount;
+        effectedColor.rgb *= 1.0 - u_vignette * distance(uv, vec2(0.5));
+        vec4 smearedColor = effectedColor;
+        vec2 grid_uv = floor(uv * u_spotSmearSize) / u_spotSmearSize;
+        if (rand(grid_uv + floor(u_time * 5.0)) < u_spotSmearDensity) {
+          smearedColor = smear(u_feedbackTex, uv, u_spotSmearIntensity, rand(grid_uv + 10.0) * 6.283);
+        }
+        float maskValue = texture2D(u_maskTex, uv).r;
+        if (maskValue > 0.1) {
+            vec4 globalSmear = smear(u_feedbackTex, uv, u_globalSmearIntensity, radians(u_globalSmearAngle));
+            smearedColor = mix(smearedColor, globalSmear, 0.5);
+        }
+        float effectedGray = dot(smearedColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 effectedGrayscale = vec4(vec3(effectedGray), 1.0);
+        if (u_isFeedbackPass) {
+          gl_FragColor = effectedGrayscale;
+          return;
+        }
+        float originalGray = dot(videoColor.rgb, vec3(0.299, 0.587, 0.114));
+        vec4 originalGrayscale = vec4(vec3(originalGray), 1.0);
+        float baseMask = texture2D(u_maskTex, uv).r;
+        float blurredMask = blur(u_maskTex, uv, u_seepIntensity).r;
+        float seep = (1.0 - baseMask) * blurredMask * u_seepAmount;
+        float finalMask = smoothstep(0.5 - u_maskFeather, 0.5 + u_maskFeather, baseMask);
+        float silhouetteMask = clamp(finalMask + seep, 0.0, 1.0);
+        float flickerMultiplier = 1.0;
+        if (u_flickerPerSecond > 0.0) {
+            float flickerCycle = 1.0 / u_flickerPerSecond;
+            float flickerPhase = mod(u_time, flickerCycle);
+            float flickerEdge = flickerCycle * u_flickerDuration;
+            float fadeWidth = flickerCycle * u_flickerFade * 0.5;
+            float isFlickerOff = 1.0 - smoothstep(flickerEdge - fadeWidth, flickerEdge + fadeWidth, flickerPhase);
+            flickerMultiplier = 1.0 - (isFlickerOff * u_flickerIntensity);
+        }
+        float effectAmount = u_overallOpacity * flickerMultiplier;
+        vec4 foregroundColor = mix(originalGrayscale, effectedGrayscale, effectAmount);
+        vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
+        gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
+      }`;
+    
+    // --- MODULES ---
+    const Renderer = {
+      gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
+      maskCanvas: document.createElement('canvas'),
+      init(canvas, uniformKeys) {
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+        if (!this.gl) throw new Error('WebGL not available');
+        const compile = (type, src) => {
+          const s = this.gl.createShader(type); this.gl.shaderSource(s, src); this.gl.compileShader(s);
+          if (!this.gl.getShaderParameter(s, this.gl.COMPILE_STATUS)) throw new Error(`Shader compile error: ${this.gl.getShaderInfoLog(s)}`);
+          return s;
+        };
+        this.program = this.gl.createProgram();
+        this.gl.attachShader(this.program, compile(this.gl.VERTEX_SHADER, vertSrc));
+        this.gl.attachShader(this.program, compile(this.gl.FRAGMENT_SHADER, fragSrc));
+        this.gl.linkProgram(this.program);
+        if (!this.gl.getProgramParameter(this.program, this.gl.LINK_STATUS)) throw new Error(`Program link error: ${this.gl.getProgramInfoLog(this.program)}`);
+        const buffer = this.gl.createBuffer(); this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 1,1]), this.gl.STATIC_DRAW);
+        const posLoc = this.gl.getAttribLocation(this.program, 'a_pos');
+        this.gl.enableVertexAttribArray(posLoc); this.gl.vertexAttribPointer(posLoc, 2, this.gl.FLOAT, false, 0, 0);
+        const createTex = () => {
+          const tex = this.gl.createTexture(); this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+          this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+          return tex;
+        };
+        this.textures = { video: createTex(), feedbackA: createTex(), feedbackB: createTex(), mask: createTex(), background: createTex() };
+        this.framebuffers.feedback = this.gl.createFramebuffer();
+        this.gl.useProgram(this.program);
+        uniformKeys.forEach(key => this.uniforms[key] = this.gl.getUniformLocation(this.program, key));
+      },
+      fit(video) {
+        if (!video.videoWidth) return;
+        const { videoWidth: w, videoHeight: h } = video;
+        const canvas = this.gl.canvas;
+        if (canvas.width === w && canvas.height === h) return;
+        canvas.width = w; canvas.height = h;
+        const resizableTextures = [this.textures.video, this.textures.feedbackA, this.textures.feedbackB, this.textures.mask];
+        for (const tex of resizableTextures) {
+          this.gl.bindTexture(this.gl.TEXTURE_2D, tex);
+          this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, w, h, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null);
+        }
+        this.gl.viewport(0, 0, w, h);
+      },
+      drawMask(video, segmentationMask) {
+        const { videoWidth: W, videoHeight: H } = video;
+        const ctx = this.maskCanvas.getContext('2d');
+        if (this.maskCanvas.width !== W || this.maskCanvas.height !== H) { this.maskCanvas.width = W; this.maskCanvas.height = H; }
+        ctx.fillStyle = 'black'; ctx.fillRect(0, 0, W, H);
+        if (segmentationMask) { ctx.drawImage(segmentationMask, 0, 0, W, H); }
+        this.gl.activeTexture(this.gl.TEXTURE2); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.mask);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, this.maskCanvas);
+      },
+      render(appState) {
+        const { video, t, uniforms, backgroundMedia, useBg } = appState;
+        this.gl.useProgram(this.program);
+        this.gl.activeTexture(this.gl.TEXTURE0); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.video);
+        this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, video);
+        if (useBg && (backgroundMedia.videoWidth || backgroundMedia.naturalWidth || backgroundMedia.width)) {
+            this.gl.activeTexture(this.gl.TEXTURE3); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.background);
+            this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, backgroundMedia);
+        }
+        this.gl.uniform2f(this.uniforms.u_resolution, this.gl.canvas.width, this.gl.canvas.height);
+        this.gl.uniform1f(this.uniforms.u_time, t);
+        for (const key in uniforms) {
+            if (this.uniforms[key]) {
+                this.gl.uniform1f(this.uniforms[key], uniforms[key]);
+            }
+        }
+        this.gl.uniform1i(this.uniforms.u_useBackground, useBg);
+        this.gl.uniform1i(this.uniforms.u_tex, 0); this.gl.uniform1i(this.uniforms.u_feedbackTex, 1);
+        this.gl.uniform1i(this.uniforms.u_maskTex, 2); this.gl.uniform1i(this.uniforms.u_backgroundTex, 3);
+        this.gl.activeTexture(this.gl.TEXTURE1); this.gl.bindTexture(this.gl.TEXTURE_2D, this.textures.feedbackA);
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 1);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.framebuffers.feedback);
+        this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.textures.feedbackB, 0);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+        this.gl.uniform1i(this.uniforms.u_isFeedbackPass, 0);
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
+        [this.textures.feedbackA, this.textures.feedbackB] = [this.textures.feedbackB, this.textures.feedbackA];
+      }
+    };
 
-  <script>
-  (() => {
-    // ------- minimal demo GL scene (placeholder) -------
+    const BodySegmenter = {
+      segmenter: null, lastResult: null, isReady: false, isBusy: false, lastUpdateTime: 0, minInterval: 60,
+      async init() {
+        if (this.isReady) return true;
+        try {
+          this.segmenter = new window.SelfieSegmentation({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}` });
+          this.segmenter.setOptions({ modelSelection: 1 });
+          this.segmenter.onResults(res => { this.lastResult = res.segmentationMask; this.isBusy = false; });
+          await this.segmenter.initialize();
+          this.isReady = true; return true;
+        } catch (err) { console.error("Selfie Segmentation failed:", err); return false; }
+      },
+      update(video) {
+        const now = performance.now();
+        if (this.isReady && !this.isBusy && (now - this.lastUpdateTime) > this.minInterval) {
+          this.isBusy = true; this.lastUpdateTime = now;
+          this.segmenter.send({ image: video });
+        }
+      }
+    };
+
+    // --- MAIN APP LOGIC ---
     const App = {
+      stream: null, rafId: null, channel: null,
       elements: {},
-      state: {
-        showLogos: true,
-      },
+      state: { uniforms: {}, animate: true, mirror: true, useBg: false, bgFile: null },
 
-      init() {
-        this.elements.glcanvas = document.getElementById('glcanvas');
-        this.elements.logoTopLeft = document.getElementById('logoTopLeft');
-        this.elements.logoTopRight = document.getElementById('logoTopRight');
-        this.elements.btnStart = document.getElementById('btnStart');
-        this.elements.btnStop = document.getElementById('btnStop');
-        this.elements.status = document.getElementById('status');
+      async init() {
+        // Get all DOM elements
+        const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
+        ids.forEach(id => this.elements[id] = document.getElementById(id));
 
+        // Setup communication channel
         this.channel = new BroadcastChannel('unknown_signal');
-        this.channel.onmessage = (e)=>this.handleMessage(e.data);
+        this.channel.onmessage = (event) => this.handleMessage(event.data);
+        
+        // Request camera and start processing
+        if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 720, height: 1280 }, audio: false });
+          this.elements.video.srcObject = this.stream;
+          await new Promise(resolve => { this.elements.video.onloadedmetadata = resolve; });
+          await this.elements.video.play();
 
-        this.elements.btnStart.addEventListener('click', async () => {
-          this.elements.status.textContent = 'recording…';
-          this.channel.postMessage({ type:'record_start' });
-        });
-        this.elements.btnStop.addEventListener('click', ()=> {
-          this.elements.status.textContent = 'stopping…';
-          this.stopRecording();
-        });
+          // Initialize WebGL Renderer
+          const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
+          Renderer.init(this.elements.glcanvas, uniformKeys);
+          Renderer.fit(this.elements.video);
 
-        this.setupCanvas();
-        this.render();
-      },
+          // Initialize Body Segmenter
+          await BodySegmenter.init();
 
-      setupCanvas() {
-        const c = this.elements.glcanvas;
-        const ctx = c.getContext('2d');
-        this._ctx2d = ctx;
-        this._t0 = performance.now();
-      },
-
-      render() {
-        const ctx = this._ctx2d;
-        const c = this.elements.glcanvas;
-        const t = (performance.now() - this._t0)/1000;
-        ctx.clearRect(0,0,c.width,c.height);
-        // simple animated background
-        const g = ctx.createLinearGradient(0,0,c.width,c.height);
-        g.addColorStop(0, `hsl(${(t*20)%360} 80% 50%)`);
-        g.addColorStop(1, `hsl(${((t*20)+120)%360} 80% 50%)`);
-        ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height);
-        // text
-        ctx.fillStyle = 'rgba(0,0,0,.2)';
-        ctx.font = '80px system-ui, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('PREVIEW', c.width/2, c.height/2);
-        requestAnimationFrame(this.render.bind(this));
-      },
-
-      handleMessage(data) {
-        if (data.type === 'record_start') {
-          // host asked us to record for some time / until stop
-          this.recordCanvasFiveSeconds(/* preferMp4: */ true).then(({blob,mime}) => {
-            this.channel.postMessage({ type:'recording_complete', payload:{ blob }});
-            this.elements.status.textContent = 'done';
-          }).catch(err => {
-            this.channel.postMessage({ type:'recording_error', payload:{ message:String(err) }});
-            this.elements.status.textContent = 'error';
-          });
-        } else if (data.type === 'record_stop') {
-          this.stopRecording();
-        } else if (data.type === 'state_update') {
-          const st = data.payload || {};
-          this.state.showLogos = !!(st.checkboxes?.logoChk ?? true);
+          // Start the main render loop
+          this.loop();
+        } catch (err) {
+          console.error(err);
+          alert(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
         }
       },
 
-      // Recording function used by Controls
+      handleMessage(data) {
+        if (data.type === 'state_update') {
+          this.state = { ...this.state, ...data.payload };
+          this.updateUI();
+        } else if (data.type === 'start_recording') {
+            this.record(data.payload);
+        }
+      },
+      
+      async record({ preferMp4 }) {
+          try {
+              const { blob } = await this.recordCanvasFiveSeconds(preferMp4);
+              this.channel.postMessage({ type: 'recording_complete', payload: { blob } });
+          } catch(e) {
+              console.error("Recording failed:", e);
+              this.channel.postMessage({ type: 'recording_error', payload: { message: String(e) } });
+          }
+      },
+
+      updateUI() {
+        // Update canvas mirroring
+        this.elements.glcanvas.style.transform = this.state.mirror ? 'scaleX(-1)' : 'none';
+        
+        // Update background media
+        if (this.state.bgFile && this.state.bgFile.url) {
+            const { url, type } = this.state.bgFile;
+            if (type.startsWith('image/')) {
+                this.elements.backgroundImage.src = url;
+                this.elements.backgroundImage.classList.remove('hidden');
+                this.elements.backgroundMedia.classList.add('hidden');
+                this.elements.backgroundMedia.pause();
+            } else if (type.startsWith('video/')) {
+                this.elements.backgroundMedia.src = url;
+                this.elements.backgroundMedia.play();
+                this.elements.backgroundMedia.classList.remove('hidden');
+                this.elements.backgroundImage.classList.add('hidden');
+            }
+        }
+        
+        // Show/hide logos based on state
+        this.elements.logoTopLeft.classList.toggle('hidden', !this.state.showLogos);
+        this.elements.logoTopRight.classList.toggle('hidden', !this.state.showLogos);
+      },
+
+      loop(time) {
+        this.rafId = requestAnimationFrame(t => this.loop(t));
+        const video = this.elements.video;
+        if (!video.videoWidth || !Renderer.gl) return;
+        
+        Renderer.fit(video);
+        BodySegmenter.update(video);
+        Renderer.drawMask(video, BodySegmenter.lastResult);
+        
+        const backgroundEl = !this.elements.backgroundImage.classList.contains('hidden')
+            ? this.elements.backgroundImage
+            : this.elements.backgroundMedia;
+
+        Renderer.render({
+          video: video,
+          t: this.state.animate ? time / 1000 : 0,
+          uniforms: this.state.uniforms,
+          backgroundMedia: backgroundEl,
+          useBg: this.state.useBg
+        });
+      },
+      
+      // Recording function, adapted to be in this window
       async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
         const logoTopRight = this.elements.logoTopRight;
-
         const compositeCanvas = document.createElement('canvas');
         compositeCanvas.width = glCanvas.width;
         compositeCanvas.height = glCanvas.height;
         const ctx = compositeCanvas.getContext('2d');
-
-        // 30fps capture
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
-
         const optionsList = [
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-
-        // ✅ FIXED: 'codeacs' → 'codecs'
-        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=h264' });
-
+        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codeacs=h264' });
         let rec = null, mime = '';
         for (const opt of optionsList) {
-          try {
-            if (MediaRecorder.isTypeSupported(opt.mimeType)) {
-              rec = new MediaRecorder(stream, opt);
-              mime = rec.mimeType;
-              break;
-            }
-          } catch {}
+          if (MediaRecorder.isTypeSupported(opt.mimeType)) {
+            rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
+          }
         }
         if (!rec) throw new Error('MediaRecorder unavailable');
-
+        
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;
-
           function drawCompositeFrame() {
             if (stopped) return;
             ctx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
             ctx.drawImage(glCanvas, 0, 0);
-            if (App.state.showLogos) {
+            if(App.state.showLogos) {
               const logo1Width = logoTopLeft.naturalWidth * 0.75;
               const logo1Height = logoTopLeft.naturalHeight * 0.75;
-              ctx.drawImage(logoTopLeft, 20, 20, logo1Width, logo1Height);
-
-              const logo2Width = logoTopRight.naturalWidth * 0.75;
-              const logo2Height = logoTopRight.naturalHeight * 0.75;
-              ctx.drawImage(logoTopRight, compositeCanvas.width - 20 - logo2Width, 20, logo2Width, logo2Height);
+              ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
+              const logo2Width = logoTopRight.videoWidth * 0.75;
+              const logo2Height = logoTopRight.videoHeight * 0.75;
+              ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
             }
             rafId = requestAnimationFrame(drawCompositeFrame);
           }
-
-          rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-          rec.onerror = (e) => { stopped = true; if (rafId) cancelAnimationFrame(rafId); reject(e.error || e); };
+          rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+          rec.onerror = e => { if (!stopped) { stopped = true; cancelAnimationFrame(rafId); reject(e.error || e); } };
           rec.onstop = () => {
-            stopped = true;
-            if (rafId) cancelAnimationFrame(rafId);
+            stopped = true; cancelAnimationFrame(rafId);
+            try { stream.getTracks().forEach(t => t.stop()); } catch {}
             resolve({ blob: new Blob(chunks, { type: mime }), mime });
           };
+          
+          // --- KEY CHANGES START HERE ---
 
-          rec.start();
-
+          // 1. Start the drawing loop FIRST to ensure the canvas is live.
           drawCompositeFrame();
 
-          // stop when host sends stop, or after 5 seconds (safety)
-          setTimeout(() => { try { rec.stop(); } catch {} }, 5000);
+          // 2. Wait 100 milliseconds before starting the recorder.
+          //    This gives the loop time to draw a few frames.
+          setTimeout(() => {
+            rec.start();
+          }, 100);
 
-          this._activeRecorder = rec;
-          this._stopComposite = () => { try { rec.stop(); } catch {} };
+          // 3. Adjust the stop timer to account for the 100ms startup delay,
+          //    ensuring the final recording is still 5 seconds long.
+          setTimeout(() => { 
+            try { rec.stop(); } catch {} 
+          }, 5100); 
+
+          // --- KEY CHANGES END HERE ---
         });
-      },
-
-      stopRecording() {
-        if (this._stopComposite) this._stopComposite();
-        this.channel?.postMessage({ type:'record_stop_ack' });
       }
     };
 
+    // --- Entry Point ---
     window.addEventListener('load', () => App.init());
-  })();
-  </script>
+})();
+</script>
 </body>
 </html>
