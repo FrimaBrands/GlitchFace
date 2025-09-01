@@ -39,15 +39,12 @@
     <script>
         // --- Window Management Script ---
         // This script opens the control and preview windows.
-        // It's recommended to have the preview on a second monitor if available.
 
         document.getElementById('openPreview').addEventListener('click', () => {
-            // Opens the preview window. Dimensions can be adjusted.
             window.open('preview.html', 'previewWindow', 'width=1280,height=720,noopener,noreferrer');
         });
 
         document.getElementById('openControls').addEventListener('click', () => {
-            // Opens the controls window.
             window.open('controls.html', 'controlsWindow', 'width=450,height=900,noopener,noreferrer');
         });
     </script>

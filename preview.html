@@ -6,7 +6,6 @@
   <title>U N K N O W N // Preview</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
   <style>
-    /* Basic styles to ensure the canvas fills the window */
     body, html {
         margin: 0;
         padding: 0;
@@ -27,7 +26,6 @@
         height: 100%;
         max-width: 100%;
     }
-    /* All visual elements are absolutely positioned to layer correctly inside the container */
     #backgroundMedia, #backgroundImage, #glcanvas {
         position: absolute;
         top: 0;
@@ -36,17 +34,15 @@
         height: 100%;
         object-fit: cover;
     }
-    /* Logos are positioned at the corners of the video container */
     #logoTopLeft, #logoTopRight {
         position: absolute;
         z-index: 10;
         transform-origin: top left;
-        transform: scale(0.5); /* Adjusted scale to match recording */
+        transform: scale(0.5); 
         pointer-events: none;
     }
     #logoTopLeft { top: 0; left: 0; }
     #logoTopRight { top: 0; right: 0; transform-origin: top right; }
-    /* Hidden video element for camera input */
     .hidden { display: none; }
   </style>
 </head>
@@ -64,10 +60,7 @@
   </div>
 
 <script>
-// --- This script is for the PREVIEW window only ---
-// It handles rendering, body segmentation, and listens for state updates.
 (() => {
-    // --- SHADER DEFINITIONS ---
     const vertSrc = `
       attribute vec2 a_pos;
       varying vec2 v_uv;
@@ -295,22 +288,18 @@
       }
     };
 
-    // --- MAIN APP LOGIC ---
     const App = {
       stream: null, rafId: null, channel: null,
       elements: {},
       state: { uniforms: {}, animate: true, mirror: true, useBg: false, bgFile: null },
 
       async init() {
-        // Get all DOM elements
         const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
 
-        // Setup communication channel
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
         
-        // Request camera and start processing
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
           this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 720, height: 1280 }, audio: false });
@@ -318,15 +307,12 @@
           await new Promise(resolve => { this.elements.video.onloadedmetadata = resolve; });
           await this.elements.video.play();
 
-          // Initialize WebGL Renderer
           const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
           Renderer.init(this.elements.glcanvas, uniformKeys);
           Renderer.fit(this.elements.video);
 
-          // Initialize Body Segmenter
           await BodySegmenter.init();
 
-          // Start the main render loop
           this.loop();
         } catch (err) {
           console.error(err);
@@ -354,10 +340,8 @@
       },
 
       updateUI() {
-        // Update canvas mirroring
         this.elements.glcanvas.style.transform = this.state.mirror ? 'scaleX(-1)' : 'none';
         
-        // Update background media
         if (this.state.bgFile && this.state.bgFile.url) {
             const { url, type } = this.state.bgFile;
             if (type.startsWith('image/')) {
@@ -373,7 +357,6 @@
             }
         }
         
-        // Show/hide logos based on state
         this.elements.logoTopLeft.classList.toggle('hidden', !this.state.showLogos);
         this.elements.logoTopRight.classList.toggle('hidden', !this.state.showLogos);
       },
@@ -400,7 +383,6 @@
         });
       },
       
-      // Recording function, adapted to be in this window
       async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -447,30 +429,19 @@
             try { stream.getTracks().forEach(t => t.stop()); } catch {}
             resolve({ blob: new Blob(chunks, { type: mime }), mime });
           };
-          
-          // --- KEY CHANGES START HERE ---
 
-          // 1. Start the drawing loop FIRST to ensure the canvas is live.
           drawCompositeFrame();
-
-          // 2. Wait 100 milliseconds before starting the recorder.
-          //    This gives the loop time to draw a few frames.
           setTimeout(() => {
             rec.start();
           }, 100);
 
-          // 3. Adjust the stop timer to account for the 100ms startup delay,
-          //    ensuring the final recording is still 5 seconds long.
           setTimeout(() => { 
             try { rec.stop(); } catch {} 
           }, 5100); 
-
-          // --- KEY CHANGES END HERE ---
         });
       }
     };
 
-    // --- Entry Point ---
     window.addEventListener('load', () => App.init());
 })();
 </script>

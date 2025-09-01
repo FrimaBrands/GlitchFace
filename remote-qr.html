@@ -57,14 +57,13 @@
     }
     .hebrew-prompt {
       font-size: 2rem;
-      margin-bottom: -10px; /* Adjust spacing */
+      margin-bottom: -10px; 
     }
     .qr-container {
       position: relative;
       padding: 20px;
       background: #fff;
     }
-    /* Animated scanner corners */
     .qr-container::before,
     .qr-container::after {
       content: '';
@@ -93,7 +92,6 @@
       75% { transform: translate(-5px, -5px); }
     }
     #q {
-      /* The QRCode.js library will insert a canvas or img here */
     }
     .muted { 
       color: #888;
@@ -110,7 +108,7 @@
         position: fixed;
         bottom: 20px;
         left: 20px;
-        width: 150px; /* Adjust size as needed */
+        width: 150px; 
         height: auto;
     }
   </style>
@@ -128,7 +126,6 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
-    // --- All JavaScript functionality remains unchanged. ---
     const target = new URLSearchParams(location.search).get('target');
     const qrHolder = document.getElementById('q');
     const linkHolder = document.getElementById('small');
@@ -152,7 +149,6 @@
       generateQR(target);
     }
   
-    // Allow the host page to update the QR code without closing this window.
     window.addEventListener('message', (ev) => {
       const data = ev.data || {};
       if (data.type !== 'updateTarget' || !data.target) return;

@@ -42,7 +42,6 @@
       --text-color: #EAEAEA;
       --accent-color: #FFFFFF;
       --dim-color: #555555;
-      /* UPDATED: Changed to a more vibrant, mysterious red */
       --error-color: #FF073A;
       --recording-color: #FF073A;
     }
@@ -57,7 +56,7 @@
       background: var(--bg-color);
       color: var(--text-color);
       display: flex;
-      align-items: flex-start; /* Changed from center to ensure top is not cropped */
+      align-items: flex-start; 
       justify-content: center;
       text-align: center;
       padding: 20px;
@@ -75,10 +74,9 @@
       max-width: 320px;
       height: auto;
       margin: 0 auto;
-      cursor: pointer; /* Added cursor to indicate it's clickable */
+      cursor: pointer; 
     }
 
-    /* --- Record Button & Animation --- */
     #record-button-area {
       margin: 20px auto;
     }
@@ -89,7 +87,6 @@
         padding: 0;
         background-color: var(--recording-color);
         border: 2px solid rgba(0,0,0,0.5);
-        /* UPDATED: Shadow uses the new vibrant red's RGB values */
         box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 7, 58, 0.5);
         border-radius: 50%;
         color: var(--accent-color);
@@ -100,10 +97,8 @@
         justify-content: center;
     }
     .record-button:not(:disabled):hover {
-        /* UPDATED: A lighter shade of the new vibrant red for hover */
-        background-color: #ff3d67;
-        /* UPDATED: Hover shadow uses new vibrant red's RGB values */
-        box-shadow: 0 0 0 3px #ff3d67, 0 0 35px rgba(255, 61, 103, 0.7);
+        background-color: #FF073A;
+        box-shadow: 0 0 0 3px #FF073A, 0 0 35px rgba(255, 61, 103, 0.7);
         transform: scale(1.02);
     }
     .record-button:not(:disabled):active {
@@ -111,7 +106,7 @@
         transition: transform 0.1s;
     }
     .record-button:disabled {
-        background-color: #4d0210; /* Darker shade of new red */
+        background-color: #4d0210;
         box-shadow: none;
         opacity: 1;
         cursor: not-allowed;
@@ -145,7 +140,6 @@
     }
     .progress-ring {
         position: absolute;
-        /* FIXED: Replaced top/left positioning with transform for better centering */
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
@@ -167,7 +161,6 @@
         transition: stroke-dashoffset 0.3s ease;
     }
     .record-button.is-recording {
-        /* UPDATED: Slower, more 'breathing' animation */
         box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 7, 58, 0.7);
         animation: pulse 2.5s infinite ease-in-out;
         background-color: #000;
@@ -189,7 +182,6 @@
     .record-button.is-recording .progress-ring__circle-bg {
         opacity: 0.3;
     }
-    /* UPDATED: Slower, more intense pulse for a mysterious "breathing" effect */
     @keyframes pulse {
       0% { box-shadow: 0 0 0 2px var(--recording-color), 0 0 20px rgba(255, 7, 58, 0.5); }
       50% { box-shadow: 0 0 0 4px var(--recording-color), 0 0 50px rgba(255, 7, 58, 1); }
@@ -200,10 +192,8 @@
         50% { transform: scale(1.05); }
     }
     
-    /* --- Status and Progress --- */
     .status-area {
-      min-height: 40px; /* Reduced height */
-      /* CHANGED: Status area is now hidden by default */
+      min-height: 40px; 
       display: none;
       flex-direction: column;
       align-items: center;
@@ -230,7 +220,6 @@
     progress::-webkit-progress-value { background-color: var(--accent-color); transition: width 0.1s linear; }
     progress::-moz-progress-bar { background-color: var(--accent-color); }
 
-    /* --- Result Area --- */
     .result-area {
       width: 100%;
       display: none;
@@ -248,7 +237,6 @@
     }
     video { width: 100%; border: 1px solid var(--dim-color); }
     
-    /* UPDATED: Download button is now white */
     a.dl {
       display: inline-block;
       width: 100%;
@@ -268,7 +256,6 @@
       color: var(--accent-color);
     }
     
-    /* UPDATED: Reset button is now black/transparent */
     .reset-button {
         width: 100%;
         padding: 10px 16px;
@@ -340,7 +327,6 @@
       resetBtn: document.getElementById('resetBtn')
     };
 
-    // ADDED: Secret toggle for the status area
     const logo = document.querySelector('.title-logo');
     let clickCount = 0;
     let clickTimer = null;
