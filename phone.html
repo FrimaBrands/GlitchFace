@@ -301,20 +301,20 @@
               <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
           </svg>
           <div class="record-button__content">
-            <span id="startBtnText" class="record-button__text">CONNECTING</span>
+            <span id="startBtnText" class="record-button__text">מתחבר</span>
             <span id="startBtnSubtext" class="record-button__subtext"></span>
           </div>
       </button>
     </div>
     
     <div id="result-area" class="result-area">
-      <a id="download" class="dl" href="#" download>Download Video</a>
+      <a id="download" class="dl" href="#" download>הורדת סרטון</a>
       <video id="preview" controls playsinline></video>
-      <button id="resetBtn" class="reset-button">Record Another</button>
+      <button id="resetBtn" class="reset-button">הקלטה חדשה</button>
     </div>
 
     <div class="status-area">
-      <div id="statusLine" class="status-text">Initializing…</div>
+      <div id="statusLine" class="status-text">מאתחל</div>
       <div id="progress-container">
         <progress id="progress" value="0" max="100"></progress>
       </div>
@@ -357,7 +357,7 @@
     function startRecordingAnimation() {
         els.btn.disabled = true;
         els.btn.classList.add('is-recording');
-        els.btnSubtext.textContent = 'RECORDING';
+        els.btnSubtext.textContent = 'מקליט';
         let secondsLeft = 5;
         
         els.btnText.textContent = secondsLeft;
@@ -385,7 +385,7 @@
         
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
-        els.btnText.textContent = 'START';
+        els.btnText.textContent = 'התחלה';
         els.btnSubtext.textContent = '';
 
 
@@ -441,7 +441,7 @@
             updateStatus('Connected. Ready to capture.');
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            els.btnText.textContent = 'START RECORDING';
+            els.btnText.textContent = 'הקלטת סרטון';
           });
 
           conn.on('data', (msg) => {
@@ -478,7 +478,7 @@
                 updateStatus(message, true);
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                els.btnText.textContent = 'RETRY';
+                els.btnText.textContent = 'נסו שוב';
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -487,7 +487,7 @@
             }
           });
 
-          conn.on('close', () => { logMsg('Connection closed.'); updateStatus('Disconnected.', true); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
+          conn.on('close', () => { logMsg('Connection closed.'); updateStatus('Disconnected.', true); els.btn.disabled = true; els.btnText.textContent = 'מנתוק'; });
           conn.on('error', (err) => { logMsg(`Connection error: ${err}`); updateStatus('Connection error.', true); });
         });
         
@@ -504,7 +504,7 @@
             if (els.statusLine.textContent === 'Requesting capture…') {
               updateStatus('Request timed out. Please try again.', true);
               resetUI();
-              els.btnText.textContent = 'RETRY';
+              els.btnText.textContent = 'נסו שוב';
             }
           }, 8000);
         });
