@@ -431,7 +431,7 @@
             updateStatus('חיבור');
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
-            els.btnText.textContent = 'START RECORDING';
+            els.btnText.textContent = 'התחילו הקלטה';
           });
 
           conn.on('data', (msg) => {
@@ -467,7 +467,7 @@
                 updateStatus(message, true);
                 logMsg(`Host sent error: ${data.message}`);
                 resetUI();
-                els.btnText.textContent = 'RETRY';
+                els.btnText.textContent = 'נסו שוב';
               }
             } else {
               chunks.push(new Uint8Array(msg));
@@ -476,7 +476,7 @@
             }
           });
 
-          conn.on('close', () => { logMsg('Connection closed.'); updateStatus('Disconnected.', true); els.btn.disabled = true; els.btnText.textContent = 'OFFLINE'; });
+          conn.on('close', () => { logMsg('Connection closed.'); updateStatus('Disconnected.', true); els.btn.disabled = true; els.btnText.textContent = 'מנותק'; });
           conn.on('error', (err) => { logMsg(`Connection error: ${err}`); updateStatus('Connection error.', true); });
         });
         
@@ -490,10 +490,10 @@
           startRecordingAnimation();
 
           setTimeout(() => { 
-            if (els.statusLine.textContent === 'Requesting capture…') {
+            if (els.statusLine.textContent === 'מבקש הקלטה...') {
               updateStatus('Request timed out. Please try again.', true);
               resetUI();
-              els.btnText.textContent = 'RETRY';
+              els.btnText.textContent = 'נסו שוב';
             }
           }, 8000);
         });
