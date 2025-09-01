@@ -296,7 +296,7 @@
       stream: null, rafId: null, channel: null,
       elements: {},
       state: { uniforms: {}, animate: true, mirror: true, useBg: false, bgFile: null },
-      ffmpeg: null, // ADDED: Property to hold the ffmpeg instance
+      ffmpeg: null, 
 
       async init() {
         const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
@@ -305,8 +305,8 @@
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
         
-        // ADDED: Pre-load ffmpeg for faster use later
-        this.loadFFmpeg();
+        // This now happens lazily inside the record() function to ensure scripts are loaded
+        // this.loadFFmpeg(); 
 
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
@@ -328,20 +328,33 @@
         }
       },
 
-      // ADDED: New helper function to load and prepare FFmpeg
+      // MODIFIED: This function is now more robust and includes error checking
       async loadFFmpeg() {
         if (this.ffmpeg) return;
+
+        // Check if the global FFmpeg object exists. This is the crucial fix.
+        if (!window.FFmpeg || !window.FFmpegUtil) {
+            const errorMsg = "FFmpeg library failed to load from the CDN. This may be due to a network issue or a content blocker (like an ad-blocker). Please check your internet connection and disable any blockers that may be interfering with unpkg.com.";
+            console.error(errorMsg);
+            alert(errorMsg); // Also alert the operator
+            throw new Error(errorMsg);
+        }
+
         const { FFmpeg } = window.FFmpeg;
         const { toBlobURL } = window.FFmpegUtil;
+        
         this.ffmpeg = new FFmpeg();
+        
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
         this.ffmpeg.on('log', ({ message }) => {
             console.log('[FFMPEG]', message);
         });
+
         await this.ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
         });
+
         console.log('FFmpeg loaded and ready.');
       },
 
@@ -350,14 +363,18 @@
           this.state = { ...this.state, ...data.payload };
           this.updateUI();
         } else if (data.type === 'start_recording') {
-            // MODIFIED: No longer needs a payload
             this.record();
         }
       },
       
-      // MODIFIED: This function now handles the full record -> transcode -> send pipeline
       async record() {
           try {
+              // Load FFmpeg on demand, right before it's needed. This is safer.
+              if (!this.ffmpeg) {
+                  console.log("Loading FFmpeg on demand...");
+                  await this.loadFFmpeg();
+              }
+
               console.log("Starting recording process...");
               const { blob, mime } = await this.recordCanvasFiveSeconds();
               console.log(`Recording complete. Original format: ${mime}, size: ${blob.size} bytes.`);
@@ -373,10 +390,9 @@
           }
       },
 
-      // ADDED: New function to handle transcoding
       async transcodeToMp4(webmBlob) {
         if (!this.ffmpeg || !this.ffmpeg.loaded) {
-            await this.loadFFmpeg();
+          throw new Error("FFmpeg is not loaded, cannot transcode.");
         }
         
         const inFilename = 'input.webm';
@@ -444,7 +460,6 @@
         });
       },
       
-      // MODIFIED: This function now reliably records to WebM format
       async recordCanvasFiveSeconds() {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -456,7 +471,6 @@
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
         
-        // MODIFIED: Simplified options list to reliably get WebM
         const optionsList = [
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_500_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_500_000 },
