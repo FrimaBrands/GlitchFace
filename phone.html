@@ -76,11 +76,6 @@
       height: auto;
       margin: 0 auto;
     }
-    .instructions {
-      font-size: 0.9rem;
-      color: var(--dim-color);
-      line-height: 1.6;
-    }
 
     /* --- Record Button & Animation --- */
     #record-button-area {
@@ -171,7 +166,6 @@
     .record-button.is-recording {
         /* UPDATED: Slower, more 'breathing' animation */
         box-shadow: 0 0 0 2px var(--recording-color), 0 0 25px rgba(255, 7, 58, 0.7);
-        animation: pulse 2.5s infinite ease-in-out;
         background-color: #000;
     }
     .record-button.is-recording .record-button__text {
@@ -292,7 +286,6 @@
 <body>
   <div class="container">
     <img src="UnkownLogoHQ.gif" alt="UNKNOWN" class="title-logo" />
-    <p id="instructions" class="instructions">Tap to record a 5 second video</p>
     
     <div id="record-button-area">
       <button id="startBtn" class="record-button" disabled>
@@ -301,20 +294,20 @@
               <circle class="progress-ring__circle" stroke-width="4" fill="transparent" r="80" cx="84" cy="84"/>
           </svg>
           <div class="record-button__content">
-            <span id="startBtnText" class="record-button__text">CONNECTING</span>
+            <span id="startBtnText" class="record-button__text">מתחבר</span>
             <span id="startBtnSubtext" class="record-button__subtext"></span>
           </div>
       </button>
     </div>
     
     <div id="result-area" class="result-area">
-      <a id="download" class="dl" href="#" download>Download Video</a>
+      <a id="download" class="dl" href="#" download>הורדת סרטון</a>
       <video id="preview" controls playsinline></video>
-      <button id="resetBtn" class="reset-button">Record Another</button>
+      <button id="resetBtn" class="reset-button">הקלטה חדשה</button>
     </div>
 
     <div class="status-area">
-      <div id="statusLine" class="status-text">Initializing…</div>
+      <div id="statusLine" class="status-text">מאתחל</div>
       <div id="progress-container">
         <progress id="progress" value="0" max="100"></progress>
       </div>
@@ -337,7 +330,6 @@
       dl: document.getElementById('download'),
       video: document.getElementById('preview'),
       debug: document.getElementById('debugLog'),
-      instructions: document.getElementById('instructions'),
       resultArea: document.getElementById('result-area'),
       recordArea: document.getElementById('record-button-area'),
       resetBtn: document.getElementById('resetBtn')
@@ -357,7 +349,7 @@
     function startRecordingAnimation() {
         els.btn.disabled = true;
         els.btn.classList.add('is-recording');
-        els.btnSubtext.textContent = 'RECORDING';
+        els.btnSubtext.textContent = 'מקליט';
         let secondsLeft = 5;
         
         els.btnText.textContent = secondsLeft;
@@ -381,11 +373,9 @@
         els.video.src = '';
         els.dl.href = '#';
         els.recordArea.style.display = 'block';
-        els.instructions.style.display = 'block';
-        
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
-        els.btnText.textContent = 'START';
+        els.btnText.textContent = 'התחילו';
         els.btnSubtext.textContent = '';
 
 
@@ -393,7 +383,7 @@
         els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
         setRingProgress(0);
         
-        updateStatus('Connected. Ready to capture.');
+        updateStatus('חיבור הוצלח, מוכן להקלטה.');
         els.progressContainer.style.display = 'none';
         els.progress.value = 0;
     }
@@ -416,8 +406,8 @@
         const token = new URLSearchParams(location.search).get('token');
 
         if (!hostId || !token) {
-          updateStatus('ERROR: Invalid link. Please re-scan the QR code.', true);
-          logMsg('Error: Missing host or token in URL.');
+          updateStatus('שגיאה. סרקו מחדש את הברקוד.', true);
+          logMsg('שגיאה. סרקו מחדש את הברקוד.');
           return;
         }
 
@@ -438,7 +428,7 @@
 
           conn.on('open', () => {
             logMsg('Connection established with host!');
-            updateStatus('Connected. Ready to capture.');
+            updateStatus('חיבור');
             conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
             els.btnText.textContent = 'START RECORDING';
@@ -464,7 +454,6 @@
                 els.video.src = url; 
                 
                 els.recordArea.style.display = 'none';
-                els.instructions.style.display = 'none';
                 els.resultArea.style.display = 'flex';
                 
                 els.progress.value = 100;
