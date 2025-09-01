@@ -76,11 +76,6 @@
       height: auto;
       margin: 0 auto;
     }
-    .instructions {
-      font-size: 0.9rem;
-      color: var(--dim-color);
-      line-height: 1.6;
-    }
 
     /* --- Record Button & Animation --- */
     #record-button-area {
@@ -292,7 +287,6 @@
 <body>
   <div class="container">
     <img src="UnkownLogoHQ.gif" alt="UNKNOWN" class="title-logo" />
-    <p id="instructions" class="instructions">Tap to record a 5 second video</p>
     
     <div id="record-button-area">
       <button id="startBtn" class="record-button" disabled>
@@ -337,7 +331,6 @@
       dl: document.getElementById('download'),
       video: document.getElementById('preview'),
       debug: document.getElementById('debugLog'),
-      instructions: document.getElementById('instructions'),
       resultArea: document.getElementById('result-area'),
       recordArea: document.getElementById('record-button-area'),
       resetBtn: document.getElementById('resetBtn')
@@ -381,7 +374,6 @@
         els.video.src = '';
         els.dl.href = '#';
         els.recordArea.style.display = 'block';
-        els.instructions.style.display = 'block';
         
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
@@ -464,7 +456,6 @@
                 els.video.src = url; 
                 
                 els.recordArea.style.display = 'none';
-                els.instructions.style.display = 'none';
                 els.resultArea.style.display = 'flex';
                 
                 els.progress.value = 100;
