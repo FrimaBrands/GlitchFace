@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>U N K N O W N // Preview</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
-  
-  <script src="ffmpeg.js"></script>
-  <script src="ffmpeg-util.js"></script>
-
   <style>
     body, html {
         margin: 0;
@@ -65,7 +61,6 @@
 
 <script>
 (() => {
-    // --- SHADER CODE (Unchanged) ---
     const vertSrc = `
       attribute vec2 a_pos;
       varying vec2 v_uv;
@@ -73,6 +68,7 @@
         v_uv = a_pos;
         gl_Position = vec4(a_pos * 2.0 - 1.0, 0.0, 1.0);
       }`;
+
     const fragSrc = `
       precision highp float;
       varying vec2 v_uv;
@@ -181,7 +177,7 @@
         gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
       }`;
     
-    // --- MODULES (Unchanged) ---
+    // --- MODULES ---
     const Renderer = {
       gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
       maskCanvas: document.createElement('canvas'),
@@ -270,6 +266,7 @@
         [this.textures.feedbackA, this.textures.feedbackB] = [this.textures.feedbackB, this.textures.feedbackA];
       }
     };
+
     const BodySegmenter = {
       segmenter: null, lastResult: null, isReady: false, isBusy: false, lastUpdateTime: 0, minInterval: 60,
       async init() {
@@ -291,12 +288,10 @@
       }
     };
 
-    // --- MAIN APP LOGIC (Final Version) ---
     const App = {
       stream: null, rafId: null, channel: null,
       elements: {},
       state: { uniforms: {}, animate: true, mirror: true, useBg: false, bgFile: null },
-      ffmpeg: null, 
 
       async init() {
         const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
@@ -304,7 +299,7 @@
 
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
-
+        
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
           this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 720, height: 1280 }, audio: false });
@@ -324,92 +319,24 @@
           alert(`Camera error: ${(err.name === 'NotAllowedError') ? 'Permission denied.' : err.message}`);
         }
       },
-      
-      async loadFFmpeg() {
-        if (this.ffmpeg) return;
-
-        if (!window.FFmpeg || !window.FFmpegUtil) {
-            const errorMsg = "FFmpeg library failed to load. This may be due to a network issue or a content blocker (like an ad-blocker). Please check your internet connection and disable any blockers.";
-            console.error(errorMsg);
-            alert(errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        const { FFmpeg } = window.FFmpeg;
-        const { toBlobURL } = window.FFmpegUtil;
-        
-        this.ffmpeg = new FFmpeg();
-        
-        // MODIFIED: baseURL now points to the local folder
-        const baseURL = '.'; 
-        
-        this.ffmpeg.on('log', ({ message }) => {
-            console.log('[FFMPEG]', message);
-        });
-
-        await this.ffmpeg.load({
-            coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-            wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-
-        console.log('FFmpeg loaded and ready.');
-      },
 
       handleMessage(data) {
         if (data.type === 'state_update') {
           this.state = { ...this.state, ...data.payload };
           this.updateUI();
         } else if (data.type === 'start_recording') {
-            this.record();
+            this.record(data.payload);
         }
       },
       
-      async record() {
+      async record({ preferMp4 }) {
           try {
-              if (!this.ffmpeg) {
-                  console.log("Loading FFmpeg on demand...");
-                  await this.loadFFmpeg();
-              }
-
-              console.log("Starting recording process...");
-              const { blob, mime } = await this.recordCanvasFiveSeconds();
-              console.log(`Recording complete. Original format: ${mime}, size: ${blob.size} bytes.`);
-
-              console.log("Transcoding to MP4...");
-              const mp4Blob = await this.transcodeToMp4(blob);
-              console.log(`Transcoding complete. MP4 size: ${mp4Blob.size} bytes.`);
-              
-              this.channel.postMessage({ type: 'recording_complete', payload: { blob: mp4Blob } });
+              const { blob } = await this.recordCanvasFiveSeconds(preferMp4);
+              this.channel.postMessage({ type: 'recording_complete', payload: { blob } });
           } catch(e) {
-              console.error("Recording or Transcoding failed:", e);
+              console.error("Recording failed:", e);
               this.channel.postMessage({ type: 'recording_error', payload: { message: String(e) } });
           }
-      },
-
-      async transcodeToMp4(webmBlob) {
-        if (!this.ffmpeg || !this.ffmpeg.loaded) {
-          throw new Error("FFmpeg is not loaded, cannot transcode.");
-        }
-        
-        const inFilename = 'input.webm';
-        const outFilename = 'output.mp4';
-        
-        await this.ffmpeg.writeFile(inFilename, new Uint8Array(await webmBlob.arrayBuffer()));
-
-        await this.ffmpeg.exec([
-            '-i', inFilename,
-            '-c:v', 'libx264',
-            '-preset', 'ultrafast',
-            '-vf', 'format=yuv420p',
-            '-movflags', '+faststart',
-            outFilename
-        ]);
-
-        const data = await this.ffmpeg.readFile(outFilename);
-        await this.ffmpeg.deleteFile(inFilename);
-        await this.ffmpeg.deleteFile(outFilename);
-        
-        return new Blob([data.buffer], { type: 'video/mp4' });
       },
 
       updateUI() {
@@ -456,7 +383,7 @@
         });
       },
       
-      async recordCanvasFiveSeconds() {
+      async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
         const logoTopRight = this.elements.logoTopRight;
@@ -466,23 +393,18 @@
         const ctx = compositeCanvas.getContext('2d');
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
-        
         const optionsList = [
-          { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_500_000 },
-          { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_500_000 },
-          { mimeType: 'video/webm' }
+          { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
+          { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-
+        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codeacs=h264' });
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
-            rec = new MediaRecorder(stream, opt); 
-            mime = rec.mimeType; 
-            console.log(`Using supported mimeType: ${mime}`);
-            break;
+            rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
           }
         }
-        if (!rec) throw new Error('MediaRecorder unavailable or no supported WebM format found.');
+        if (!rec) throw new Error('MediaRecorder unavailable');
         
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;

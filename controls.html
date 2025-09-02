@@ -98,7 +98,6 @@
 
 <script>
 (() => {
-    // --- UI and PresetManager Objects (Unchanged) ---
     const UI = {
       elements: {}, state: { ui: {}, jitter: {} }, globalState: { ui: {} },
       definitions: {}, globalDefinitions: {},
@@ -174,6 +173,7 @@
       setStatus(text, isError = false) { this.elements.statusBar.textContent = `STATUS: ${text}`; this.elements.statusBar.classList.toggle('error', isError); },
       setMsg(text) { this.elements.msg.textContent = text; }
     };
+
     const PresetManager = {
       init() {
         this.populateList();
@@ -242,6 +242,7 @@
         UI.setMsg('Parameters randomized!'); App.broadcastState();
       }
     };
+
     const App = {
       channel: null, definitions: {}, globalDefinitions: {}, rafId: null,
       lastRandomizeTime: 0, lastPresetIterateTime: 0, currentPresetIndex: 0,
@@ -344,7 +345,6 @@
       }
     };
     
-    // --- Remote Object (Modified) ---
     const Remote = {
         peer: null, connections: new Map(), sessionToken: null, armed: false, isRecording: false,
         activeConnection: null, 
@@ -422,25 +422,23 @@
                 const data = typeof msg === 'string' ? JSON.parse(msg) : msg;
                 if (data.type === 'hello') {
                     if (data.token !== this.sessionToken) { conn.send(JSON.stringify({ type:'error', message: 'Invalid token.' })); setTimeout(() => { try { conn.close(); } catch {} }, 100); return; }
+                    conn.capabilities = { supportsWebM: !!data.supportsWebM };
                     conn.send(JSON.stringify({ type:'helloAck', ok:true }));
                 } else if (data.type === 'startRecording') {
                     if (!this.armed) return conn.send(JSON.stringify({ type: 'error', message: 'Remote not armed.' }));
                     if (this.isRecording) return conn.send(JSON.stringify({ type: 'error', message: 'Host busy.' }));
                     this.isRecording = true; this.activeConnection = conn; this.updateStatus();
-                    // MODIFIED: No longer need to check capabilities, just send the request
-                    App.channel.postMessage({ type: 'start_recording', payload: {} });
+                    const preferMp4 = conn.capabilities ? !conn.capabilities.supportsWebM : false;
+                    App.channel.postMessage({ type: 'start_recording', payload: { preferMp4 } });
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
         },
         async handleRecordingBlob(blob) {
             const conn = this.activeConnection;
             if (!conn) { this.isRecording = false; this.updateStatus(); return; }
-            
-            // MODIFIED: The blob is now always an MP4
-            const mime = 'video/mp4';
+            const { type: mime } = blob;
             const arrayBuf = await blob.arrayBuffer(); const total = arrayBuf.byteLength;
-            const filename = `unknown_${Date.now()}.mp4`; // Always use .mp4 extension
-            
+            const filename = `unknown_${Date.now()}.${mime.includes('mp4')?'mp4':'webm'}`;
             conn.send(JSON.stringify({ type:'recordingMeta', mime, totalBytes: total, filename }));
             const CHUNK = 64 * 1024; let sent = 0; const channel = conn.dataChannel;
             while (sent < total) {
@@ -466,7 +464,6 @@
         }
     };
 
-    // --- Definitions and Initialization (Unchanged) ---
     const definitions = {
       Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
       Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },

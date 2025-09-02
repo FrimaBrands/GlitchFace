@@ -420,6 +420,7 @@
           return;
         }
 
+        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
         const chunks = [];
         let expectedBytes = 0, received = 0, mime = 'video/webm', filename = 'capture.webm', conn = null;
 
@@ -437,7 +438,7 @@
           conn.on('open', () => {
             logMsg('Connection established with host!');
             updateStatus('Connected. Ready to capture.');
-            conn.send(JSON.stringify({ type:'hello', token }));
+            conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
             els.btn.disabled = false;
             els.btnText.textContent = 'הקלטת סרטון';
           });
@@ -503,7 +504,7 @@
               resetUI();
               els.btnText.textContent = 'נסו שוב';
             }
-          }, 20000); // Increased timeout
+          }, 8000);
         });
     } catch (e) {
         logMsg(`CRITICAL ERROR: ${e.message}.`);
