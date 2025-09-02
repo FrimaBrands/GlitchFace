@@ -118,7 +118,6 @@
         this.elements.maskFeather.addEventListener('input', () => { this.elements.maskFeatherValue.textContent = parseFloat(this.elements.maskFeather.value).toFixed(3); });
         this.elements.autoRandomizeSlider.addEventListener('input', () => { const val = parseFloat(this.elements.autoRandomizeSlider.value); this.elements.autoRandomizeValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
         this.elements.presetIterationSlider.addEventListener('input', () => { const val = parseFloat(this.elements.presetIterationSlider.value); this.elements.presetIterationValue.textContent = val === 0 ? 'Off' : `${val.toFixed(1)}s`; });
-        // Add change listeners to all inputs to trigger a state broadcast
         document.querySelectorAll('input, select').forEach(el => el.addEventListener('change', () => App.broadcastState()));
         document.querySelectorAll('input[type="range"]').forEach(el => el.addEventListener('input', () => App.broadcastState()));
       },
@@ -190,7 +189,6 @@
       },
       getPresets: () => JSON.parse(localStorage.getItem('bodyGlitchV5.0Presets') || '{}'),
       savePresets: (p) => localStorage.setItem('bodyGlitchV5.0Presets', JSON.stringify(p)),
-      getAppState() { /* This is now handled by App.getCurrentState() */ },
       setAppState(state) {
         if (!state) return;
         if (state.controls) {
@@ -212,7 +210,7 @@
           UI.elements.animateChk.checked = state.checkboxes.animateChk ?? true; UI.elements.mirrorChk.checked  = state.checkboxes.mirrorChk ?? true; UI.elements.useBgChk.checked = state.checkboxes.useBgChk ?? false; UI.elements.logoChk.checked = state.checkboxes.logoChk ?? true;
         }
         if (state.misc) { const featherSlider = UI.elements.maskFeather; if (featherSlider) { featherSlider.value = state.misc.maskFeather ?? '0.15'; featherSlider.dispatchEvent(new Event('input')); } }
-        App.broadcastState(); // Broadcast after loading a preset
+        App.broadcastState();
       },
       populateList() {
         const presets = this.getPresets(); const { presetList } = UI.elements; const currentVal = presetList.value;
@@ -262,7 +260,7 @@
         PresetManager.init();
         UI.elements.bgUpload.addEventListener('change', (e) => this.handleBgUpload(e));
         this.loop();
-        this.broadcastState(); // Initial broadcast
+        this.broadcastState();
       },
 
       handleMessage(data) {
@@ -284,11 +282,9 @@
 
       getCurrentState(forPreset = false) {
         const state = { uniforms: {}, animate: UI.elements.animateChk.checked, mirror: UI.elements.mirrorChk.checked, showLogos: UI.elements.logoChk.checked, useBg: UI.elements.useBgChk.checked };
-        // For presets, we need a different structure
         if (forPreset) {
             state.controls = {}; state.toggles = {}; state.globalControls = {}; state.checkboxes = {}; state.misc = {};
         }
-        // Process randomized controls
         for (const [groupKey, group] of Object.entries(UI.state.ui)) {
             if (forPreset) { state.controls[groupKey] = {}; state.toggles[groupKey] = this.definitions[groupKey].active; }
             const groupIsActive = this.definitions[groupKey].active;
@@ -299,7 +295,6 @@
                 if (forPreset) { state.controls[groupKey][controlKey] = control.value; }
             }
         }
-        // Process global controls
         for (const [groupKey, group] of Object.entries(UI.globalState.ui)) {
             if (forPreset) { state.globalControls[groupKey] = {}; }
             for (const [controlKey, control] of Object.entries(group)) {
@@ -307,7 +302,6 @@
                 if (forPreset) { state.globalControls[groupKey][controlKey] = control.value; }
             }
         }
-        // Add other misc values
         state.uniforms.u_maskFeather = parseFloat(UI.elements.maskFeather.value);
         if (this.bgObjectUrl) { state.bgFile = { url: this.bgObjectUrl, type: UI.elements.bgUpload.files[0].type }; }
 
@@ -355,12 +349,11 @@
       }
     };
 
-    // --- Remote Trigger Module ---
     const Remote = {
         peer: null, connections: new Map(), sessionToken: null, armed: false,
         isRecording: false, isTranscoding: false,
         activeConnection: null,
-        ffmpeg: null, // Holds the FFmpeg instance
+        ffmpeg: null,
         init() {
             const els = { showQR: document.getElementById('remoteShowQR'), reset: document.getElementById('remoteReset'), status: document.getElementById('remoteStatus') };
             els.showQR.addEventListener('click', async () => {
@@ -368,19 +361,18 @@
                 this.openQRWindow();
             });
             els.reset.addEventListener('click', () => this.disarm() );
-            // Pre-load FFmpeg when the module initializes
             this.loadFFmpeg();
         },
         async loadFFmpeg() {
             try {
                 this.ffmpeg = FFmpeg.createFFmpeg({
-                    log: false, // Set to true for debugging transcoder
-                    // MODIFIED: corePath is now relative to the new local ffmpeg folder
+                    log: false,
+                    // MODIFIED: Use local, single-threaded core file
                     corePath: './ffmpeg/ffmpeg-core.js',
                 });
                 await this.ffmpeg.load();
                 console.log('FFmpeg (single-threaded, local) loaded successfully.');
-                UI.setMsg(''); // Clear any previous errors
+                UI.setMsg('');
             } catch (e) {
                 console.error('Failed to load FFmpeg:', e);
                 UI.setMsg('Error: Transcoder failed to load. Please reload.');
@@ -414,7 +406,6 @@
                 this.peer = new window.Peer(undefined, { debug: 1, config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] } });
 
                 this.peer.on('open', id => {
-                    console.log('PeerJS connection established with ID:', id);
                     this.armed = true;
                     this.updateStatus();
                     document.getElementById('remoteReset').disabled = false;
@@ -423,7 +414,6 @@
                 });
 
                 this.peer.on('error', err => {
-                    console.error('PeerJS error:', err);
                     this.disarm();
                     reject(err);
                 });
@@ -469,11 +459,11 @@
             this.isRecording = false;
             this.isTranscoding = true;
             this.updateStatus();
-            conn.send(JSON.stringify({ type: 'processing' })); // Notify phone that processing has started
+            conn.send(JSON.stringify({ type: 'processing' }));
 
             try {
                 if (!this.ffmpeg || !this.ffmpeg.isLoaded()) {
-                    await this.loadFFmpeg(); // Attempt to reload if not loaded
+                    await this.loadFFmpeg();
                     if (!this.ffmpeg.isLoaded()) throw new Error('FFmpeg is not loaded.');
                 }
 
@@ -538,7 +528,6 @@
         }
     };
 
-    // --- DEFINITIONS ---
     const definitions = {
       Jitter: { title: 'Jitter Animation', active: true, controls: { jitterAmount: { label: 'Amount', min: 0, max: 0.1, step: 0.001, value: 0.005, neutral: 0.0 }, jitterSpeed: { label: 'Speed', min: 0, max: 10, step: 0.1, value: 2.5, neutral: 0.0 } } },
       Smear: { title: 'Smearing', active: true, controls: { globalSmearIntensity: { label: 'Global Intensity', min: 0, max: 100, step: 1, value: 30, neutral: 0.0 }, globalSmearAngle: { label: 'Global Angle', min: 0, max: 360, step: 1, value: 0, neutral: 0.0 }, spotSmearIntensity: { label: 'Spot Intensity', min: 0, max: 50, step: 1, value: 10, neutral: 0.0 }, spotSmearDensity: { label: 'Spot Density', min: 0, max: 1, step: 0.01, value: 0.2, neutral: 0.0 }, spotSmearSize: { label: 'Spot Size', min: 5, max: 50, step: 1, value: 20, neutral: 0.0 } } },
