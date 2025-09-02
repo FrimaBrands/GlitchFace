@@ -100,7 +100,6 @@
 
 <script>
 // --- This script is for the CONTROLS window only ---
-// It manages the UI, presets, and remote connections. It broadcasts state changes.
 (() => {
     // --- MODULES ---
     const UI = {
@@ -367,7 +366,7 @@
             try {
                 this.ffmpeg = FFmpeg.createFFmpeg({
                     log: false,
-                    // MODIFIED: Use local, single-threaded core file
+                    // The key change: use the local, single-threaded core file
                     corePath: './ffmpeg/ffmpeg-core.js',
                 });
                 await this.ffmpeg.load();
@@ -541,7 +540,6 @@
         Seep: { title: 'Effect Seep', active: true, controls: { seepAmount: { label: 'Seep Amount', min: 0, max: 2.0, step: 0.01, value: 2.0 }, seepIntensity: { label: 'Seep Distance', min: 0, max: 20, step: 0.1, value: 20 } } }
     };
 
-    // --- Entry Point ---
     window.addEventListener('load', () => {
         App.init(definitions, globalDefinitions);
         Remote.init();
