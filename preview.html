@@ -55,7 +55,7 @@
     <div class="video-container">
       <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
       <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
-      
+
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
       <img id="backgroundImage" class="hidden" />
@@ -183,7 +183,7 @@
         vec4 backgroundColor = u_useBackground ? texture2D(u_backgroundTex, uv) : originalGrayscale;
         gl_FragColor = mix(backgroundColor, foregroundColor, silhouetteMask);
       }`;
-    
+
     // --- MODULES ---
     const Renderer = {
       gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
@@ -302,15 +302,12 @@
       state: { uniforms: {}, animate: true, mirror: true, useBg: false, bgFile: null },
 
       async init() {
-        // Get all DOM elements
         const ids = ['video', 'glcanvas', 'backgroundMedia', 'backgroundImage', 'logoTopLeft', 'logoTopRight'];
         ids.forEach(id => this.elements[id] = document.getElementById(id));
 
-        // Setup communication channel
         this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
-        
-        // Request camera and start processing
+
         if (!navigator.mediaDevices?.getUserMedia) return alert('Your browser does not support camera access.');
         try {
           this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 720, height: 1280 }, audio: false });
@@ -318,15 +315,12 @@
           await new Promise(resolve => { this.elements.video.onloadedmetadata = resolve; });
           await this.elements.video.play();
 
-          // Initialize WebGL Renderer
           const uniformKeys = ['u_resolution', 'u_time', 'u_isFeedbackPass', 'u_tex', 'u_feedbackTex', 'u_maskTex', 'u_backgroundTex', 'u_useBackground', 'u_maskFeather', 'u_overallOpacity', 'u_flickerPerSecond', 'u_flickerDuration', 'u_flickerIntensity', 'u_flickerFade', 'u_seepAmount', 'u_seepIntensity', 'u_feedbackAmount', 'u_feedbackZoom', 'u_glitchIntensity', 'u_glitchBlockSize', 'u_rgbShift', 'u_noiseAmount', 'u_noiseSpeed', 'u_vignette', 'u_globalSmearIntensity', 'u_globalSmearAngle', 'u_spotSmearIntensity', 'u_spotSmearDensity', 'u_spotSmearSize'];
           Renderer.init(this.elements.glcanvas, uniformKeys);
           Renderer.fit(this.elements.video);
 
-          // Initialize Body Segmenter
           await BodySegmenter.init();
 
-          // Start the main render loop
           this.loop();
         } catch (err) {
           console.error(err);
@@ -339,10 +333,10 @@
           this.state = { ...this.state, ...data.payload };
           this.updateUI();
         } else if (data.type === 'start_recording') {
-            this.record(); // MODIFIED: No payload needed
+            this.record();
         }
       },
-      
+
       async record() {
           try {
               const { blob } = await this.recordCanvasFiveSeconds();
@@ -354,10 +348,8 @@
       },
 
       updateUI() {
-        // Update canvas mirroring
         this.elements.glcanvas.style.transform = this.state.mirror ? 'scaleX(-1)' : 'none';
-        
-        // Update background media
+
         if (this.state.bgFile && this.state.bgFile.url) {
             const { url, type } = this.state.bgFile;
             if (type.startsWith('image/')) {
@@ -372,8 +364,7 @@
                 this.elements.backgroundImage.classList.add('hidden');
             }
         }
-        
-        // Show/hide logos based on state
+
         this.elements.logoTopLeft.classList.toggle('hidden', !this.state.showLogos);
         this.elements.logoTopRight.classList.toggle('hidden', !this.state.showLogos);
       },
@@ -382,11 +373,11 @@
         this.rafId = requestAnimationFrame(t => this.loop(t));
         const video = this.elements.video;
         if (!video.videoWidth || !Renderer.gl) return;
-        
+
         Renderer.fit(video);
         BodySegmenter.update(video);
         Renderer.drawMask(video, BodySegmenter.lastResult);
-        
+
         const backgroundEl = !this.elements.backgroundImage.classList.contains('hidden')
             ? this.elements.backgroundImage
             : this.elements.backgroundMedia;
@@ -399,8 +390,8 @@
           useBg: this.state.useBg
         });
       },
-      
-      // MODIFIED: Recording function simplified to always produce WebM
+
+      // Recording function simplified to always produce WebM
       async recordCanvasFiveSeconds() {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -412,7 +403,7 @@
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
 
-        // MODIFIED: Simplified options to reliably record WebM for transcoding
+        // Simplified options to reliably record WebM for transcoding
         const options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
             console.error('WebM VP9 is not supported');
@@ -420,7 +411,7 @@
         }
         const rec = new MediaRecorder(stream, options);
         const mime = rec.mimeType;
-        
+
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;
           function drawCompositeFrame() {
@@ -444,10 +435,10 @@
             try { stream.getTracks().forEach(t => t.stop()); } catch {}
             resolve({ blob: new Blob(chunks, { type: mime }), mime });
           };
-          
+
           drawCompositeFrame();
           setTimeout(() => rec.start(), 100);
-          setTimeout(() => { try { rec.stop(); } catch {} }, 5100); 
+          setTimeout(() => { try { rec.stop(); } catch {} }, 5100);
         });
       }
     };
