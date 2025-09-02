@@ -391,7 +391,6 @@
         });
       },
 
-      // Recording function simplified to always produce WebM
       async recordCanvasFiveSeconds() {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -403,7 +402,6 @@
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
 
-        // Simplified options to reliably record WebM for transcoding
         const options = { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
             console.error('WebM VP9 is not supported');
