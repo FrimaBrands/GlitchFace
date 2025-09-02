@@ -172,6 +172,11 @@
         animation: pulse 2.5s infinite ease-in-out;
         background-color: #000;
     }
+    /* ADDED: is-processing class */
+    .record-button.is-processing {
+        background-color: #000;
+        animation: pulse 2.5s infinite ease-in-out;
+    }
     .record-button.is-recording .record-button__text {
         font-size: 2.8rem;
         letter-spacing: 0;
@@ -340,7 +345,6 @@
       resetBtn: document.getElementById('resetBtn')
     };
 
-    // ADDED: Secret toggle for the status area
     const logo = document.querySelector('.title-logo');
     let clickCount = 0;
     let clickTimer = null;
@@ -370,6 +374,7 @@
 
     function startRecordingAnimation() {
         els.btn.disabled = true;
+        els.btn.classList.remove('is-processing'); // MODIFIED
         els.btn.classList.add('is-recording');
         els.btnSubtext.textContent = 'מקליט';
         let secondsLeft = 5;
@@ -389,6 +394,19 @@
             }
         }, 1000);
     }
+    
+    // ADDED: New function for processing state
+    function showProcessingState() {
+        if (recordingTimer) clearInterval(recordingTimer);
+        els.btn.disabled = true;
+        els.btn.classList.remove('is-recording');
+        els.btn.classList.add('is-processing');
+        els.btnText.textContent = 'מעבד...';
+        els.btnSubtext.textContent = '';
+        els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
+        setRingProgress(0);
+        updateStatus('Processing capture on host...');
+    }
 
     function resetUI() {
         els.resultArea.style.display = 'none';
@@ -397,10 +415,9 @@
         els.recordArea.style.display = 'block';
         
         els.btn.disabled = false;
-        els.btn.classList.remove('is-recording');
+        els.btn.classList.remove('is-recording', 'is-processing'); // MODIFIED
         els.btnText.textContent = 'התחלה';
         els.btnSubtext.textContent = '';
-
 
         if (recordingTimer) clearInterval(recordingTimer);
         els.progressRing.style.transition = 'stroke-dashoffset 0.3s';
@@ -434,7 +451,6 @@
           return;
         }
 
-        const supportsWebM = (typeof MediaSource !== 'undefined') && MediaSource.isTypeSupported && (MediaSource.isTypeSupported('video/webm;codecs=vp9') || MediaSource.isTypeSupported('video/webm;codecs=vp8'));
         const chunks = [];
         let expectedBytes = 0, received = 0, mime = 'video/webm', filename = 'capture.webm', conn = null;
 
@@ -452,7 +468,7 @@
           conn.on('open', () => {
             logMsg('Connection established with host!');
             updateStatus('Connected. Ready to capture.');
-            conn.send(JSON.stringify({ type:'hello', token, supportsWebM }));
+            conn.send(JSON.stringify({ type:'hello', token }));
             els.btn.disabled = false;
             els.btnText.textContent = 'הקלטת סרטון';
           });
@@ -462,6 +478,9 @@
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
                 logMsg('Handshake acknowledged. Ready.');
+              } else if (data.type === 'processing') { // MODIFIED: Handle new state
+                logMsg('Host has started processing the video.');
+                showProcessingState();
               } else if (data.type === 'recordingMeta') {
                 mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
                 chunks.length = 0; received = 0;
