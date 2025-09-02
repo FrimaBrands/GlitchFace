@@ -371,15 +371,15 @@
             // Pre-load FFmpeg when the module initializes
             this.loadFFmpeg();
         },
-        // New method to load FFmpeg
         async loadFFmpeg() {
             try {
                 this.ffmpeg = FFmpeg.createFFmpeg({
                     log: false, // Set to true for debugging transcoder
-                    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+                    // THIS IS THE KEY CHANGE FOR GITHUB PAGES
+                    corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.0/dist/ffmpeg-core.js',
                 });
                 await this.ffmpeg.load();
-                console.log('FFmpeg loaded successfully.');
+                console.log('FFmpeg (single-threaded) loaded successfully.');
                 UI.setMsg(''); // Clear any previous errors
             } catch (e) {
                 console.error('Failed to load FFmpeg:', e);
@@ -462,7 +462,6 @@
                 }
             } catch (e) { console.error('Remote message error', e); this.isRecording = false; this.updateStatus(); }
         },
-        // Major rewrite of handleRecordingBlob to perform transcoding
         async handleRecordingBlob(webmBlob) {
             const conn = this.activeConnection;
             if (!conn) { this.isRecording = false; this.updateStatus(); return; }
@@ -481,13 +480,11 @@
                 const { fetchFile } = FFmpeg;
                 this.ffmpeg.FS('writeFile', 'input.webm', await fetchFile(webmBlob));
 
-                // Run FFmpeg command. -preset ultrafast is key for performance.
                 await this.ffmpeg.run('-i', 'input.webm', '-preset', 'ultrafast', 'output.mp4');
 
                 const data = this.ffmpeg.FS('readFile', 'output.mp4');
                 const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
 
-                // Now send the converted MP4 blob
                 const { type: mime } = mp4Blob;
                 const arrayBuf = await mp4Blob.arrayBuffer();
                 const total = arrayBuf.byteLength;
