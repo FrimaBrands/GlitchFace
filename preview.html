@@ -415,7 +415,7 @@
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codeacs=h264' });
+        if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=h264' });
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
