@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+  <script src="./ffmpeg/ffmpeg.min.js"></script>
 
   <style>
     body { font-family: 'JetBrains Mono', monospace; background-color: #0a0a0a; color: #EAEAEA; }
@@ -375,11 +375,11 @@
             try {
                 this.ffmpeg = FFmpeg.createFFmpeg({
                     log: false, // Set to true for debugging transcoder
-                    // THIS IS THE KEY CHANGE FOR GITHUB PAGES
-                    corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.0/dist/ffmpeg-core.js',
+                    // MODIFIED: corePath is now relative to the new local ffmpeg folder
+                    corePath: './ffmpeg/ffmpeg-core.js',
                 });
                 await this.ffmpeg.load();
-                console.log('FFmpeg (single-threaded) loaded successfully.');
+                console.log('FFmpeg (single-threaded, local) loaded successfully.');
                 UI.setMsg(''); // Clear any previous errors
             } catch (e) {
                 console.error('Failed to load FFmpeg:', e);
