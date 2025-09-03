@@ -463,14 +463,8 @@
               if (data.type === 'helloAck') {
                 logMsg('Handshake acknowledged. Ready.');
               } else if (data.type === 'recordingMeta') {
-                mime = data.mime; 
-                expectedBytes = data.totalBytes; 
-                // *** EDITED LINE HERE ***
-                const ext = data.ext || (data.mime.includes('mp4') ? 'mp4' : 'webm');
-                filename = `unknown_${Date.now()}.${ext}`;
-                
-                chunks.length = 0; 
-                received = 0;
+                mime = data.mime; expectedBytes = data.totalBytes; filename = data.filename;
+                chunks.length = 0; received = 0;
                 els.progressContainer.style.display = 'block';
                 els.progress.value = 0;
                 updateStatus('Receiving capture…');
