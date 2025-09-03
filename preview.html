@@ -54,7 +54,7 @@
   <div class="main-stage">
     <div class="video-container">
       <img id="logoTopLeft" src="FirmaLogo.png" class="hidden">
-      <img id="logoTopRight" src="UnkownLogoLQ.gif" class="hidden">
+      <video id="logoTopRight" src="UnkownLogoLQ.webm" autoplay loop muted playsinline class="hidden"></video>
       
       <video id="video" playsinline muted class="hidden"></video>
       <video id="backgroundMedia" loop muted playsinline class="hidden"></video>
@@ -400,7 +400,7 @@
         });
       },
       
-      // --- UPDATED RECORDING FUNCTION ---
+      // Recording function, adapted to be in this window
       async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -415,16 +415,14 @@
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-        if (preferMp4) {
-          optionsList.unshift({ mimeType: 'video/mp4' });
-        }
+if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' });
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
             rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
           }
         }
-        if (!rec) throw new Error('No supported MediaRecorder format found.');
+        if (!rec) throw new Error('MediaRecorder unavailable');
         
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;
@@ -436,13 +434,9 @@
               const logo1Width = logoTopLeft.naturalWidth * 0.75;
               const logo1Height = logoTopLeft.naturalHeight * 0.75;
               ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
-              
-              const logo2Element = logoTopRight;
-              const logo2Width = (logo2Element.videoWidth || logo2Element.naturalWidth) * 0.75;
-              const logo2Height = (logo2Element.videoHeight || logo2Element.naturalHeight) * 0.75;
-              if (logo2Width > 0) {
-                 ctx.drawImage(logo2Element, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
-              }
+              const logo2Width = logoTopRight.videoWidth * 0.75;
+              const logo2Height = logoTopRight.videoHeight * 0.75;
+              ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
             }
             rafId = requestAnimationFrame(drawCompositeFrame);
           }
@@ -460,7 +454,7 @@
           drawCompositeFrame();
 
           // 2. Wait 100 milliseconds before starting the recorder.
-          //    This gives the loop time to draw a few frames and avoids the race condition.
+          //    This gives the loop time to draw a few frames.
           setTimeout(() => {
             rec.start();
           }, 100);
