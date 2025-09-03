@@ -189,7 +189,7 @@
       gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
       maskCanvas: document.createElement('canvas'),
       init(canvas, uniformKeys) {
-        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
+this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true, preserveDrawingBuffer: true });
         if (!this.gl) throw new Error('WebGL not available');
         const compile = (type, src) => {
           const s = this.gl.createShader(type); this.gl.shaderSource(s, src); this.gl.compileShader(s);
