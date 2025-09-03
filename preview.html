@@ -189,7 +189,7 @@
       gl: null, program: null, textures: {}, framebuffers: {}, uniforms: {},
       maskCanvas: document.createElement('canvas'),
       init(canvas, uniformKeys) {
-this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true, preserveDrawingBuffer: true });
+        this.gl = canvas.getContext('webgl', { premultipliedAlpha: false, antialias: true });
         if (!this.gl) throw new Error('WebGL not available');
         const compile = (type, src) => {
           const s = this.gl.createShader(type); this.gl.shaderSource(s, src); this.gl.compileShader(s);
@@ -434,12 +434,9 @@ if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' })
               const logo1Width = logoTopLeft.naturalWidth * 0.75;
               const logo1Height = logoTopLeft.naturalHeight * 0.75;
               ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
-              
-              /*
               const logo2Width = logoTopRight.videoWidth * 0.75;
               const logo2Height = logoTopRight.videoHeight * 0.75;
               ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
-              */
             }
             rafId = requestAnimationFrame(drawCompositeFrame);
           }
