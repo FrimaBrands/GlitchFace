@@ -345,8 +345,8 @@
       
       async record({ preferMp4 }) {
           try {
-              const { blob } = await this.recordCanvasFiveSeconds(preferMp4);
-              this.channel.postMessage({ type: 'recording_complete', payload: { blob } });
+              const { blob, mime, ext } = await this.recordCanvasFiveSeconds(preferMp4);
+              this.channel.postMessage({ type: 'recording_complete', payload: { blob, mime, ext } });
           } catch(e) {
               console.error("Recording failed:", e);
               this.channel.postMessage({ type: 'recording_error', payload: { message: String(e) } });
@@ -400,7 +400,6 @@
         });
       },
       
-      // Recording function, adapted to be in this window
       async recordCanvasFiveSeconds(preferMp4 = false) {
         const glCanvas = this.elements.glcanvas;
         const logoTopLeft = this.elements.logoTopLeft;
@@ -409,63 +408,108 @@
         compositeCanvas.width = glCanvas.width;
         compositeCanvas.height = glCanvas.height;
         const ctx = compositeCanvas.getContext('2d');
+
+        const optionsList = [
+          { mimeType: 'video/webm;codecs=vp9', bits: 2_500_000, ext: 'webm' },
+          { mimeType: 'video/webm;codecs=vp8', bits: 2_500_000, ext: 'webm' },
+          { mimeType: 'video/webm', bits: 2_500_000, ext: 'webm' }
+        ];
+        if (preferMp4) {
+            optionsList.unshift(
+                { mimeType: 'video/mp4;codecs=avc1.42E01E', bits: 2_500_000, ext: 'mp4' },
+                { mimeType: 'video/mp4', bits: 2_500_000, ext: 'mp4' }
+            );
+        }
+
         const stream = compositeCanvas.captureStream(30);
         const chunks = [];
-        const optionsList = [
-          { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
-          { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
-        ];
-if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' });
-        let rec = null, mime = '';
+        let rec = null, chosenOption = null;
+
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
-            rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
+            try {
+              rec = new MediaRecorder(stream, { mimeType: opt.mimeType, videoBitsPerSecond: opt.bits });
+              chosenOption = opt;
+              console.log("MediaRecorder initialized with:", opt.mimeType);
+              break;
+            } catch (e) {
+              console.warn(`Could not initialize MediaRecorder with ${opt.mimeType}:`, e.message);
+              rec = null;
+            }
           }
         }
-        if (!rec) throw new Error('MediaRecorder unavailable');
-        
+
+        if (!rec) {
+            stream.getTracks().forEach(t => t.stop());
+            throw new Error('MediaRecorder is not supported or no compatible codecs found.');
+        }
+
         return await new Promise((resolve, reject) => {
-          let stopped = false, rafId = null;
+          let stopped = false, rafId = null, frameDrawn = false;
+
           function drawCompositeFrame() {
             if (stopped) return;
             ctx.clearRect(0, 0, compositeCanvas.width, compositeCanvas.height);
-            ctx.drawImage(glCanvas, 0, 0);
+            ctx.save();
+            ctx.scale(1, -1);
+            ctx.translate(0, -compositeCanvas.height);
+            ctx.drawImage(glCanvas, 0, 0, compositeCanvas.width, compositeCanvas.height);
+            ctx.restore();
+
             if(App.state.showLogos) {
-              const logo1Width = logoTopLeft.naturalWidth * 0.75;
-              const logo1Height = logoTopLeft.naturalHeight * 0.75;
-              ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
-              const logo2Width = logoTopRight.videoWidth * 0.75;
-              const logo2Height = logoTopRight.videoHeight * 0.75;
-              ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
+              const scaleFactor = compositeCanvas.width / glCanvas.getBoundingClientRect().width;
+              
+              if(logoTopLeft.naturalWidth > 0){
+                const logo1Width = logoTopLeft.naturalWidth * 0.5 * scaleFactor;
+                const logo1Height = logoTopLeft.naturalHeight * 0.5 * scaleFactor;
+                ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
+              }
+              
+              if(logoTopRight.videoWidth > 0) {
+                const logo2Width = logoTopRight.videoWidth * 0.5 * scaleFactor;
+                const logo2Height = logoTopRight.videoHeight * 0.5 * scaleFactor;
+                ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
+              }
             }
+            
+            if (!frameDrawn) {
+                frameDrawn = true;
+            }
+            
             rafId = requestAnimationFrame(drawCompositeFrame);
           }
+
           rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
           rec.onerror = e => { if (!stopped) { stopped = true; cancelAnimationFrame(rafId); reject(e.error || e); } };
           rec.onstop = () => {
             stopped = true; cancelAnimationFrame(rafId);
             try { stream.getTracks().forEach(t => t.stop()); } catch {}
-            resolve({ blob: new Blob(chunks, { type: mime }), mime });
+            const blob = new Blob(chunks, { type: rec.mimeType });
+            console.log(`Recording complete. Blob size: ${blob.size} bytes`);
+            
+            if (blob.size < 5000) {
+               reject(new Error("Recording resulted in an empty file. This can be a timing or codec issue on the recording browser."));
+               return;
+            }
+            resolve({ blob, mime: rec.mimeType, ext: chosenOption.ext });
           };
           
-          // --- KEY CHANGES START HERE ---
+          function startWhenReady() {
+              if (frameDrawn) {
+                  rec.start();
+                  console.log('Recorder started.');
+                  setTimeout(() => { 
+                      if (rec.state === 'recording') {
+                          try { rec.stop(); } catch(e){ console.error("Error stopping recorder:", e); } 
+                      }
+                  }, 5000); 
+              } else {
+                  requestAnimationFrame(startWhenReady);
+              }
+          }
 
-          // 1. Start the drawing loop FIRST to ensure the canvas is live.
           drawCompositeFrame();
-
-          // 2. Wait 100 milliseconds before starting the recorder.
-          //    This gives the loop time to draw a few frames.
-          setTimeout(() => {
-            rec.start();
-          }, 100);
-
-          // 3. Adjust the stop timer to account for the 100ms startup delay,
-          //    ensuring the final recording is still 5 seconds long.
-          setTimeout(() => { 
-            try { rec.stop(); } catch {} 
-          }, 5100); 
-
-          // --- KEY CHANGES END HERE ---
+          startWhenReady();
         });
       }
     };
