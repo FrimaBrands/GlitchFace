@@ -66,43 +66,6 @@
 <script>
 // --- This script is for the PREVIEW window only ---
 // It handles rendering, body segmentation, and listens for state updates.
-
-// Helper function to create a cross-window communication channel
-// that falls back to localStorage for older Safari versions.
-function createCrossWindowChannel(name) {
-  // Use native BroadcastChannel if supported
-  if ('BroadcastChannel' in window) {
-    return new BroadcastChannel(name);
-  }
-
-  // Fallback to localStorage for older browsers (like Safari < 15.4)
-  const listeners = [];
-  const storageKey = `channel:${name}`;
-
-  window.addEventListener('storage', (event) => {
-    if (event.key === storageKey && event.newValue) {
-      try {
-        const data = JSON.parse(event.newValue);
-        listeners.forEach(listener => listener({ data }));
-      } catch (e) {
-        console.error('Could not parse storage event data', e);
-      }
-    }
-  });
-
-  return {
-    postMessage(data) {
-      // Set a random value to ensure the 'storage' event fires even if the data is identical
-      localStorage.setItem(storageKey, JSON.stringify(data));
-    },
-    set onmessage(handler) {
-      if (typeof handler === 'function') {
-        listeners.push(handler);
-      }
-    }
-  };
-}
-
 (() => {
     // --- SHADER DEFINITIONS ---
     const vertSrc = `
@@ -344,7 +307,7 @@ function createCrossWindowChannel(name) {
         ids.forEach(id => this.elements[id] = document.getElementById(id));
 
         // Setup communication channel
-        this.channel = createCrossWindowChannel('unknown_signal');
+        this.channel = new BroadcastChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
         
         // Request camera and start processing
@@ -452,19 +415,14 @@ function createCrossWindowChannel(name) {
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-        if (preferMp4) {
-          optionsList.unshift(
-            { mimeType: 'video/mp4;codecs=avc1.42E01E' },
-            { mimeType: 'video/mp4' }
-          );
-        }
+if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' });
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
             rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
           }
         }
-        if (!rec) throw new Error('MediaRecorder unavailable for requested formats');
+        if (!rec) throw new Error('MediaRecorder unavailable');
         
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;
@@ -490,16 +448,24 @@ function createCrossWindowChannel(name) {
             resolve({ blob: new Blob(chunks, { type: mime }), mime });
           };
           
+          // --- KEY CHANGES START HERE ---
+
+          // 1. Start the drawing loop FIRST to ensure the canvas is live.
           drawCompositeFrame();
 
+          // 2. Wait 100 milliseconds before starting the recorder.
+          //    This gives the loop time to draw a few frames.
           setTimeout(() => {
             rec.start();
           }, 100);
 
+          // 3. Adjust the stop timer to account for the 100ms startup delay,
+          //    ensuring the final recording is still 5 seconds long.
           setTimeout(() => { 
             try { rec.stop(); } catch {} 
           }, 5100); 
 
+          // --- KEY CHANGES END HERE ---
         });
       }
     };
