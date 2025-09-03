@@ -434,9 +434,12 @@ if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' })
               const logo1Width = logoTopLeft.naturalWidth * 0.75;
               const logo1Height = logoTopLeft.naturalHeight * 0.75;
               ctx.drawImage(logoTopLeft, 0, 0, logo1Width, logo1Height);
+              
+              /*
               const logo2Width = logoTopRight.videoWidth * 0.75;
               const logo2Height = logoTopRight.videoHeight * 0.75;
               ctx.drawImage(logoTopRight, compositeCanvas.width - logo2Width, 0, logo2Width, logo2Height);
+              */
             }
             rafId = requestAnimationFrame(drawCompositeFrame);
           }
