@@ -66,6 +66,43 @@
 <script>
 // --- This script is for the PREVIEW window only ---
 // It handles rendering, body segmentation, and listens for state updates.
+
+// Helper function to create a cross-window communication channel
+// that falls back to localStorage for older Safari versions.
+function createCrossWindowChannel(name) {
+  // Use native BroadcastChannel if supported
+  if ('BroadcastChannel' in window) {
+    return new BroadcastChannel(name);
+  }
+
+  // Fallback to localStorage for older browsers (like Safari < 15.4)
+  const listeners = [];
+  const storageKey = `channel:${name}`;
+
+  window.addEventListener('storage', (event) => {
+    if (event.key === storageKey && event.newValue) {
+      try {
+        const data = JSON.parse(event.newValue);
+        listeners.forEach(listener => listener({ data }));
+      } catch (e) {
+        console.error('Could not parse storage event data', e);
+      }
+    }
+  });
+
+  return {
+    postMessage(data) {
+      // Set a random value to ensure the 'storage' event fires even if the data is identical
+      localStorage.setItem(storageKey, JSON.stringify(data));
+    },
+    set onmessage(handler) {
+      if (typeof handler === 'function') {
+        listeners.push(handler);
+      }
+    }
+  };
+}
+
 (() => {
     // --- SHADER DEFINITIONS ---
     const vertSrc = `
@@ -307,7 +344,7 @@
         ids.forEach(id => this.elements[id] = document.getElementById(id));
 
         // Setup communication channel
-        this.channel = new BroadcastChannel('unknown_signal');
+        this.channel = createCrossWindowChannel('unknown_signal');
         this.channel.onmessage = (event) => this.handleMessage(event.data);
         
         // Request camera and start processing
@@ -415,16 +452,12 @@
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-        // --- START MODIFICATION ---
         if (preferMp4) {
-            // Add multiple MP4/H.264 options to the front of the list
-            // to maximize compatibility for the host browser's MediaRecorder.
-            optionsList.unshift(
-                { mimeType: 'video/mp4;codecs=avc1.42E01E' },
-                { mimeType: 'video/mp4' } 
-            );
+          optionsList.unshift(
+            { mimeType: 'video/mp4;codecs=avc1.42E01E' },
+            { mimeType: 'video/mp4' }
+          );
         }
-        // --- END MODIFICATION ---
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
@@ -466,6 +499,7 @@
           setTimeout(() => { 
             try { rec.stop(); } catch {} 
           }, 5100); 
+
         });
       }
     };
