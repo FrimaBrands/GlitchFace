@@ -267,13 +267,6 @@
       background: transparent;
       color: var(--accent-color);
     }
-    /* ADDED: Style for the download link when it's disabled during conversion */
-    a.dl.disabled {
-        opacity: 0.6;
-        pointer-events: none;
-        background: var(--dim-color);
-        border-color: var(--dim-color);
-    }
     
     /* UPDATED: Reset button is now black/transparent */
     .reset-button {
@@ -329,8 +322,6 @@
   </div>
 
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-  
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const els = {
@@ -349,6 +340,7 @@
       resetBtn: document.getElementById('resetBtn')
     };
 
+    // ADDED: Secret toggle for the status area
     const logo = document.querySelector('.title-logo');
     let clickCount = 0;
     let clickTimer = null;
@@ -401,12 +393,9 @@
     function resetUI() {
         els.resultArea.style.display = 'none';
         els.video.src = '';
-        URL.revokeObjectURL(els.dl.href); // Revoke old URL to free memory
         els.dl.href = '#';
-        els.dl.textContent = 'הורדת סרטון';
-        els.dl.classList.remove('disabled');
-        
         els.recordArea.style.display = 'block';
+        
         els.btn.disabled = false;
         els.btn.classList.remove('is-recording');
         els.btnText.textContent = 'התחלה';
@@ -431,61 +420,6 @@
         els.statusLine.textContent = text;
         els.statusLine.className = isError ? 'status-text bad' : 'status-text';
     }
-
-    // --- NEW: FFMPEG CONVERSION FUNCTION ---
-    let ffmpeg = null; // Hold the ffmpeg instance
-    async function convertToMp4(webmBlob, originalFilename) {
-        try {
-            updateStatus('Initializing converter...');
-            els.dl.textContent = 'מפענח וידאו...';
-            els.dl.classList.add('disabled');
-
-            if (!ffmpeg) {
-                ffmpeg = new FFmpeg.FFmpeg();
-                ffmpeg.on('log', ({ message }) => logMsg(`FFMPEG: ${message}`));
-                ffmpeg.on('progress', ({ progress }) => {
-                    const percentage = Math.round(progress * 100);
-                    updateStatus(`Converting to MP4: ${percentage}%`);
-                    els.progress.value = percentage;
-                });
-                
-                await ffmpeg.load({
-                    coreURL: "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js"
-                });
-            }
-
-            updateStatus('Starting conversion...');
-            els.progressContainer.style.display = 'block';
-            els.progress.value = 0;
-
-            const inputFilename = 'input.webm';
-            const outputFilename = originalFilename.replace(/\.webm$/, '.mp4');
-
-            await ffmpeg.writeFile(inputFilename, await FFmpeg.fetchFile(webmBlob));
-            await ffmpeg.exec(['-i', inputFilename, '-c:v', 'libx264', '-preset', 'ultrafast', outputFilename]);
-            const data = await ffmpeg.readFile(outputFilename);
-
-            const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-            const mp4Url = URL.createObjectURL(mp4Blob);
-
-            logMsg('Conversion to MP4 successful.');
-            return { url: mp4Url, filename: outputFilename };
-
-        } catch (error) {
-            logMsg(`CRITICAL: MP4 conversion failed: ${error}`);
-            updateStatus('MP4 conversion failed. Providing original file.', true);
-            // Fallback: return the original WebM blob
-            const webmUrl = URL.createObjectURL(webmBlob);
-            return { url: webmUrl, filename: originalFilename };
-        } finally {
-            // Reset UI elements after conversion (success or fail)
-            els.dl.textContent = 'הורדת סרטון';
-            els.dl.classList.remove('disabled');
-            els.progressContainer.style.display = 'none';
-            els.progress.value = 0;
-        }
-    }
-
 
     logMsg('DOM is ready. Starting script.');
     els.resetBtn.addEventListener('click', resetUI);
@@ -523,7 +457,7 @@
             els.btnText.textContent = 'הקלטת סרטון';
           });
 
-          conn.on('data', async (msg) => { // MODIFIED: Made this handler async
+          conn.on('data', (msg) => {
             if (typeof msg === 'string') {
               const data = JSON.parse(msg);
               if (data.type === 'helloAck') {
@@ -537,24 +471,18 @@
                 logMsg(`Receiving file: ${filename} (${expectedBytes} bytes)`);
               } else if (data.type === 'recordingEnd') {
                 if (recordingTimer) clearInterval(recordingTimer);
-                
-                const webmBlob = new Blob(chunks, { type: mime });
+                const blob = new Blob(chunks, { type: mime });
+                const url = URL.createObjectURL(blob);
+                els.dl.href = url; els.dl.download = filename;
+                els.video.src = url; 
                 
                 els.recordArea.style.display = 'none';
                 els.resultArea.style.display = 'flex';
-                els.progress.value = 100;
-
-                // --- MODIFIED: Start conversion instead of directly using the blob ---
-                const result = await convertToMp4(webmBlob, filename);
                 
-                els.dl.href = result.url; 
-                els.dl.download = result.filename;
-                els.video.src = result.url; 
-                                
+                els.progress.value = 100;
                 setTimeout(() => { els.progressContainer.style.display = 'none'; }, 500);
                 updateStatus('Capture complete.');
-                logMsg('File processed and ready for download.');
-
+                logMsg('File received successfully.');
               } else if (data.type === 'error') {
                 let message = data.message || 'An unknown error occurred.';
                 if (message === 'Invalid token.') message = 'Invalid session. Please scan the QR code again.';
