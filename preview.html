@@ -415,21 +415,23 @@
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-if (preferMp4) {
-  // Add multiple MP4/H.264 options to the front of the list
-  // to maximize compatibility for the host browser's MediaRecorder.
-  optionsList.unshift(
-    { mimeType: 'video/mp4;codecs=avc1.42E01E' },
-    { mimeType: 'video/mp4' } 
-  );
-}
+        // --- START MODIFICATION ---
+        if (preferMp4) {
+            // Add multiple MP4/H.264 options to the front of the list
+            // to maximize compatibility for the host browser's MediaRecorder.
+            optionsList.unshift(
+                { mimeType: 'video/mp4;codecs=avc1.42E01E' },
+                { mimeType: 'video/mp4' } 
+            );
+        }
+        // --- END MODIFICATION ---
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
             rec = new MediaRecorder(stream, opt); mime = rec.mimeType; break;
           }
         }
-        if (!rec) throw new Error('MediaRecorder unavailable');
+        if (!rec) throw new Error('MediaRecorder unavailable for requested formats');
         
         return await new Promise((resolve, reject) => {
           let stopped = false, rafId = null;
@@ -455,24 +457,15 @@ if (preferMp4) {
             resolve({ blob: new Blob(chunks, { type: mime }), mime });
           };
           
-          // --- KEY CHANGES START HERE ---
-
-          // 1. Start the drawing loop FIRST to ensure the canvas is live.
           drawCompositeFrame();
 
-          // 2. Wait 100 milliseconds before starting the recorder.
-          //    This gives the loop time to draw a few frames.
           setTimeout(() => {
             rec.start();
           }, 100);
 
-          // 3. Adjust the stop timer to account for the 100ms startup delay,
-          //    ensuring the final recording is still 5 seconds long.
           setTimeout(() => { 
             try { rec.stop(); } catch {} 
           }, 5100); 
-
-          // --- KEY CHANGES END HERE ---
         });
       }
     };
