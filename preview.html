@@ -415,7 +415,14 @@
           { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 2_000_000 },
           { mimeType: 'video/webm;codecs=vp8', videoBitsPerSecond: 2_000_000 },
         ];
-if (preferMp4) optionsList.unshift({ mimeType: 'video/mp4;codecs=avc1.42E01E' });
+if (preferMp4) {
+  // Add multiple MP4/H.264 options to the front of the list
+  // to maximize compatibility for the host browser's MediaRecorder.
+  optionsList.unshift(
+    { mimeType: 'video/mp4;codecs=avc1.42E01E' },
+    { mimeType: 'video/mp4' } 
+  );
+}
         let rec = null, mime = '';
         for (const opt of optionsList) {
           if (MediaRecorder.isTypeSupported(opt.mimeType)) {
